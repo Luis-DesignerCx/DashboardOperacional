@@ -3,25 +3,49 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --background: #0b1120;
+  --foreground: #e2e8f0;
+  --font-sora: "Sora", sans-serif;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sora);
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Fix autofill do browser sobrescrevendo fundo dos inputs */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #0f0f24 inset !important;
+  -webkit-text-fill-color: #e2e8f0 !important;
+  caret-color: #e2e8f0;
+  border-color: #3c3a88 !important;
+  transition: none;
+}
+
+/* Scrollbar GR Group */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0f0f24;
+}
+::-webkit-scrollbar-thumb {
+  background: #3c3a88;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6460e4;
 }

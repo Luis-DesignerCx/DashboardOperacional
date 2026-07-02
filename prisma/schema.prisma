@@ -1,0 +1,463 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── ENUMS ────────────────────────────────────────────────────────────────────
+
+enum Perfil {
+  ADMINISTRADOR
+  GESTOR
+  CONSULTOR
+}
+
+enum TipoEquipe {
+  FLASH
+  CRA_1_30
+  CR_31_90
+  CR_PDD_91_180
+  CR_PDD_181
+}
+
+enum TipoContato {
+  LIGACAO
+  WHATSAPP
+  EMAIL
+  SMS
+  VISITA
+}
+
+enum StatusContato {
+  NAO_ATENDE
+  SEM_RESPOSTA
+  CONTATO_INEXISTENTE
+  ACIONADO
+  EM_NEGOCIACAO
+  AGUARDANDO_RETORNO
+  LIGAR_DEPOIS
+  LINK_ENVIADO
+  PROMESSA_PAGAMENTO
+  PROMESSA_QUEBRADA
+  RECEBIDO
+  SOLICITOU_CANCELAMENTO
+  ENCAMINHADO_RETENCAO
+  INADIMPLENCIA_EQUIVOCADA
+  NAO_QUER_CONTATO
+  OUTROS
+}
+
+enum FormaPagamento {
+  PIX
+  BOLETO
+  CARTAO_CREDITO
+  CARTAO_DEBITO
+  DINHEIRO
+  TED
+  DEBITO_AUTOMATICO
+}
+
+enum StatusPromessa {
+  ABERTA
+  PAGA
+  QUEBRADA
+  CANCELADA
+}
+
+enum StatusSolicitacao {
+  PENDENTE
+  APROVADA
+  REJEITADA
+}
+
+enum TipoSolicitacao {
+  TRANSFERENCIA_CONTRATO
+  INADIMPLENCIA_EQUIVOCADA
+  DIVERGENCIA_RECEBIMENTO
+}
+
+enum StatusRecuperacao {
+  INADIMPLENTE
+  RECUPERACAO_PARCIAL
+  RECUPERADO_INTEGRALMENTE
+}
+
+// ─── EMPRESA ──────────────────────────────────────────────────────────────────
+
+model Empresa {
+  id           String   @id @default(cuid())
+  nome         String
+  prefixos     String[]
+  ativa        Boolean  @default(true)
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  contratos    Contrato[]
+  metas        Meta[]
+  usuarios     Usuario[]
+
+  @@map("empresas")
+}
+
+// ─── USUÁRIO ──────────────────────────────────────────────────────────────────
+
+model Usuario {
+  id           String    @id @default(cuid())
+  nome         String
+  email        String    @unique
+  senhaHash    String
+  perfil       Perfil
+  ativo             Boolean   @default(true)
+  emFerias          Boolean   @default(false)
+  deveAlterarSenha  Boolean   @default(false)
+  empresaId    String?
+  equipeId     String?
+  criadoEm     DateTime  @default(now())
+  atualizadoEm DateTime  @updatedAt
+  deletadoEm   DateTime?
+
+  empresa      Empresa?          @relation(fields: [empresaId], references: [id])
+  equipe       Equipe?           @relation(fields: [equipeId], references: [id])
+  contatos          Contato[]
+  promessas         Promessa[]
+  recebimentos      Recebimento[]
+  auditoria         Auditoria[]
+  solicitacoes      Solicitacao[]
+  carteiras         CarteiraParcela[]
+  frentesAdicionais EquipeConsultor[] @relation("FrentesAdicionais")
+
+  @@index([equipeId])
+  @@index([perfil])
+  @@index([ativo])
+  @@map("usuarios")
+}
+
+// ─── EQUIPE ───────────────────────────────────────────────────────────────────
+
+model Equipe {
+  id             String     @id @default(cuid())
+  nome           String
+  tipo           TipoEquipe
+  gestorId       String?
+  ativa          Boolean    @default(true)
+  diasSemContato Int        @default(3)
+  criadoEm       DateTime   @default(now())
+  atualizadoEm   DateTime   @updatedAt
+
+  usuarios           Usuario[]
+  metas              Meta[]
+  comissoes          Comissao[]
+  consultoresAdic    EquipeConsultor[]
+
+  @@map("equipes")
+}
+
+// Permite vincular um consultor a mais de 1 frente de cobrança
+model EquipeConsultor {
+  id          String   @id @default(cuid())
+  equipeId    String
+  consultorId String
+  criadoEm    DateTime @default(now())
+
+  equipe     Equipe   @relation(fields: [equipeId], references: [id])
+  consultor  Usuario  @relation("FrentesAdicionais", fields: [consultorId], references: [id])
+
+  @@unique([equipeId, consultorId])
+  @@map("equipe_consultores")
+}
+
+// ─── COMPETÊNCIA ──────────────────────────────────────────────────────────────
+
+model Competencia {
+  id          String    @id @default(cuid())
+  mes         Int
+  ano         Int
+  descricao   String
+  fechada     Boolean   @default(false)
+  fechadaEm   DateTime?
+  criadoEm    DateTime  @default(now())
+
+  metas       Meta[]
+  importacoes Importacao[]
+  carteiras   CarteiraParcela[]
+
+  @@unique([mes, ano])
+  @@map("competencias")
+}
+
+// ─── IMPORTAÇÃO ───────────────────────────────────────────────────────────────
+
+model Importacao {
+  id            String      @id @default(cuid())
+  competenciaId String
+  usuarioId     String
+  nomeArquivo   String
+  totalLinhas   Int
+  totalContratos Int        @default(0)
+  processadas   Int         @default(0)
+  erros         Int         @default(0)
+  status        String      @default("PROCESSANDO")
+  criadoEm      DateTime    @default(now())
+  concluidoEm   DateTime?
+
+  competencia   Competencia @relation(fields: [competenciaId], references: [id])
+
+  @@map("importacoes")
+}
+
+// ─── CLIENTE ──────────────────────────────────────────────────────────────────
+
+model Cliente {
+  id           String   @id @default(cuid())
+  nome         String
+  cpf          String?
+  telefones    String?  // múltiplos normalizados, separados por vírgula
+  emails       String?  // múltiplos, separados por vírgula
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  contratos    Contrato[]
+
+  @@map("clientes")
+}
+
+// ─── CONTRATO ─────────────────────────────────────────────────────────────────
+// Chave única: numero (global, independente de competência)
+
+model Contrato {
+  id                    String            @id @default(cuid())
+  numero                String            @unique
+  clienteId             String
+  empresaId             String
+  statusContrato        String?           // col 2 da planilha — aceita qualquer valor
+  totalParcelasVencidas Int?              // col 18 — informativo
+  maiorDiasAtraso       Int?              // calculado: max(parcela.diasAtraso)
+  valorTotalAberto      Decimal?          @db.Decimal(15, 2) // soma das parcelas
+  valorContrato         Decimal?          @db.Decimal(15, 2) // col 19
+  statusRecuperacao     StatusRecuperacao @default(INADIMPLENTE)
+  ativo                 Boolean           @default(true)
+  criadoEm              DateTime          @default(now())
+  atualizadoEm          DateTime          @updatedAt
+
+  cliente               Cliente           @relation(fields: [clienteId], references: [id])
+  empresa               Empresa           @relation(fields: [empresaId], references: [id])
+  parcelas              Parcela[]
+  carteiras             CarteiraParcela[]
+  solicitacoes          Solicitacao[]
+  contatos              Contato[]
+  promessas             Promessa[]
+  recebimentos          Recebimento[]
+
+  @@index([clienteId])
+  @@index([empresaId])
+  @@index([maiorDiasAtraso])
+  @@index([ativo])
+  @@map("contratos")
+}
+
+// ─── PARCELA ──────────────────────────────────────────────────────────────────
+
+model Parcela {
+  id               String    @id @default(cuid())
+  contratoId       String
+  numero           Int
+  dataVencimento   DateTime
+  diasAtraso       Int
+  origem           String?   // col 3 — livre, aceita qualquer valor
+  meioPagamento    String?   // col 4 — livre, aceita qualquer valor
+  valorParcela     Decimal   @db.Decimal(15, 2)
+  valorTotalAberto Decimal   @db.Decimal(15, 2)
+  paga             Boolean   @default(false)
+  criadoEm         DateTime  @default(now())
+  atualizadoEm     DateTime  @updatedAt
+
+  contrato         Contrato  @relation(fields: [contratoId], references: [id])
+
+  @@unique([contratoId, numero])
+  @@map("parcelas")
+}
+
+// ─── CARTEIRA (distribuição por contrato) ────────────────────────────────────
+
+model CarteiraParcela {
+  id            String      @id @default(cuid())
+  contratoId    String
+  consultorId   String
+  competenciaId String
+  ativo         Boolean     @default(true)
+  atribuidoEm   DateTime    @default(now())
+
+  contrato      Contrato    @relation(fields: [contratoId], references: [id])
+  consultor     Usuario     @relation(fields: [consultorId], references: [id])
+  competencia   Competencia @relation(fields: [competenciaId], references: [id])
+
+  @@unique([contratoId, competenciaId])
+  @@index([consultorId])
+  @@index([competenciaId])
+  @@index([consultorId, competenciaId])
+  @@map("carteira_parcelas")
+}
+
+// ─── CONTATO ──────────────────────────────────────────────────────────────────
+
+model Contato {
+  id          String        @id @default(cuid())
+  contratoId  String
+  consultorId String
+  tipo        TipoContato
+  status      StatusContato
+  observacao  String?
+  criadoEm    DateTime      @default(now())
+
+  contrato    Contrato      @relation(fields: [contratoId], references: [id])
+  consultor   Usuario       @relation(fields: [consultorId], references: [id])
+
+  @@index([contratoId])
+  @@index([consultorId])
+  @@map("contatos")
+}
+
+// ─── PROMESSA ─────────────────────────────────────────────────────────────────
+
+model Promessa {
+  id             String         @id @default(cuid())
+  contratoId     String
+  consultorId    String
+  valorPrometido Decimal        @db.Decimal(15, 2)
+  dataPrometida  DateTime
+  formaPagamento FormaPagamento
+  status         StatusPromessa @default(ABERTA)
+  observacao     String?
+  criadoEm       DateTime       @default(now())
+  atualizadoEm   DateTime       @updatedAt
+
+  contrato       Contrato       @relation(fields: [contratoId], references: [id])
+  consultor      Usuario        @relation(fields: [consultorId], references: [id])
+
+  @@index([consultorId])
+  @@index([contratoId])
+  @@index([status, dataPrometida])
+  @@map("promessas")
+}
+
+// ─── RECEBIMENTO ──────────────────────────────────────────────────────────────
+
+model Recebimento {
+  id              String         @id @default(cuid())
+  contratoId      String
+  consultorId     String
+  valor           Decimal        @db.Decimal(15, 2)
+  valorAParte     Decimal?       @db.Decimal(15, 2) // recebimento fora da inadimplência (antecipação/a parte)
+  dataRecebimento DateTime
+  formaPagamento  FormaPagamento
+  justificativa   String
+  baixaOficial    Boolean        @default(false)
+  valorBaixado    Decimal?       @db.Decimal(15, 2)
+  divergencia     Boolean        @default(false)
+  aprovado        Boolean        @default(false)
+  criadoEm        DateTime       @default(now())
+  atualizadoEm    DateTime       @updatedAt
+
+  contrato        Contrato       @relation(fields: [contratoId], references: [id])
+  consultor       Usuario        @relation(fields: [consultorId], references: [id])
+
+  @@index([contratoId])
+  @@index([consultorId])
+  @@map("recebimentos")
+}
+
+// ─── META ─────────────────────────────────────────────────────────────────────
+
+model Meta {
+  id            String      @id @default(cuid())
+  equipeId      String
+  competenciaId String
+  empresaId     String?
+  nome          String
+  tipo          String
+  valorAlvo     Decimal     @db.Decimal(15, 2)
+  peso          Decimal     @default(1) @db.Decimal(5, 2)
+  criadoEm      DateTime    @default(now())
+  atualizadoEm  DateTime    @updatedAt
+
+  equipe        Equipe      @relation(fields: [equipeId], references: [id])
+  competencia   Competencia @relation(fields: [competenciaId], references: [id])
+  empresa       Empresa?    @relation(fields: [empresaId], references: [id])
+
+  @@index([equipeId, competenciaId])
+  @@map("metas")
+}
+
+// ─── COMISSÃO ─────────────────────────────────────────────────────────────────
+
+model Comissao {
+  id             String   @id @default(cuid())
+  equipeId       String
+  competenciaId  String
+  usuarioId      String
+  valorBase      Decimal  @db.Decimal(15, 2)
+  percentualMeta Decimal  @db.Decimal(5, 2)
+  faixaAplicada  Decimal  @db.Decimal(5, 2)
+  valorFinal     Decimal  @db.Decimal(15, 2)
+  calculadoEm    DateTime @default(now())
+
+  equipe         Equipe   @relation(fields: [equipeId], references: [id])
+
+  @@map("comissoes")
+}
+
+// ─── SOLICITAÇÃO ──────────────────────────────────────────────────────────────
+
+model Solicitacao {
+  id            String            @id @default(cuid())
+  tipo          TipoSolicitacao
+  status        StatusSolicitacao @default(PENDENTE)
+  solicitanteId String
+  gestorId      String?
+  contratoId    String?
+  motivo        String
+  resposta      String?
+  dados         Json?
+  criadoEm      DateTime          @default(now())
+  resolvidaEm   DateTime?
+
+  solicitante   Usuario           @relation(fields: [solicitanteId], references: [id])
+  contrato      Contrato?         @relation(fields: [contratoId], references: [id])
+
+  @@map("solicitacoes")
+}
+
+// ─── AUDITORIA ────────────────────────────────────────────────────────────────
+
+model Auditoria {
+  id            String   @id @default(cuid())
+  usuarioId     String
+  tabela        String
+  registroId    String
+  campo         String?
+  valorAnterior String?
+  valorNovo     String?
+  acao          String
+  motivo        String?
+  ip            String?
+  userAgent     String?
+  criadoEm      DateTime @default(now())
+
+  usuario       Usuario  @relation(fields: [usuarioId], references: [id])
+
+  @@map("auditoria")
+}
+
+// ─── CONFIGURAÇÃO ─────────────────────────────────────────────────────────────
+
+model Configuracao {
+  id    String @id @default(cuid())
+  chave String @unique
+  valor String
+
+  @@map("configuracoes")
+}
