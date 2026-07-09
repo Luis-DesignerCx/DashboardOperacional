@@ -3,13 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-// Retorna o filtro de maiorDiasAtraso para cada tipo de equipe
 function getDiasFilter(tipo: string): { gte?: number; lte?: number } | undefined {
   switch (tipo) {
     case "FLASH":         return { lte: 0 };
     case "CRA_1_30":      return { gte: 1,  lte: 30  };
     case "CR_31_90":      return { gte: 31, lte: 90  };
-    case "CR_PDD_91_180": return { gte: 91, lte: 180 };
+    case "CR_PDD_91_180": return { gte: 91 };  // PDD 91+ engloba tudo acima de 91
     case "CR_PDD_181":    return { gte: 181 };
     default:              return undefined;
   }
@@ -27,15 +26,26 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
   const competenciaId = searchParams.get("competenciaId");
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
 
-  // Busca o tipo da equipe para determinar a faixa de dias
+  // Permite sobrescrever o range de dias via query params (para sub-faixas)
+  const diasMinParam = searchParams.get("diasMin");
+  const diasMaxParam = searchParams.get("diasMax");
+
   const equipeInfo = await prisma.equipe.findUnique({
     where: { id: equipeId },
     select: { tipo: true },
   });
 
-  const diasFilter = equipeInfo ? getDiasFilter(equipeInfo.tipo) : undefined;
+  let diasFilter: { gte?: number; lte?: number } | undefined;
 
-  // Filtro para carteiraParcela: por faixa de dias OU por equipeId do consultor (fallback)
+  if (diasMinParam || diasMaxParam) {
+    // Sub-faixa explícita passada via query params
+    diasFilter = {};
+    if (diasMinParam) diasFilter.gte = Number(diasMinParam);
+    if (diasMaxParam) diasFilter.lte = Number(diasMaxParam);
+  } else {
+    diasFilter = equipeInfo ? getDiasFilter(equipeInfo.tipo) : undefined;
+  }
+
   const carteiraWhere: any = { competenciaId, ativo: true };
   if (diasFilter) {
     carteiraWhere.contrato = { maiorDiasAtraso: diasFilter };
@@ -43,7 +53,6 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     carteiraWhere.consultor = { equipeId };
   }
 
-  // Carrega carteiras e empresas
   const carteiraData = await prisma.carteiraParcela.findMany({
     where: carteiraWhere,
     select: {
@@ -59,34 +68,34 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     },
   });
 
-  // Ids únicos de consultores que têm carteira nessa faixa
   const consultorIds = [...new Set(carteiraData.map((c) => c.consultorId))];
 
-  // Busca info dos consultores + recebimentos em paralelo
   const [consultores, recebimentos] = await Promise.all([
-    prisma.usuario.findMany({
-      where: { id: { in: consultorIds }, perfil: "CONSULTOR", ativo: true },
-      select: { id: true, nome: true, emFerias: true },
-      orderBy: { nome: "asc" },
-    }),
-    prisma.recebimento.findMany({
-      where: {
-        consultorId: { in: consultorIds },
-        contrato: { carteiras: { some: { competenciaId, ativo: true } } },
-      },
-      select: {
-        consultorId: true,
-        valor: true,
-        valorAParte: true,
-        contrato: { select: { empresaId: true } },
-      },
-    }),
+    consultorIds.length > 0
+      ? prisma.usuario.findMany({
+          where: { id: { in: consultorIds }, perfil: "CONSULTOR", ativo: true },
+          select: { id: true, nome: true, emFerias: true },
+          orderBy: { nome: "asc" },
+        })
+      : Promise.resolve([]),
+    consultorIds.length > 0
+      ? prisma.recebimento.findMany({
+          where: {
+            consultorId: { in: consultorIds },
+            contrato: { carteiras: { some: { competenciaId, ativo: true } } },
+          },
+          select: {
+            consultorId: true,
+            valor: true,
+            valorAParte: true,
+            contrato: { select: { empresaId: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
 
-  // Mapas de empresa
   const empresaNames = new Map<string, string>();
 
-  // Map: consultorId -> empresaId -> { inadimplencia, contratos }
   const carteiraMap = new Map<string, Map<string, { inadimplencia: number; contratos: Set<string> }>>();
   for (const c of carteiraData) {
     empresaNames.set(c.contrato.empresa.id, c.contrato.empresa.nome);
@@ -98,7 +107,6 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     reg.contratos.add(c.contratoId);
   }
 
-  // Map: consultorId -> empresaId -> { recebido, recebidoAParte }
   const recebMap = new Map<string, Map<string, { recebido: number; recebidoAParte: number }>>();
   for (const r of recebimentos) {
     if (!recebMap.has(r.consultorId)) recebMap.set(r.consultorId, new Map());

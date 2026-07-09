@@ -1,62 +1,50 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useFrente } from "@/contexts/FrenteContext";
 import { formatarMoeda } from "@/lib/utils";
-import { ChevronDown, ChevronRight, Search, AlertCircle, TrendingUp, Palmtree } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, AlertCircle, TrendingUp, Palmtree, Activity } from "lucide-react";
+
+// ── Frentes visíveis no sidebar ──────────────────────────────────────────────
+// CR_PDD_181 não aparece como frente separada; é sub-faixa de PDD 91+
+const FRENTES_VISIVEIS = ["FLASH", "CRA_1_30", "CR_31_90", "CR_PDD_91_180"];
 
 const FAIXA_LABEL: Record<string, string> = {
-  FLASH:          "Flash",
-  CRA_1_30:       "1 a 30 dias",
-  CR_31_90:       "31 a 90 dias",
-  CR_PDD_91_180:  "91 a 180 dias",
-  CR_PDD_181:     "181+ dias",
+  FLASH:         "Flash",
+  CRA_1_30:      "1 a 30 dias",
+  CR_31_90:      "31 a 90 dias",
+  CR_PDD_91_180: "PDD 91+",
 };
 
 const FAIXA_COR: Record<string, string> = {
-  FLASH:          "text-amber-400 bg-amber-500/10 border-amber-500/20",
-  CRA_1_30:       "text-sky-400 bg-sky-500/10 border-sky-500/20",
-  CR_31_90:       "text-blue-400 bg-blue-500/10 border-blue-500/20",
-  CR_PDD_91_180:  "text-orange-400 bg-orange-500/10 border-orange-500/20",
-  CR_PDD_181:     "text-red-400 bg-red-500/10 border-red-500/20",
+  FLASH:         "text-amber-400 bg-amber-500/10 border-amber-500/20",
+  CRA_1_30:      "text-sky-400 bg-sky-500/10 border-sky-500/20",
+  CR_31_90:      "text-blue-400 bg-blue-500/10 border-blue-500/20",
+  CR_PDD_91_180: "text-orange-400 bg-orange-500/10 border-orange-500/20",
 };
 
 const TIPO_ORDEM = ["FLASH", "CRA_1_30", "CR_31_90", "CR_PDD_91_180", "CR_PDD_181"];
 
-interface EquipeUsuario {
-  id: string;
-  perfil: string;
-}
+// Sub-faixas da frente PDD 91+
+const SUB_FAIXAS = [
+  { label: "Todos 91+",    diasMin: 91,  diasMax: undefined },
+  { label: "91–120 dias",  diasMin: 91,  diasMax: 120 },
+  { label: "121–150 dias", diasMin: 121, diasMax: 150 },
+  { label: "151–180 dias", diasMin: 151, diasMax: 180 },
+  { label: "181+ dias",    diasMin: 181, diasMax: undefined },
+];
 
-interface Equipe {
-  id: string;
-  nome: string;
-  tipo: string;
-  usuarios: EquipeUsuario[];
-}
-
-interface PorEmpresa {
-  id: string;
-  nome: string;
-  inadimplencia: number;
-  recebido: number;
-  recebidoAParte: number;
-}
-
+interface EquipeUsuario { id: string; perfil: string; }
+interface Equipe { id: string; nome: string; tipo: string; usuarios: EquipeUsuario[]; }
+interface PorEmpresa { id: string; nome: string; inadimplencia: number; recebido: number; recebidoAParte: number; }
 interface Consultor {
-  id: string;
-  nome: string;
-  emFerias: boolean;
-  totalContratos: number;
-  inadimplencia: number;
-  recebido: number;
-  recebidoAParte: number;
-  percentual: number;
-  porEmpresa: PorEmpresa[];
+  id: string; nome: string; emFerias: boolean;
+  totalContratos: number; inadimplencia: number; recebido: number;
+  recebidoAParte: number; percentual: number; porEmpresa: PorEmpresa[];
 }
 
 export default function GestaoPage() {
-  const { equipeId: filtroFrente, setEquipeId: setFiltroFrente } = useFrente();
+  const { equipeId: filtroFrente } = useFrente();
   const [equipes, setEquipes] = useState<Equipe[]>([]);
   const [equipeId, setEquipeId] = useState<string>("");
   const [competencias, setCompetencias] = useState<any[]>([]);
@@ -65,45 +53,54 @@ export default function GestaoPage() {
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState("");
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [subFaixa, setSubFaixa] = useState(0); // índice em SUB_FAIXAS
 
-  // Carrega equipes e competências em paralelo
+  const isPDD91 = (tipo: string) => tipo === "CR_PDD_91_180";
+
   useEffect(() => {
     Promise.all([
       fetch("/api/equipes").then((r) => r.json()),
       fetch("/api/competencias").then((r) => r.json()),
     ]).then(([eq, cs]) => {
-      const equipesOrdenadas = (Array.isArray(eq) ? eq : []).sort(
+      const ordenadas = (Array.isArray(eq) ? eq : []).sort(
         (a: Equipe, b: Equipe) => TIPO_ORDEM.indexOf(a.tipo) - TIPO_ORDEM.indexOf(b.tipo)
       );
-      setEquipes(equipesOrdenadas);
-      const primeiraComConsultores = equipesOrdenadas.find(
-        (e) => e.usuarios.some((u: EquipeUsuario) => u.perfil === "CONSULTOR")
-      ) ?? equipesOrdenadas[0];
-      // Usa o filtro global se estiver ativo, senão pega a primeira com consultores
+      setEquipes(ordenadas);
+      const visiveis = ordenadas.filter((e: Equipe) => FRENTES_VISIVEIS.includes(e.tipo));
       const inicial = filtroFrente
-        ? (equipesOrdenadas.find((e) => e.id === filtroFrente) ?? primeiraComConsultores)
-        : primeiraComConsultores;
+        ? (visiveis.find((e: Equipe) => e.id === filtroFrente) ?? visiveis[0])
+        : visiveis[0];
       if (inicial) setEquipeId(inicial.id);
-
-      if (Array.isArray(cs) && cs.length > 0) setCompetencias(cs);
-      if (cs[0]) setCompetenciaId(cs[0].id);
+      if (Array.isArray(cs) && cs.length > 0) {
+        setCompetencias(cs);
+        setCompetenciaId(cs[0].id);
+      }
     });
   }, []);
 
-  // Sincroniza tab com filtro global
   useEffect(() => {
     if (filtroFrente && equipes.length > 0) setEquipeId(filtroFrente);
   }, [filtroFrente, equipes.length]);
 
-  // Carrega consultores quando equipe ou competência muda
-  useEffect(() => {
+  const carregarConsultores = useCallback(() => {
     if (!equipeId || !competenciaId) return;
+    const equipe = equipes.find((e) => e.id === equipeId);
     setCarregando(true);
     setExpandidos(new Set());
-    fetch(`/api/gestao/${equipeId}?competenciaId=${competenciaId}`)
+
+    let url = `/api/gestao/${equipeId}?competenciaId=${competenciaId}`;
+    if (equipe && isPDD91(equipe.tipo)) {
+      const sf = SUB_FAIXAS[subFaixa];
+      url += `&diasMin=${sf.diasMin}`;
+      if (sf.diasMax !== undefined) url += `&diasMax=${sf.diasMax}`;
+    }
+
+    fetch(url)
       .then((r) => r.json())
       .then((data) => { setConsultores(Array.isArray(data) ? data : []); setCarregando(false); });
-  }, [equipeId, competenciaId]);
+  }, [equipeId, competenciaId, subFaixa, equipes]);
+
+  useEffect(() => { carregarConsultores(); }, [carregarConsultores]);
 
   function toggleExpandir(id: string) {
     setExpandidos((prev) => {
@@ -114,30 +111,32 @@ export default function GestaoPage() {
   }
 
   const equipeSelecionada = equipes.find((e) => e.id === equipeId);
-  const filtrados = consultores.filter((c) =>
-    c.nome.toLowerCase().includes(busca.toLowerCase())
-  );
+  const visiveis = equipes.filter((e) => FRENTES_VISIVEIS.includes(e.tipo));
+  const filtrados = consultores.filter((c) => c.nome.toLowerCase().includes(busca.toLowerCase()));
 
-  const totalInadimplencia = filtrados.reduce((s, c) => s + c.inadimplencia, 0);
-  const totalRecebido = filtrados.reduce((s, c) => s + c.recebido, 0);
-  const totalAParte = filtrados.reduce((s, c) => s + c.recebidoAParte, 0);
+  const totalInad = filtrados.reduce((s, c) => s + c.inadimplencia, 0);
+  const totalRec  = filtrados.reduce((s, c) => s + c.recebido, 0);
+  const totalAP   = filtrados.reduce((s, c) => s + c.recebidoAParte, 0);
+  const eficiencia = totalInad > 0 ? Math.min((totalRec / totalInad) * 100, 100) : 0;
+
+  const ehPDD91 = equipeSelecionada ? isPDD91(equipeSelecionada.tipo) : false;
 
   return (
     <div className="flex gap-0 h-[calc(100vh-4rem)] -m-6 overflow-hidden">
-      {/* ── Painel esquerdo: Frentes ── */}
+      {/* ── Sidebar: Frentes ── */}
       <aside className="w-52 flex-shrink-0 border-r border-slate-800 bg-slate-900/50 flex flex-col">
         <div className="p-4 border-b border-slate-800">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Frentes</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
-          {equipes.map((eq) => {
+          {visiveis.map((eq) => {
             const ativo = eq.id === equipeId;
             const cor = FAIXA_COR[eq.tipo] ?? "text-slate-400 bg-slate-800 border-slate-700";
-            const qtd = eq.usuarios.filter((u: EquipeUsuario) => u.perfil === "CONSULTOR").length;
+            const qtd = eq.usuarios.filter((u) => u.perfil === "CONSULTOR").length;
             return (
               <button
                 key={eq.id}
-                onClick={() => setEquipeId(eq.id)}
+                onClick={() => { setEquipeId(eq.id); setSubFaixa(0); }}
                 className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all ${
                   ativo
                     ? "bg-gr-500/15 text-white border border-gr-500/20 font-medium"
@@ -159,8 +158,9 @@ export default function GestaoPage() {
         </nav>
       </aside>
 
-      {/* ── Painel direito: Conteúdo ── */}
+      {/* ── Painel principal ── */}
       <div className="flex-1 flex flex-col overflow-hidden">
+
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
           <div>
@@ -169,7 +169,7 @@ export default function GestaoPage() {
             </h1>
             {!carregando && (
               <p className="text-slate-500 text-xs mt-0.5">
-                {filtrados.length} consultor{filtrados.length !== 1 ? "es" : ""} · {formatarMoeda(totalInadimplencia)} em carteira
+                {filtrados.length} consultor{filtrados.length !== 1 ? "es" : ""} · {formatarMoeda(totalInad)} em carteira
               </p>
             )}
           </div>
@@ -182,20 +182,54 @@ export default function GestaoPage() {
           </select>
         </div>
 
-        {/* Totais */}
+        {/* Sub-faixas PDD 91+ */}
+        {ehPDD91 && (
+          <div className="flex gap-1 px-6 pt-3 pb-0 flex-shrink-0">
+            {SUB_FAIXAS.map((sf, i) => (
+              <button
+                key={i}
+                onClick={() => setSubFaixa(i)}
+                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  subFaixa === i
+                    ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                }`}
+              >
+                {sf.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Cards de totais */}
         {!carregando && filtrados.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 px-6 py-3 border-b border-slate-800 flex-shrink-0">
+          <div className="grid grid-cols-4 gap-3 px-6 py-3 border-b border-slate-800 flex-shrink-0">
             <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Inadimplência total</p>
-              <p className="text-lg font-bold text-white mt-0.5">{formatarMoeda(totalInadimplencia)}</p>
+              <p className="text-lg font-bold text-white mt-0.5">{formatarMoeda(totalInad)}</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Total recebido</p>
-              <p className="text-lg font-bold text-emerald-400 mt-0.5">{formatarMoeda(totalRecebido)}</p>
+              <p className="text-lg font-bold text-emerald-400 mt-0.5">{formatarMoeda(totalRec)}</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Total a parte</p>
-              <p className="text-lg font-bold text-sky-400 mt-0.5">{formatarMoeda(totalAParte)}</p>
+              <p className="text-lg font-bold text-sky-400 mt-0.5">{formatarMoeda(totalAP)}</p>
+            </div>
+            <div className={`border rounded-xl px-4 py-3 ${
+              eficiencia >= 80 ? "bg-emerald-500/10 border-emerald-500/20"
+              : eficiencia >= 40 ? "bg-amber-500/10 border-amber-500/20"
+              : "bg-slate-900 border-slate-800"
+            }`}>
+              <div className="flex items-center gap-1.5">
+                <Activity size={12} className={eficiencia >= 80 ? "text-emerald-400" : eficiencia >= 40 ? "text-amber-400" : "text-slate-500"} />
+                <p className="text-xs text-slate-500">Eficiência da equipe</p>
+              </div>
+              <p className={`text-lg font-bold mt-0.5 ${
+                eficiencia >= 80 ? "text-emerald-400" : eficiencia >= 40 ? "text-amber-400" : "text-slate-400"
+              }`}>
+                {eficiencia.toFixed(1)}%
+              </p>
             </div>
           </div>
         )}
@@ -227,7 +261,6 @@ export default function GestaoPage() {
             </div>
           ) : (
             <>
-              {/* Cabeçalho da tabela */}
               <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-2.5 border-b border-slate-800 bg-slate-900/30">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consultor</span>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
@@ -242,7 +275,6 @@ export default function GestaoPage() {
                   const expandido = expandidos.has(c.id);
                   return (
                     <div key={c.id}>
-                      {/* Linha do consultor */}
                       <button
                         onClick={() => toggleExpandir(c.id)}
                         className="w-full grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-3.5 hover:bg-slate-800/30 transition-colors text-left"
@@ -250,8 +282,7 @@ export default function GestaoPage() {
                         <div className="flex items-center gap-2.5">
                           {expandido
                             ? <ChevronDown size={15} className="text-gr-400 flex-shrink-0" />
-                            : <ChevronRight size={15} className="text-slate-600 flex-shrink-0" />
-                          }
+                            : <ChevronRight size={15} className="text-slate-600 flex-shrink-0" />}
                           <span className="text-white font-medium text-sm">{c.nome}</span>
                           {c.emFerias && (
                             <span className="flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
@@ -274,7 +305,6 @@ export default function GestaoPage() {
                         </div>
                       </button>
 
-                      {/* Expansão: por empresa */}
                       {expandido && (
                         <div className="bg-slate-900/60 border-t border-slate-800/50">
                           <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2 border-b border-slate-800/30">
@@ -284,10 +314,7 @@ export default function GestaoPage() {
                             <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider text-right">A Parte</span>
                           </div>
                           {c.porEmpresa.map((emp) => (
-                            <div
-                              key={emp.id}
-                              className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-b border-slate-800/20 last:border-0 hover:bg-slate-800/20"
-                            >
+                            <div key={emp.id} className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-b border-slate-800/20 last:border-0 hover:bg-slate-800/20">
                               <span className="text-slate-300 text-sm">{emp.nome}</span>
                               <span className="text-slate-400 text-sm tabular-nums text-right">{formatarMoeda(emp.inadimplencia)}</span>
                               <span className={`text-sm tabular-nums font-medium text-right ${emp.recebido > 0 ? "text-emerald-400" : "text-slate-600"}`}>
@@ -298,8 +325,6 @@ export default function GestaoPage() {
                               </span>
                             </div>
                           ))}
-
-                          {/* Subtotal do consultor */}
                           <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-t border-slate-700/40 bg-slate-800/20">
                             <span className="text-xs text-slate-500 font-semibold">TOTAL</span>
                             <span className="text-xs text-white tabular-nums font-semibold text-right">{formatarMoeda(c.inadimplencia)}</span>

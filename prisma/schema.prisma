@@ -133,6 +133,7 @@ model Usuario {
   solicitacoes      Solicitacao[]
   carteiras         CarteiraParcela[]
   frentesAdicionais EquipeConsultor[] @relation("FrentesAdicionais")
+  metas             Meta[]            @relation("MetasConsultor")
 
   @@index([equipeId])
   @@index([perfil])
@@ -379,22 +380,27 @@ model Recebimento {
 // ─── META ─────────────────────────────────────────────────────────────────────
 
 model Meta {
-  id            String      @id @default(cuid())
-  equipeId      String
-  competenciaId String
-  empresaId     String?
-  nome          String
-  tipo          String
-  valorAlvo     Decimal     @db.Decimal(15, 2)
-  peso          Decimal     @default(1) @db.Decimal(5, 2)
-  criadoEm      DateTime    @default(now())
-  atualizadoEm  DateTime    @updatedAt
+  id               String      @id @default(cuid())
+  equipeId         String
+  competenciaId    String
+  consultorId      String?
+  empresaId        String?
+  nome             String
+  tipo             String      // FINANCEIRA | QUANTIDADE | MONITORIA
+  percentualAlvo   Decimal?    @db.Decimal(5, 2)
+  quantidadeAlvo   Int?
+  valorAlvo        Decimal?    @db.Decimal(15, 2)
+  peso             Decimal     @default(1) @db.Decimal(5, 2)
+  criadoEm         DateTime    @default(now())
+  atualizadoEm     DateTime    @updatedAt
 
-  equipe        Equipe      @relation(fields: [equipeId], references: [id])
-  competencia   Competencia @relation(fields: [competenciaId], references: [id])
-  empresa       Empresa?    @relation(fields: [empresaId], references: [id])
+  equipe           Equipe      @relation(fields: [equipeId], references: [id])
+  competencia      Competencia @relation(fields: [competenciaId], references: [id])
+  consultor        Usuario?    @relation("MetasConsultor", fields: [consultorId], references: [id])
+  empresa          Empresa?    @relation(fields: [empresaId], references: [id])
 
   @@index([equipeId, competenciaId])
+  @@index([consultorId, competenciaId])
   @@map("metas")
 }
 
