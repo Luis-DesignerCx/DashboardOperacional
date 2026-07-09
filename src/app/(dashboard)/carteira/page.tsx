@@ -855,12 +855,8 @@ export default function CarteiraPage() {
                           onChange={(e) => setExternoForm((f) => ({ ...f, formaPagamento: e.target.value }))}
                         >
                           <option value="PIX">PIX</option>
+                          <option value="CARTAO_CREDITO">Cartão de Crédito</option>
                           <option value="BOLETO">Boleto</option>
-                          <option value="TED">Transferência (TED)</option>
-                          <option value="DINHEIRO">Dinheiro</option>
-                          <option value="CHEQUE">Cheque</option>
-                          <option value="CARTAO_DEBITO">Cartão Débito</option>
-                          <option value="CARTAO_CREDITO">Cartão Crédito</option>
                         </select>
                       </div>
                       <div className="col-span-2">
@@ -1055,12 +1051,8 @@ export default function CarteiraPage() {
                     onChange={(e) => setRecebForm((f) => ({ ...f, formaPagamento: e.target.value }))}
                   >
                     <option value="PIX">PIX</option>
+                    <option value="CARTAO_CREDITO">Cartão de Crédito</option>
                     <option value="BOLETO">Boleto</option>
-                    <option value="TED">Transferência (TED)</option>
-                    <option value="DINHEIRO">Dinheiro</option>
-                    <option value="CHEQUE">Cheque</option>
-                    <option value="CARTAO_DEBITO">Cartão Débito</option>
-                    <option value="CARTAO_CREDITO">Cartão Crédito</option>
                   </select>
                 </div>
                 <div className="col-span-2">
