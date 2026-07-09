@@ -38,14 +38,14 @@ const PERFIL_ICON: Record<string, React.ElementType> = {
 };
 const FRENTE_LABEL: Record<string, string> = {
   FLASH: "Flash", CRA_1_30: "1-30", CR_31_90: "31-90",
-  CR_PDD_91_180: "91-180", CR_PDD_181: "181+",
+  CR_PDD_91_180: "91+", CR_PDD_181: "91+",
 };
 const FRENTE_COR: Record<string, string> = {
   FLASH:         "bg-sky-500/15 text-sky-400",
   CRA_1_30:      "bg-emerald-500/15 text-emerald-400",
   CR_31_90:      "bg-amber-500/15 text-amber-400",
   CR_PDD_91_180: "bg-orange-500/15 text-orange-400",
-  CR_PDD_181:    "bg-rose-500/15 text-rose-400",
+  CR_PDD_181:    "bg-orange-500/15 text-orange-400",
 };
 
 function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; frentesAdicionais: { equipe: Equipe }[] }) {
@@ -342,7 +342,7 @@ export default function UsuariosPage() {
                   <select className={inputCls} value={form.equipeId}
                     onChange={(e) => setForm((f) => ({ ...f, equipeId: e.target.value }))}>
                     <option value="">Sem frente atribuída</option>
-                    {equipes.map((e) => <option key={e.id} value={e.id}>{FRENTE_LABEL[e.tipo] ?? e.nome}</option>)}
+                    {equipes.filter((e) => e.tipo !== "CR_PDD_181").map((e) => <option key={e.id} value={e.id}>{FRENTE_LABEL[e.tipo] ?? e.nome}</option>)}
                   </select>
                 </div>
               )}

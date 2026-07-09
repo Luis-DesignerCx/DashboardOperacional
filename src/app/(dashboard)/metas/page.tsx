@@ -41,7 +41,7 @@ const TIPO_CONFIG = {
 
 const TIPO_EQUIPE_LABEL: Record<string, string> = {
   FLASH: "Flash", CRA_1_30: "1-30 dias", CR_31_90: "31-90 dias",
-  CR_PDD_91_180: "PDD 91+", CR_PDD_181: "181+ dias",
+  CR_PDD_91_180: "PDD 91+", CR_PDD_181: "PDD 91+",
 };
 
 const FORM_VAZIO = {

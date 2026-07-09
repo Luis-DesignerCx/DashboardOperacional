@@ -3,23 +3,19 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-const FRENTE_ORDER = ["eq-flash", "eq-1-30", "eq-31-90", "eq-91-180", "eq-181plus"];
+const FRENTE_ORDER = ["eq-flash", "eq-1-30", "eq-31-90", "eq-91-180"];
 const FRENTE_LABEL: Record<string, string> = {
-  "eq-flash":   "Flash",
-  "eq-1-30":    "1 a 30 dias",
-  "eq-31-90":   "31 a 90 dias",
-  "eq-91-180":  "91 a 180 dias",
-  "eq-181plus": "+ 181 dias",
+  "eq-flash":  "Flash",
+  "eq-1-30":   "1 a 30 dias",
+  "eq-31-90":  "31 a 90 dias",
+  "eq-91-180": "91+ dias",
 };
 
-// Deriva o equipeId da frente a partir da equipe primária do consultor e dos dias de atraso
 function derivarFrenteId(consultorEquipeId: string | null, diasAtraso: number): string {
-  // Consultores cuja equipe primária é Flash → sempre Flash (vêm do import Flash Semanal)
   if (consultorEquipeId === "eq-flash") return "eq-flash";
-  if (diasAtraso <= 30)  return "eq-1-30";
-  if (diasAtraso <= 90)  return "eq-31-90";
-  if (diasAtraso <= 180) return "eq-91-180";
-  return "eq-181plus";
+  if (diasAtraso <= 30) return "eq-1-30";
+  if (diasAtraso <= 90) return "eq-31-90";
+  return "eq-91-180"; // 91+ engloba tudo acima de 90
 }
 
 export async function GET(req: NextRequest) {

@@ -39,11 +39,10 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const FRENTE_CHIPS = [
-  { id: "eq-flash",   label: "Flash" },
-  { id: "eq-1-30",    label: "1-30" },
-  { id: "eq-31-90",   label: "31-90" },
-  { id: "eq-91-180",  label: "91-180" },
-  { id: "eq-181plus", label: "181+" },
+  { id: "eq-flash",  label: "Flash" },
+  { id: "eq-1-30",   label: "1-30" },
+  { id: "eq-31-90",  label: "31-90" },
+  { id: "eq-91-180", label: "91+" },
 ];
 
 export function Sidebar({ perfil }: { perfil: Perfil }) {

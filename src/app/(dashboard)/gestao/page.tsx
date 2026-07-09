@@ -23,7 +23,7 @@ const FAIXA_COR: Record<string, string> = {
   CR_PDD_91_180: "text-orange-400 bg-orange-500/10 border-orange-500/20",
 };
 
-const TIPO_ORDEM = ["FLASH", "CRA_1_30", "CR_31_90", "CR_PDD_91_180", "CR_PDD_181"];
+const TIPO_ORDEM = ["FLASH", "CRA_1_30", "CR_31_90", "CR_PDD_91_180"];
 
 // Sub-faixas por tipo de frente
 const SUB_FAIXAS_MAP: Record<string, Array<{ label: string; diasMin: number; diasMax?: number }>> = {

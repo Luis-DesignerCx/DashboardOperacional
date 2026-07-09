@@ -1,14 +1,13 @@
 import { prisma } from "@/lib/prisma";
 
 const FRENTE_LABEL: Record<string, string> = {
-  "eq-flash":   "Flash",
-  "eq-1-30":    "1 a 30 dias",
-  "eq-31-90":   "31 a 90 dias",
-  "eq-91-180":  "91 a 180 dias",
-  "eq-181plus": "+ 181 dias",
+  "eq-flash":  "Flash",
+  "eq-1-30":   "1 a 30 dias",
+  "eq-31-90":  "31 a 90 dias",
+  "eq-91-180": "91+ dias",
 };
 
-const FRENTE_ORDER = ["eq-flash", "eq-1-30", "eq-31-90", "eq-91-180", "eq-181plus"];
+const FRENTE_ORDER = ["eq-flash", "eq-1-30", "eq-31-90", "eq-91-180"];
 
 /**
  * Retorna todos os equipeIds que o usuário gerencia:

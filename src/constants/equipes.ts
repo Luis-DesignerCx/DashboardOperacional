@@ -23,23 +23,23 @@ export const CONFIG_EQUIPES: Record<
     metaTipo: "FINANCEIRA",
   },
   CR_PDD_91_180: {
-    label: "CR PDD 91 a 180",
-    diasAtraso: [91, 180],
+    label: "CR PDD 91+",
+    diasAtraso: [91, 9999],
     diasSemContato: 7,
     metaTipo: "QUANTIDADE_CLIENTES",
   },
+  // Mantido apenas para compatibilidade com o enum do Prisma — não usado na UI
   CR_PDD_181: {
-    label: "CR PDD 181+",
-    diasAtraso: [181, 9999],
-    diasSemContato: 10,
+    label: "CR PDD 91+",
+    diasAtraso: [91, 9999],
+    diasSemContato: 7,
     metaTipo: "QUANTIDADE_CLIENTES",
   },
 };
 
 export function obterEquipePorDiasAtraso(diasAtraso: number): TipoEquipe {
-  if (diasAtraso <= 0)   return "FLASH";
-  if (diasAtraso <= 30)  return "CRA_1_30";
-  if (diasAtraso <= 90)  return "CR_31_90";
-  if (diasAtraso <= 180) return "CR_PDD_91_180";
-  return "CR_PDD_181";
+  if (diasAtraso <= 0)  return "FLASH";
+  if (diasAtraso <= 30) return "CRA_1_30";
+  if (diasAtraso <= 90) return "CR_31_90";
+  return "CR_PDD_91_180"; // 91+ engloba tudo acima de 90
 }

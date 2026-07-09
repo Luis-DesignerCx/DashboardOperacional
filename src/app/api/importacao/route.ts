@@ -60,7 +60,7 @@ function faixaParaTipoEquipe(faixa: string): string | null {
   if (f.includes("1 a 30") || f.includes("1a30"))   return "CRA_1_30";
   if (f.includes("31 a 90") || f.includes("31a90"))  return "CR_31_90";
   if (f.includes("91 a 180") || f.includes("91a180")) return "CR_PDD_91_180";
-  if (f.includes("181") || f.includes("pdd"))         return "CR_PDD_181";
+  if (f.includes("181") || f.includes("91+") || f.includes("pdd")) return "CR_PDD_91_180";
   if (f.includes("flash"))                             return "FLASH";
   return null;
 }
