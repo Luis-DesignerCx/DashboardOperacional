@@ -141,12 +141,6 @@ export default function CarteiraPage() {
   const [erroReceb, setErroReceb] = useState("");
   const [modalAParte, setModalAParte] = useState<Contrato | null>(null);
 
-  // Estado modal buscar existente
-  const [queryBusca, setQueryBusca] = useState("");
-  const [resultados, setResultados] = useState<ContratoBusca[]>([]);
-  const [buscando, setBuscando] = useState(false);
-  const [adicionando, setAdicionando] = useState<string | null>(null);
-  const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Estado modal recebimento externo (outra carteira)
   const [externoQuery, setExternoQuery] = useState("");
@@ -276,33 +270,7 @@ export default function CarteiraPage() {
     setExternoSucesso(false);
   }
 
-  // Busca com debounce
-  useEffect(() => {
-    if (!queryBusca || queryBusca.length < 2) { setResultados([]); return; }
-    if (buscaTimer.current) clearTimeout(buscaTimer.current);
-    buscaTimer.current = setTimeout(async () => {
-      setBuscando(true);
-      const data = await fetch(`/api/carteira/buscar?q=${encodeURIComponent(queryBusca)}&competenciaId=${competenciaId}`).then((r) => r.json());
-      setResultados(Array.isArray(data) ? data : []);
-      setBuscando(false);
-    }, 350);
-  }, [queryBusca, competenciaId]);
 
-  async function adicionarExistente(contratoId: string) {
-    setAdicionando(contratoId);
-    const res = await fetch("/api/carteira/manual", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ contratoId, competenciaId }),
-    });
-    setAdicionando(null);
-    if (res.ok) {
-      setModal(null);
-      setQueryBusca("");
-      setResultados([]);
-      carregarPagina(competenciaId, 1);
-    }
-  }
 
   function abrirRecebimento(c: Contrato) {
     setContratoRecebimento(c);
@@ -525,12 +493,6 @@ export default function CarteiraPage() {
             className="flex items-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-sm font-medium px-3 py-2 rounded-xl transition-colors"
           >
             <ArrowLeftRight size={15} /> Outra carteira
-          </button>
-          <button
-            onClick={() => { setModal("buscar"); setQueryBusca(""); setResultados([]); }}
-            className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-sm font-medium px-3 py-2 rounded-xl transition-colors"
-          >
-            <Search size={15} /> Buscar existente
           </button>
           <button
             onClick={() => setModal("novo")}
@@ -946,71 +908,6 @@ export default function CarteiraPage() {
         </div>
       )}
 
-      {/* Modal: Buscar contrato existente */}
-      {modal === "buscar" && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
-              <div>
-                <h2 className="text-white font-semibold">Adicionar contrato existente</h2>
-                <p className="text-slate-500 text-xs mt-0.5">Busque pelo nome do cliente ou número do contrato</p>
-              </div>
-              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 space-y-3">
-              <div className="relative">
-                <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  autoFocus
-                  value={queryBusca}
-                  onChange={(e) => setQueryBusca(e.target.value)}
-                  placeholder="Nome do cliente ou nº do contrato..."
-                  className={inputCls + " pl-9"}
-                />
-              </div>
-
-              {buscando && (
-                <div className="flex justify-center py-4">
-                  <Loader2 size={20} className="animate-spin text-slate-500" />
-                </div>
-              )}
-
-              {!buscando && resultados.length === 0 && queryBusca.length >= 2 && (
-                <p className="text-slate-400 text-sm text-center py-4">Nenhum contrato sem carteira encontrado</p>
-              )}
-
-              {resultados.length > 0 && (
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {resultados.map((ct) => (
-                    <div key={ct.id} className="flex items-center justify-between bg-slate-800 rounded-xl px-4 py-3">
-                      <div>
-                        <p className="text-white text-sm font-medium">{ct.cliente.nome}</p>
-                        <p className="text-slate-500 text-xs font-mono">{ct.numero} · {ct.empresa.nome}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <p className="text-white text-xs font-semibold">{formatarMoeda(Number(ct.valorTotalAberto ?? 0))}</p>
-                          <p className={`text-xs ${diasAtrasoColor(ct.maiorDiasAtraso)}`}>{ct.maiorDiasAtraso ?? 0}d</p>
-                        </div>
-                        <button
-                          onClick={() => adicionarExistente(ct.id)}
-                          disabled={adicionando === ct.id}
-                          className="flex items-center gap-1.5 bg-gr-500 hover:bg-gr-400 disabled:bg-gr-500/30 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-                        >
-                          {adicionando === ct.id ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                          Adicionar
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal: Detalhes A Parte */}
       {modalAParte && (
