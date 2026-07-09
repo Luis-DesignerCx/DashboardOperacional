@@ -401,7 +401,7 @@ export default function CarteiraPage() {
   function abrirPromessaRapida(c: Contrato, modo: "PROMESSA" | "LINK" = "PROMESSA") {
     setModalPromRap(c);
     setPromRapModo(modo);
-    setPromRapForm({ valor: "", data: new Date().toISOString().slice(0, 10), formaPagamento: "PIX", observacao: "", parcelasIds: [] });
+    setPromRapForm({ valor: "", data: new Date().toISOString().slice(0, 10), formaPagamento: modo === "LINK" ? "LINK_PAGAMENTO" : "PIX", observacao: "", parcelasIds: [] });
     setErroPromRap("");
   }
 
@@ -1324,17 +1324,17 @@ export default function CarteiraPage() {
                     readOnly={promRapModo === "LINK"}
                     onChange={promRapModo === "LINK" ? undefined : (e) => setPromRapForm((f) => ({ ...f, data: e.target.value }))} />
                 </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
-                  <select className={inputCls} value={promRapForm.formaPagamento}
-                    onChange={(e) => setPromRapForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
-                    <option value="PIX">PIX</option>
-                    <option value="CARTAO_CREDITO">Cartão de Crédito</option>
-                    <option value="BOLETO">Boleto</option>
-                    <option value="TED">Transferência (TED)</option>
-                    <option value="DINHEIRO">Dinheiro</option>
-                  </select>
-                </div>
+                {promRapModo !== "LINK" && (
+                  <div className="col-span-2">
+                    <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
+                    <select className={inputCls} value={promRapForm.formaPagamento}
+                      onChange={(e) => setPromRapForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
+                      <option value="PIX">PIX</option>
+                      <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                      <option value="BOLETO">Boleto</option>
+                    </select>
+                  </div>
+                )}
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-400 mb-1.5">Observação</label>
                   <textarea rows={2} className={inputCls + " resize-none"} placeholder="Opcional"
