@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Target, Plus, X, CheckCircle2, Loader2, Trash2, TrendingUp, Users, ClipboardCheck } from "lucide-react";
+import { Target, Plus, X, CheckCircle2, Loader2, Trash2, TrendingUp, Users, ClipboardCheck, Pencil } from "lucide-react";
 
 interface Meta {
   id: string;
@@ -58,6 +58,7 @@ export default function MetasPage() {
   const [consultoresDaEquipe, setConsultoresDaEquipe] = useState<any[]>([]);
 
   const [modalAberto, setModalAberto] = useState(false);
+  const [editandoMeta, setEditandoMeta] = useState<Meta | null>(null);
   const [form, setForm] = useState({ ...FORM_VAZIO });
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState<string | null>(null);
@@ -92,8 +93,23 @@ export default function MetasPage() {
   }, [form.equipeId, equipes]);
 
   function abrirModal() {
+    setEditandoMeta(null);
     setModalAberto(true);
     setForm((f) => ({ ...FORM_VAZIO, equipeId: equipes[0]?.id ?? "", competenciaId: competencias[0]?.id ?? "" }));
+    setErro("");
+  }
+
+  function abrirEdicao(m: Meta) {
+    setEditandoMeta(m);
+    setModalAberto(true);
+    setForm({
+      equipeId: "", competenciaId: "", consultorId: "",
+      nome: m.nome ?? "",
+      tipo: m.tipo as "FINANCEIRA" | "QUANTIDADE" | "MONITORIA",
+      percentualAlvo: m.percentualAlvo != null ? String(m.percentualAlvo) : "",
+      quantidadeAlvo: m.quantidadeAlvo != null ? String(m.quantidadeAlvo) : "",
+      peso: String(m.peso ?? 1),
+    });
     setErro("");
   }
 
@@ -123,15 +139,22 @@ export default function MetasPage() {
     }
 
     setSalvando(true);
-    const res = await fetch("/api/metas", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const res = editandoMeta
+      ? await fetch("/api/metas", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: editandoMeta.id, ...payload }),
+        })
+      : await fetch("/api/metas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
     const data = await res.json();
     setSalvando(false);
     if (!res.ok) { setErro(data.erro || "Erro ao salvar"); return; }
     setModalAberto(false);
+    setEditandoMeta(null);
     recarregar();
   }
 
@@ -212,13 +235,21 @@ export default function MetasPage() {
                     <td className="px-4 py-3 text-right text-white font-semibold tabular-nums">{renderAlvo(m)}</td>
                     <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{Number(m.peso).toFixed(1)}x</td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => excluirMeta(m.id)}
-                        disabled={excluindo === m.id}
-                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-40"
-                      >
-                        {excluindo === m.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => abrirEdicao(m)}
+                          className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 rounded-lg transition-colors"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          onClick={() => excluirMeta(m.id)}
+                          disabled={excluindo === m.id}
+                          className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-40"
+                        >
+                          {excluindo === m.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -234,8 +265,8 @@ export default function MetasPage() {
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-slate-800">
               <div>
-                <h2 className="text-white font-semibold">Nova Meta</h2>
-                <p className="text-slate-500 text-xs mt-0.5">Defina a meta para um consultor nesta competência</p>
+                <h2 className="text-white font-semibold">{editandoMeta ? "Editar Meta" : "Nova Meta"}</h2>
+                <p className="text-slate-500 text-xs mt-0.5">{editandoMeta ? `${editandoMeta.nome || "Meta"} · ${editandoMeta.consultor?.nome ?? "Equipe toda"}` : "Defina a meta para um consultor nesta competência"}</p>
               </div>
               <button onClick={() => setModalAberto(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
                 <X size={16} />
@@ -269,33 +300,37 @@ export default function MetasPage() {
                 <p className="text-[11px] text-slate-500 mt-1.5">{TIPO_CONFIG[form.tipo].desc}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Equipe *</label>
-                  <select className={inputCls} value={form.equipeId} onChange={(e) => setForm((f) => ({ ...f, equipeId: e.target.value, consultorId: "" }))}>
-                    <option value="">Selecione...</option>
-                    {equipes.map((e: any) => (
-                      <option key={e.id} value={e.id}>{e.nome} ({TIPO_EQUIPE_LABEL[e.tipo] ?? e.tipo})</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Competência *</label>
-                  <select className={inputCls} value={form.competenciaId} onChange={(e) => setForm((f) => ({ ...f, competenciaId: e.target.value }))}>
-                    {competencias.map((c: any) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
-                  </select>
-                </div>
-              </div>
+              {!editandoMeta && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Equipe *</label>
+                      <select className={inputCls} value={form.equipeId} onChange={(e) => setForm((f) => ({ ...f, equipeId: e.target.value, consultorId: "" }))}>
+                        <option value="">Selecione...</option>
+                        {equipes.map((e: any) => (
+                          <option key={e.id} value={e.id}>{e.nome} ({TIPO_EQUIPE_LABEL[e.tipo] ?? e.tipo})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Competência *</label>
+                      <select className={inputCls} value={form.competenciaId} onChange={(e) => setForm((f) => ({ ...f, competenciaId: e.target.value }))}>
+                        {competencias.map((c: any) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
+                      </select>
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Consultor (opcional — deixe em branco para meta da equipe)</label>
-                <select className={inputCls} value={form.consultorId} onChange={(e) => setForm((f) => ({ ...f, consultorId: e.target.value }))}>
-                  <option value="">Equipe toda</option>
-                  {consultoresDaEquipe.map((c: any) => (
-                    <option key={c.id} value={c.id}>{c.nome}</option>
-                  ))}
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1.5">Consultor (opcional — deixe em branco para meta da equipe)</label>
+                    <select className={inputCls} value={form.consultorId} onChange={(e) => setForm((f) => ({ ...f, consultorId: e.target.value }))}>
+                      <option value="">Equipe toda</option>
+                      {consultoresDaEquipe.map((c: any) => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block text-xs text-slate-400 mb-1.5">Nome da meta</label>
@@ -376,7 +411,7 @@ export default function MetasPage() {
                 disabled={salvando}
                 className="flex-1 bg-sky-500 hover:bg-sky-400 disabled:bg-sky-500/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
               >
-                {salvando ? <><Loader2 size={14} className="animate-spin" /> Salvando...</> : <><CheckCircle2 size={14} /> Criar meta</>}
+                {salvando ? <><Loader2 size={14} className="animate-spin" /> Salvando...</> : <><CheckCircle2 size={14} /> {editandoMeta ? "Salvar alterações" : "Criar meta"}</>}
               </button>
             </div>
           </div>
