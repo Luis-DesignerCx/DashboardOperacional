@@ -83,6 +83,11 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
     return () => clearInterval(interval);
   }, [perfil]);
 
+  // Limpa o badge ao visitar a página de tarefas
+  useEffect(() => {
+    if (pathname === "/pendencias") setPromessasHoje(0);
+  }, [pathname]);
+
   const itensVisiveis = NAV_ITEMS.filter((item) => item.perfis.includes(perfil));
 
   return (

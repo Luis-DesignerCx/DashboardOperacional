@@ -171,20 +171,12 @@ export default function PendenciasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Bell size={24} className="text-amber-400" />
-          <div>
-            <h1 className="text-2xl font-bold text-white">Minhas Tarefas</h1>
-            <p className="text-slate-400 text-sm">{totalAbertas} promessa{totalAbertas !== 1 ? "s" : ""} em aberto · {agendadosHoje.length} retorno{agendadosHoje.length !== 1 ? "s" : ""} hoje</p>
-          </div>
+      <div className="flex items-center gap-3">
+        <Bell size={24} className="text-amber-400" />
+        <div>
+          <h1 className="text-2xl font-bold text-white">Minhas Tarefas</h1>
+          <p className="text-slate-400 text-sm">{totalAbertas} promessa{totalAbertas !== 1 ? "s" : ""} em aberto · {agendadosHoje.length} retorno{agendadosHoje.length !== 1 ? "s" : ""} hoje</p>
         </div>
-        <button
-          onClick={abrirModal}
-          className="flex items-center gap-2 bg-gr-500 hover:bg-gr-400 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
-        >
-          <Plus size={15} /> Nova Promessa
-        </button>
       </div>
 
       {/* Resumo */}
