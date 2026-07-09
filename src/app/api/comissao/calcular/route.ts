@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calcularComissao } from "@/constants/comissao";
 import { getEquipesGerenciadas } from "@/lib/frentes";
+import { calcularComissaoMetas } from "@/lib/comissao";
+import { Decimal } from "@prisma/client/runtime/library";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -23,13 +24,25 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Busca meta da equipe/competência
-  const meta = await prisma.meta.findFirst({ where: { equipeId, competenciaId } });
-  if (!meta) {
+  const equipe = await prisma.equipe.findUnique({
+    where: { id: equipeId },
+    select: { comissaoBase: true },
+  });
+  const comissaoBase = Number(equipe?.comissaoBase ?? 0);
+
+  if (comissaoBase <= 0) {
+    return NextResponse.json({ erro: "Configure o valor base (100%) desta frente antes de calcular" }, { status: 400 });
+  }
+
+  const metas = await prisma.meta.findMany({
+    where: { equipeId, competenciaId },
+    orderBy: { criadoEm: "asc" },
+  });
+
+  if (metas.length === 0) {
     return NextResponse.json({ erro: "Nenhuma meta configurada para esta equipe/competência" }, { status: 400 });
   }
 
-  // Busca consultores ativos da equipe
   const consultores = await prisma.usuario.findMany({
     where: { equipeId, ativo: true, perfil: "CONSULTOR" },
     select: { id: true, nome: true },
@@ -39,66 +52,57 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "Nenhum consultor ativo na equipe" }, { status: 400 });
   }
 
-  // Para cada consultor: soma recebimentos (valor + valorAParte) dos contratos na carteira
   const resultados = await Promise.all(
     consultores.map(async (consultor) => {
       const recebimentos = await prisma.recebimento.findMany({
         where: {
           consultorId: consultor.id,
-          contrato: {
-            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } },
-          },
+          contrato: { carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
         },
         select: { valor: true, valorAParte: true },
       });
 
-      // Comissão: valor normal + valorAParte
-      const totalComissao = recebimentos.reduce(
+      const totalRecebido = recebimentos.reduce(
         (s, r) => s + Number(r.valor) + Number(r.valorAParte ?? 0),
         0
       );
-      const metaValor = Number(meta.valorAlvo);
-      const percentualMeta = metaValor > 0 ? (totalComissao / metaValor) * 100 : 0;
-      const { faixa, valor } = calcularComissao(totalComissao, percentualMeta);
 
-      // Upsert na tabela Comissao (permite recalcular)
+      const metasComNota = metas.map((m) => ({
+        id: m.id,
+        nome: m.nome,
+        tipo: m.tipo,
+        peso: Number(m.peso),
+        valorAlvo: m.valorAlvo ? Number(m.valorAlvo) : null,
+        thresholdsMonitoria: (m.thresholdsMonitoria as Record<string, number>) ?? null,
+        notaMonitoria: ((m.resultadosConsultores as Record<string, number>) ?? {})[consultor.id] ?? 0,
+      }));
+
+      const { totalComissao, breakdown } = calcularComissaoMetas(comissaoBase, metasComNota, totalRecebido);
+
+      const metaFin = metasComNota.find((m) => m.tipo === "FINANCEIRA");
+      const percentualMeta = metaFin?.valorAlvo ? (totalRecebido / metaFin.valorAlvo) * 100 : 0;
+      const faixaAplicada = breakdown.find((b) => b.tipo === "FINANCEIRA")?.multiplicador ?? 0;
+
       const existing = await prisma.comissao.findFirst({
         where: { usuarioId: consultor.id, equipeId, competenciaId },
       });
 
+      const comissaoData = {
+        valorBase: new Decimal(String(comissaoBase)),
+        percentualMeta: new Decimal(percentualMeta.toFixed(2)),
+        faixaAplicada: new Decimal(String(faixaAplicada)),
+        valorFinal: new Decimal(totalComissao.toFixed(2)),
+        breakdown: breakdown as any,
+        calculadoEm: new Date(),
+      };
+
       if (existing) {
-        await prisma.comissao.update({
-          where: { id: existing.id },
-          data: {
-            valorBase: totalComissao,
-            percentualMeta,
-            faixaAplicada: faixa,
-            valorFinal: valor,
-            calculadoEm: new Date(),
-          },
-        });
+        await prisma.comissao.update({ where: { id: existing.id }, data: comissaoData });
       } else {
-        await prisma.comissao.create({
-          data: {
-            equipeId,
-            competenciaId,
-            usuarioId: consultor.id,
-            valorBase: totalComissao,
-            percentualMeta,
-            faixaAplicada: faixa,
-            valorFinal: valor,
-          },
-        });
+        await prisma.comissao.create({ data: { equipeId, competenciaId, usuarioId: consultor.id, ...comissaoData } });
       }
 
-      return {
-        consultorId: consultor.id,
-        consultorNome: consultor.nome,
-        totalComissao,
-        percentualMeta,
-        faixaAplicada: faixa,
-        valorFinal: valor,
-      };
+      return { consultorId: consultor.id, consultorNome: consultor.nome, totalRecebido, totalComissao, breakdown };
     })
   );
 

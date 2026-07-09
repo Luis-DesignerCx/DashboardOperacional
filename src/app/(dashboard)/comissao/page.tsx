@@ -3,22 +3,48 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { formatarMoeda } from "@/lib/utils";
-import { DollarSign, Target, TrendingUp, Calculator, Pencil, Check, X, AlertCircle } from "lucide-react";
+import {
+  DollarSign, TrendingUp, Calculator, Pencil, Check, X,
+  AlertCircle, ChevronDown, ChevronUp, Loader2, Save,
+} from "lucide-react";
 
-const FAIXAS = [
-  { meta: "<70%", comissao: "0%", cor: "text-slate-500" },
-  { meta: "70%", comissao: "60%", cor: "text-orange-400" },
-  { meta: "80%", comissao: "70%", cor: "text-amber-400" },
-  { meta: "90%", comissao: "80%", cor: "text-yellow-400" },
-  { meta: "100%", comissao: "100%", cor: "text-emerald-400" },
-  { meta: "110%", comissao: "110%", cor: "text-emerald-400" },
-  { meta: "120%", comissao: "120%", cor: "text-emerald-400" },
-  { meta: "130%", comissao: "130%", cor: "text-emerald-400" },
-  { meta: "140%", comissao: "140%", cor: "text-emerald-400" },
-  { meta: "150%", comissao: "150%", cor: "text-emerald-400" },
-  { meta: "160%+", comissao: "160%", cor: "text-sky-400" },
-];
+// ─── tipos ─────────────────────────────────────────────────
+interface MetaItem {
+  id: string;
+  nome: string;
+  tipo: string;
+  peso: number;
+  valorAlvo: number | null;
+  thresholdsMonitoria: Record<string, number> | null;
+}
 
+interface MetaBreakdown {
+  metaId: string;
+  nome: string;
+  tipo: string;
+  peso: number;
+  valorBase: number;
+  atingimento: number;
+  multiplicador: number;
+  contribuicao: number;
+  realizado: number | null;
+  alvo: number | null;
+}
+
+interface ConsultorResult {
+  id: string;
+  nome: string;
+  totalRecebido: number;
+  totalComissao: number;
+  comissaoBase: number;
+  breakdown: MetaBreakdown[];
+  recebido: number;
+  percentualMeta: number;
+  faixaAplicada: number;
+  valorFinal: number;
+}
+
+// ─── helpers visuais ───────────────────────────────────────
 function faixaCor(pct: number) {
   if (pct < 70) return "text-slate-500";
   if (pct < 80) return "text-orange-400";
@@ -26,7 +52,6 @@ function faixaCor(pct: number) {
   if (pct < 100) return "text-yellow-400";
   return "text-emerald-400";
 }
-
 function faixaBarCor(pct: number) {
   if (pct < 70) return "bg-slate-600";
   if (pct < 80) return "bg-orange-500";
@@ -35,27 +60,7 @@ function faixaBarCor(pct: number) {
   return "bg-emerald-500";
 }
 
-interface Consultor {
-  id: string;
-  nome: string;
-  recebido: number;
-  percentualMeta: number;
-  faixaAplicada: number;
-  valorFinal: number;
-}
-
-interface HistoricoItem {
-  id: string;
-  usuarioId: string;
-  valorBase: number;
-  percentualMeta: number;
-  faixaAplicada: number;
-  valorFinal: number;
-  calculadoEm: string;
-  equipe: { nome: string };
-}
-
-const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
+const inputCls = "bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
 
 // ─────────────────────────────────────────────────────────
 // GESTOR VIEW
@@ -63,39 +68,74 @@ const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py
 function GestorComissao({ equipeId }: { equipeId: string }) {
   const [competencias, setCompetencias] = useState<any[]>([]);
   const [competenciaId, setCompetenciaId] = useState("");
-  const [meta, setMeta] = useState<{ id: string; valorAlvo: number } | null>(null);
-  const [editandoMeta, setEditandoMeta] = useState(false);
-  const [novoValorMeta, setNovoValorMeta] = useState("");
-  const [salvandoMeta, setSalvandoMeta] = useState(false);
-  const [consultores, setConsultores] = useState<Consultor[]>([]);
-  const [historico, setHistorico] = useState<HistoricoItem[]>([]);
+
+  const [comissaoBase, setComissaoBase] = useState<number>(0);
+  const [editandoBase, setEditandoBase] = useState(false);
+  const [novoBase, setNovoBase] = useState("");
+  const [salvandoBase, setSalvandoBase] = useState(false);
+
+  const [metas, setMetas] = useState<MetaItem[]>([]);
+  const [consultores, setConsultores] = useState<ConsultorResult[]>([]);
+  const [notasMonitoria, setNotasMonitoria] = useState<Record<string, Record<string, string>>>({}); // metaId -> consultorId -> nota
+  const [salvandoNotas, setSalvandoNotas] = useState(false);
+
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [carregando, setCarregando] = useState(false);
   const [calculando, setCalculando] = useState(false);
   const [erroCalc, setErroCalc] = useState("");
-  const [sucesso, setSucesso] = useState(false);
+  const [sucesso, setSucesso] = useState("");
 
   useEffect(() => {
     fetch("/api/competencias").then((r) => r.json()).then((cs) => {
-      setCompetencias(cs);
-      if (cs[0]) setCompetenciaId(cs[0].id);
+      if (Array.isArray(cs)) {
+        setCompetencias(cs);
+        if (cs[0]) setCompetenciaId(cs[0].id);
+      }
     });
   }, []);
 
   const carregarDados = useCallback(async (cId: string) => {
-    if (!cId) return;
+    if (!cId || !equipeId) return;
     setCarregando(true);
     setErroCalc("");
-    setSucesso(false);
+    setSucesso("");
 
-    const [metaRes, historicoRes, consultoresRes] = await Promise.all([
+    const [equipeRes, metasRes, prevRes] = await Promise.all([
+      fetch(`/api/equipes/${equipeId}`).then((r) => r.json()),
       fetch(`/api/metas?competenciaId=${cId}&equipeId=${equipeId}`).then((r) => r.json()),
-      fetch(`/api/comissao?competenciaId=${cId}`).then((r) => r.json()),
       fetch(`/api/comissao/preview?competenciaId=${cId}&equipeId=${equipeId}`).then((r) => r.json()),
     ]);
 
-    setMeta(Array.isArray(metaRes) && metaRes[0] ? metaRes[0] : null);
-    setHistorico(Array.isArray(historicoRes) ? historicoRes : []);
-    setConsultores(Array.isArray(consultoresRes) ? consultoresRes : []);
+    const base = Number(equipeRes?.comissaoBase ?? 0);
+    setComissaoBase(base);
+
+    const metaLista: MetaItem[] = Array.isArray(metasRes) ? metasRes.map((m: any) => ({
+      id: m.id,
+      nome: m.nome,
+      tipo: m.tipo,
+      peso: Number(m.peso),
+      valorAlvo: m.valorAlvo ? Number(m.valorAlvo) : null,
+      thresholdsMonitoria: m.thresholdsMonitoria ?? null,
+    })) : [];
+    setMetas(metaLista);
+
+    const cons: ConsultorResult[] = Array.isArray(prevRes) ? prevRes : [];
+    setConsultores(cons);
+
+    // Inicializa notas de monitoria a partir do breakdown
+    const notas: Record<string, Record<string, string>> = {};
+    for (const meta of metaLista) {
+      if (meta.tipo !== "MONITORIA") continue;
+      notas[meta.id] = {};
+      for (const c of cons) {
+        const bd = c.breakdown?.find((b) => b.metaId === meta.id);
+        notas[meta.id][c.id] = bd?.realizado != null ? String(bd.realizado) : "";
+      }
+    }
+    setNotasMonitoria(notas);
+
+    // Expande todos os consultores por padrão
+    setExpandidos(new Set(cons.map((c) => c.id)));
     setCarregando(false);
   }, [equipeId]);
 
@@ -103,26 +143,52 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
     if (competenciaId) carregarDados(competenciaId);
   }, [competenciaId, carregarDados]);
 
-  async function salvarMeta() {
-    if (!novoValorMeta || !competenciaId) return;
-    setSalvandoMeta(true);
-    const valor = parseFloat(novoValorMeta.replace(",", "."));
-    const res = await fetch("/api/metas", {
-      method: "POST",
+  async function salvarBase() {
+    const v = parseFloat(novoBase.replace(",", ".") || "0");
+    if (!v || v <= 0) return;
+    setSalvandoBase(true);
+    const res = await fetch(`/api/equipes/${equipeId}`, {
+      method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ equipeId, competenciaId, valorAlvo: valor, nome: "Meta Financeira" }),
+      body: JSON.stringify({ comissaoBase: v }),
     });
-    setSalvandoMeta(false);
+    setSalvandoBase(false);
     if (res.ok) {
-      setEditandoMeta(false);
-      carregarDados(competenciaId);
+      setEditandoBase(false);
+      setComissaoBase(v);
     }
+  }
+
+  async function salvarNotas() {
+    const metasMonitoria = metas.filter((m) => m.tipo === "MONITORIA");
+    if (metasMonitoria.length === 0) return;
+    setSalvandoNotas(true);
+    setErroCalc("");
+    setSucesso("");
+
+    for (const meta of metasMonitoria) {
+      const notas = notasMonitoria[meta.id] ?? {};
+      const resultadosConsultores: Record<string, number> = {};
+      for (const [cId, nota] of Object.entries(notas)) {
+        const n = parseFloat(nota);
+        if (!isNaN(n)) resultadosConsultores[cId] = n;
+      }
+      await fetch("/api/metas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: meta.id, resultadosConsultores }),
+      });
+    }
+
+    setSalvandoNotas(false);
+    setSucesso("Notas salvas!");
+    carregarDados(competenciaId);
   }
 
   async function calcular() {
     setCalculando(true);
     setErroCalc("");
-    setSucesso(false);
+    setSucesso("");
     const res = await fetch("/api/comissao/calcular", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -130,7 +196,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
     });
     setCalculando(false);
     if (res.ok) {
-      setSucesso(true);
+      setSucesso("Comissões registradas com sucesso!");
       carregarDados(competenciaId);
     } else {
       const d = await res.json();
@@ -138,8 +204,19 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
     }
   }
 
+  function toggleExpand(id: string) {
+    setExpandidos((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  }
+
+  const temMonitoria = metas.some((m) => m.tipo === "MONITORIA");
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Comissão</h1>
@@ -148,203 +225,263 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
         <select
           value={competenciaId}
           onChange={(e) => setCompetenciaId(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+          className={inputCls}
         >
           {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
         </select>
       </div>
 
-      {/* Meta da equipe */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Target size={16} className="text-sky-400" />
-            <h2 className="text-sm font-semibold text-white">Meta da Equipe</h2>
+      {/* Configuração: base + metas */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+        <h2 className="text-sm font-semibold text-white">Configuração da Comissão</h2>
+
+        {/* Valor base */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <p className="text-[10px] text-slate-500 mb-1">Valor Base (100%)</p>
+            {editandoBase ? (
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
+                  <input
+                    type="number"
+                    value={novoBase}
+                    onChange={(e) => setNovoBase(e.target.value)}
+                    placeholder="1580"
+                    className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 w-40"
+                    autoFocus
+                  />
+                </div>
+                <button
+                  onClick={salvarBase}
+                  disabled={salvandoBase}
+                  className="p-2 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/20 transition-colors"
+                >
+                  {salvandoBase ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+                </button>
+                <button onClick={() => setEditandoBase(false)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                {comissaoBase > 0 ? (
+                  <p className="text-xl font-bold text-white tabular-nums">{formatarMoeda(comissaoBase)}</p>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-amber-400 text-sm">
+                    <AlertCircle size={14} /> Não configurado
+                  </div>
+                )}
+                <button
+                  onClick={() => { setEditandoBase(true); setNovoBase(comissaoBase > 0 ? String(comissaoBase) : ""); }}
+                  className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <Pencil size={12} />
+                </button>
+              </div>
+            )}
           </div>
-          {!editandoMeta && (
-            <button
-              onClick={() => { setEditandoMeta(true); setNovoValorMeta(meta ? String(meta.valorAlvo) : ""); }}
-              className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
-            >
-              <Pencil size={12} /> {meta ? "Editar" : "Definir meta"}
-            </button>
-          )}
         </div>
 
-        {editandoMeta ? (
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 max-w-xs">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
-              <input
-                type="text"
-                placeholder="0,00"
-                value={novoValorMeta}
-                onChange={(e) => setNovoValorMeta(e.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
-                autoFocus
-              />
-            </div>
-            <button
-              onClick={salvarMeta}
-              disabled={salvandoMeta}
-              className="p-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 rounded-lg border border-emerald-500/20 transition-colors"
-            >
-              <Check size={15} />
-            </button>
-            <button
-              onClick={() => setEditandoMeta(false)}
-              className="p-2.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors"
-            >
-              <X size={15} />
-            </button>
+        {/* Tabela de metas */}
+        {metas.length > 0 && (
+          <div className="border border-slate-700 rounded-xl overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-slate-800/60 border-b border-slate-700">
+                  <th className="text-left px-3 py-2.5 text-slate-400 font-medium">Indicador</th>
+                  <th className="text-left px-3 py-2.5 text-slate-400 font-medium">Tipo</th>
+                  <th className="text-right px-3 py-2.5 text-slate-400 font-medium">Peso</th>
+                  <th className="text-right px-3 py-2.5 text-slate-400 font-medium">Bônus 100%</th>
+                  <th className="text-right px-3 py-2.5 text-slate-400 font-medium">Alvo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {metas.map((m) => {
+                  const valorBase = comissaoBase * m.peso;
+                  return (
+                    <tr key={m.id} className="border-b border-slate-700/50 last:border-0">
+                      <td className="px-3 py-2.5 text-white font-medium">{m.nome}</td>
+                      <td className="px-3 py-2.5">
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+                          m.tipo === "FINANCEIRA" ? "bg-sky-500/15 text-sky-300" :
+                          m.tipo === "MONITORIA" ? "bg-emerald-500/15 text-emerald-300" :
+                          "bg-purple-500/15 text-purple-300"
+                        }`}>
+                          {m.tipo === "FINANCEIRA" ? "Financeira" : m.tipo === "MONITORIA" ? "Monitoria" : "Quantidade"}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-slate-300 tabular-nums">{Math.round(m.peso * 100)}%</td>
+                      <td className="px-3 py-2.5 text-right text-emerald-400 font-semibold tabular-nums">{formatarMoeda(valorBase)}</td>
+                      <td className="px-3 py-2.5 text-right text-slate-400 tabular-nums">
+                        {m.tipo === "FINANCEIRA" && m.valorAlvo ? formatarMoeda(m.valorAlvo) :
+                         m.tipo === "MONITORIA" && m.thresholdsMonitoria ? `Nota ≥ ${m.thresholdsMonitoria["100"] ?? "?"} → 100%` : "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        ) : meta ? (
-          <p className="text-2xl font-bold text-white tabular-nums">{formatarMoeda(Number(meta.valorAlvo))}</p>
-        ) : (
-          <div className="flex items-center gap-2 text-amber-400">
-            <AlertCircle size={15} />
-            <p className="text-sm">Nenhuma meta definida para esta competência. Clique em "Definir meta" para configurar.</p>
-          </div>
+        )}
+
+        {metas.length === 0 && !carregando && (
+          <p className="text-slate-500 text-xs">Nenhuma meta configurada para esta competência. Acesse a página de Metas para criar.</p>
         )}
       </div>
 
-      {/* Tabela de consultores */}
+      {/* Consultores */}
       {carregando ? (
         <div className="flex justify-center py-10">
           <div className="w-7 h-7 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <TrendingUp size={15} className="text-gr-400" />
-              <h2 className="text-sm font-semibold text-white">Acompanhamento dos Consultores</h2>
-            </div>
-            <p className="text-xs text-slate-500">Recebido inclui valores "a parte"</p>
-          </div>
-
-          {consultores.length === 0 ? (
-            <div className="p-10 text-center">
-              <p className="text-slate-500 text-sm">Nenhum consultor ativo na equipe</p>
-            </div>
-          ) : (
-            <div className="divide-y divide-slate-800">
-              {consultores.map((c) => (
-                <div key={c.id} className="px-5 py-4">
-                  <div className="flex items-center justify-between mb-2">
+      ) : consultores.length > 0 ? (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-white">Consultores</h2>
+          {consultores.map((c) => {
+            const exp = expandidos.has(c.id);
+            return (
+              <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+                {/* Row header */}
+                <button
+                  onClick={() => toggleExpand(c.id)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-800/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {exp ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
                     <p className="text-white font-medium text-sm">{c.nome}</p>
-                    <div className="flex items-center gap-4 text-right">
-                      <div>
-                        <p className="text-[10px] text-slate-500">Recebido</p>
-                        <p className="text-white text-sm font-semibold tabular-nums">{formatarMoeda(c.recebido)}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500">% Meta</p>
-                        <p className={`text-sm font-bold tabular-nums ${faixaCor(c.percentualMeta)}`}>{c.percentualMeta.toFixed(1)}%</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500">Faixa</p>
-                        <p className={`text-sm font-bold tabular-nums ${faixaCor(c.percentualMeta)}`}>{c.faixaAplicada}%</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-500">Comissão</p>
-                        <p className="text-emerald-400 text-sm font-bold tabular-nums">{formatarMoeda(c.valorFinal)}</p>
-                      </div>
+                  </div>
+                  <div className="flex items-center gap-6 text-right">
+                    <div>
+                      <p className="text-[10px] text-slate-500">Recebido</p>
+                      <p className="text-white text-sm font-semibold tabular-nums">{formatarMoeda(c.totalRecebido)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-slate-500">Comissão Est.</p>
+                      <p className="text-emerald-400 text-sm font-bold tabular-nums">{formatarMoeda(c.totalComissao)}</p>
                     </div>
                   </div>
-                  {meta && (
-                    <div className="w-full bg-slate-800 rounded-full h-1.5">
-                      <div
-                        className={`h-1.5 rounded-full transition-all ${faixaBarCor(c.percentualMeta)}`}
-                        style={{ width: `${Math.min(c.percentualMeta, 160) / 160 * 100}%` }}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
+                </button>
+
+                {/* Breakdown expandido */}
+                {exp && (
+                  <div className="border-t border-slate-800">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-slate-800/40 border-b border-slate-800">
+                          <th className="text-left px-4 py-2.5 text-slate-400 font-medium">Indicador</th>
+                          <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Peso</th>
+                          <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Base</th>
+                          <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Realizado</th>
+                          <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Atingimento</th>
+                          <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Faixa</th>
+                          <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Comissão</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(c.breakdown ?? []).map((bd) => (
+                          <tr key={bd.metaId} className="border-b border-slate-800/50 last:border-0">
+                            <td className="px-4 py-3 text-white font-medium">{bd.nome}</td>
+                            <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{Math.round(bd.peso * 100)}%</td>
+                            <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{formatarMoeda(bd.valorBase)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums">
+                              {bd.tipo === "MONITORIA" ? (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="100"
+                                  step="0.1"
+                                  value={notasMonitoria[bd.metaId]?.[c.id] ?? ""}
+                                  onChange={(e) =>
+                                    setNotasMonitoria((prev) => ({
+                                      ...prev,
+                                      [bd.metaId]: { ...(prev[bd.metaId] ?? {}), [c.id]: e.target.value },
+                                    }))
+                                  }
+                                  className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-right focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                  placeholder="nota"
+                                />
+                              ) : (
+                                <span className="text-slate-300">
+                                  {bd.realizado != null ? formatarMoeda(bd.realizado) : "—"}
+                                </span>
+                              )}
+                            </td>
+                            <td className={`px-4 py-3 text-right font-semibold tabular-nums ${faixaCor(bd.atingimento)}`}>
+                              {bd.atingimento > 0 ? `${bd.atingimento.toFixed(1)}%` : "—"}
+                            </td>
+                            <td className={`px-4 py-3 text-right font-semibold tabular-nums ${faixaCor(bd.atingimento)}`}>
+                              {bd.multiplicador}%
+                            </td>
+                            <td className="px-4 py-3 text-right text-emerald-400 font-bold tabular-nums">
+                              {formatarMoeda(bd.contribuicao)}
+                            </td>
+                          </tr>
+                        ))}
+                        {/* Total */}
+                        <tr className="bg-slate-800/30">
+                          <td colSpan={6} className="px-4 py-3 text-right text-slate-400 font-medium">Total</td>
+                          <td className="px-4 py-3 text-right text-emerald-400 font-bold tabular-nums">{formatarMoeda(c.totalComissao)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
+      ) : (
+        !carregando && (
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center">
+            <p className="text-slate-500 text-sm">Nenhum consultor ativo nesta equipe</p>
+          </div>
+        )
       )}
 
-      {/* Botão calcular */}
-      <div className="flex items-center gap-3">
+      {/* Ações */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {temMonitoria && (
+          <button
+            onClick={salvarNotas}
+            disabled={salvandoNotas}
+            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-700/40 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
+          >
+            {salvandoNotas ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Salvar Notas de Monitoria
+          </button>
+        )}
         <button
           onClick={calcular}
-          disabled={calculando || !meta}
+          disabled={calculando || comissaoBase <= 0 || metas.length === 0}
           className="flex items-center gap-2 bg-gr-500 hover:bg-gr-400 disabled:bg-gr-500/30 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition-colors"
         >
-          <Calculator size={15} />
+          <Calculator size={14} />
           {calculando ? "Calculando..." : "Calcular e Registrar Comissões"}
         </button>
-        {!meta && <p className="text-amber-400 text-xs">Defina uma meta antes de calcular</p>}
+        {comissaoBase <= 0 && <p className="text-amber-400 text-xs">Configure o valor base antes de calcular</p>}
         {erroCalc && <p className="text-red-400 text-xs">{erroCalc}</p>}
-        {sucesso && <p className="text-emerald-400 text-xs">Comissões registradas com sucesso!</p>}
+        {sucesso && <p className="text-emerald-400 text-xs">{sucesso}</p>}
       </div>
-
-      {/* Tabela de faixas */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold text-white mb-4">Tabela de Faixas</h2>
-        <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-11 gap-2">
-          {FAIXAS.map((f) => (
-            <div key={f.meta} className="bg-slate-800 rounded-xl p-3 text-center">
-              <p className="text-slate-400 text-[10px]">Meta</p>
-              <p className="text-white font-bold text-xs">{f.meta}</p>
-              <p className="text-slate-400 text-[10px] mt-1">Comis.</p>
-              <p className={`font-bold text-xs ${f.cor}`}>{f.comissao}</p>
-            </div>
-          ))}
-        </div>
-        <p className="text-slate-400 text-xs mt-3">Abaixo de 100%: arredonda para baixo · Acima de 100%: arredonda se faltar até 2%</p>
-      </div>
-
-      {/* Histórico */}
-      {historico.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-800">
-            <h2 className="text-sm font-semibold text-white">Últimas Comissões Registradas</h2>
-          </div>
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-800">
-                <th className="text-left px-4 py-3 text-slate-400 font-medium">Consultor</th>
-                <th className="text-right px-4 py-3 text-slate-400 font-medium">Base</th>
-                <th className="text-right px-4 py-3 text-slate-400 font-medium">% Meta</th>
-                <th className="text-right px-4 py-3 text-slate-400 font-medium">Faixa</th>
-                <th className="text-right px-4 py-3 text-slate-400 font-medium">Valor Final</th>
-              </tr>
-            </thead>
-            <tbody>
-              {historico.map((c) => (
-                <tr key={c.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                  <td className="px-4 py-3 text-white">{(c as any).usuario?.nome ?? "—"}</td>
-                  <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{formatarMoeda(Number(c.valorBase))}</td>
-                  <td className={`px-4 py-3 text-right font-semibold tabular-nums ${faixaCor(Number(c.percentualMeta))}`}>{Number(c.percentualMeta).toFixed(1)}%</td>
-                  <td className="px-4 py-3 text-right text-amber-400 tabular-nums">{Number(c.faixaAplicada).toFixed(0)}%</td>
-                  <td className="px-4 py-3 text-right text-emerald-400 font-bold tabular-nums">{formatarMoeda(Number(c.valorFinal))}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────
-// CONSULTOR VIEW (somente acompanhamento)
+// CONSULTOR VIEW
 // ─────────────────────────────────────────────────────────
 function ConsultorComissao({ consultorId }: { consultorId: string }) {
   const [competencias, setCompetencias] = useState<any[]>([]);
   const [competenciaId, setCompetenciaId] = useState("");
-  const [preview, setPreview] = useState<Consultor | null>(null);
+  const [preview, setPreview] = useState<ConsultorResult | null>(null);
   const [carregando, setCarregando] = useState(false);
 
   useEffect(() => {
     fetch("/api/competencias").then((r) => r.json()).then((cs) => {
-      setCompetencias(cs);
-      if (cs[0]) setCompetenciaId(cs[0].id);
+      if (Array.isArray(cs)) {
+        setCompetencias(cs);
+        if (cs[0]) setCompetenciaId(cs[0].id);
+      }
     });
   }, []);
 
@@ -370,7 +507,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
         <select
           value={competenciaId}
           onChange={(e) => setCompetenciaId(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+          className={inputCls}
         >
           {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
         </select>
@@ -384,66 +521,96 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
           <DollarSign size={36} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400">Nenhuma meta configurada para esta competência</p>
-          <p className="text-slate-400 text-sm mt-1">Aguarde seu gestor configurar a meta da equipe.</p>
+          <p className="text-slate-400 text-sm mt-1">Aguarde seu gestor configurar as metas da equipe.</p>
         </div>
       ) : (
         <>
-          {/* Cards de performance */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Cards de resumo */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Total Recebido</p>
-              <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.recebido)}</p>
+              <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.totalRecebido)}</p>
               <p className="text-slate-500 text-[10px] mt-1">inclui valores a parte</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <p className="text-slate-400 text-xs mb-1">% da Meta</p>
-              <p className={`text-xl font-bold tabular-nums ${faixaCor(preview.percentualMeta)}`}>{preview.percentualMeta.toFixed(1)}%</p>
-              <div className="w-full bg-slate-800 rounded-full h-1.5 mt-2">
-                <div className={`h-1.5 rounded-full ${faixaBarCor(preview.percentualMeta)}`} style={{ width: `${Math.min(preview.percentualMeta, 160) / 160 * 100}%` }} />
-              </div>
+              <p className="text-slate-400 text-xs mb-1">Base (100%)</p>
+              <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.comissaoBase)}</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <p className="text-slate-400 text-xs mb-1">Faixa Aplicada</p>
-              <p className={`text-xl font-bold tabular-nums ${faixaCor(preview.percentualMeta)}`}>{preview.faixaAplicada}%</p>
-            </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-              <p className="text-slate-400 text-xs mb-1">Comissão Estimada</p>
-              <p className="text-emerald-400 text-xl font-bold tabular-nums">{formatarMoeda(preview.valorFinal)}</p>
+            <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5">
+              <p className="text-emerald-400/70 text-xs mb-1">Comissão Estimada</p>
+              <p className="text-emerald-400 text-xl font-bold tabular-nums">{formatarMoeda(preview.totalComissao)}</p>
             </div>
           </div>
 
-          {/* Próxima faixa */}
-          {preview.percentualMeta < 160 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-              <p className="text-slate-400 text-xs">Próxima faixa</p>
-              {preview.percentualMeta < 70 && <p className="text-white text-sm mt-1">Atinja <span className="text-amber-400 font-semibold">70%</span> da meta para começar a receber comissão</p>}
-              {preview.percentualMeta >= 70 && preview.percentualMeta < 80 && <p className="text-white text-sm mt-1">Faltam <span className="text-amber-400 font-semibold">{(80 - preview.percentualMeta).toFixed(1)}%</span> para a faixa de 70% → avançar para comissão de <span className="text-emerald-400 font-semibold">70%</span></p>}
-              {preview.percentualMeta >= 80 && preview.percentualMeta < 90 && <p className="text-white text-sm mt-1">Faltam <span className="text-amber-400 font-semibold">{(90 - preview.percentualMeta).toFixed(1)}%</span> para a faixa de 90% → comissão de <span className="text-emerald-400 font-semibold">80%</span></p>}
-              {preview.percentualMeta >= 90 && preview.percentualMeta < 100 && <p className="text-white text-sm mt-1">Faltam <span className="text-amber-400 font-semibold">{(100 - preview.percentualMeta).toFixed(1)}%</span> para atingir 100% da meta → comissão de <span className="text-emerald-400 font-semibold">100%</span></p>}
-              {preview.percentualMeta >= 100 && preview.percentualMeta < 160 && <p className="text-white text-sm mt-1">Continue! Cada 10% adicional aumenta sua comissão. Próxima faixa: <span className="text-emerald-400 font-semibold">{Math.ceil(preview.percentualMeta / 10) * 10}%</span></p>}
+          {/* Barra de progresso financeiro */}
+          {preview.percentualMeta > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-slate-400">Atingimento financeiro</p>
+                <p className={`text-sm font-bold tabular-nums ${faixaCor(preview.percentualMeta)}`}>{preview.percentualMeta.toFixed(1)}%</p>
+              </div>
+              <div className="w-full bg-slate-800 rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${faixaBarCor(preview.percentualMeta)}`}
+                  style={{ width: `${Math.min(preview.percentualMeta, 160) / 160 * 100}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Breakdown por meta */}
+          {preview.breakdown && preview.breakdown.length > 0 && (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={14} className="text-gr-400" />
+                  <h2 className="text-sm font-semibold text-white">Detalhamento por Indicador</h2>
+                </div>
+              </div>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-800 bg-slate-800/40">
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs">Indicador</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Peso</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Bônus 100%</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Realizado</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Atingimento</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Faixa</th>
+                    <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Comissão</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.breakdown.map((bd) => (
+                    <tr key={bd.metaId} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                      <td className="px-4 py-3 text-white font-medium">{bd.nome}</td>
+                      <td className="px-4 py-3 text-right text-slate-400 tabular-nums text-xs">{Math.round(bd.peso * 100)}%</td>
+                      <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{formatarMoeda(bd.valorBase)}</td>
+                      <td className="px-4 py-3 text-right text-slate-300 tabular-nums">
+                        {bd.tipo === "FINANCEIRA"
+                          ? (bd.realizado != null ? formatarMoeda(bd.realizado) : "—")
+                          : (bd.realizado != null ? `${bd.realizado}` : "—")}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold tabular-nums ${faixaCor(bd.atingimento)}`}>
+                        {bd.atingimento > 0 ? `${bd.atingimento.toFixed(1)}%` : "—"}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold tabular-nums ${faixaCor(bd.atingimento)}`}>
+                        {bd.multiplicador}%
+                      </td>
+                      <td className="px-4 py-3 text-right text-emerald-400 font-bold tabular-nums">
+                        {formatarMoeda(bd.contribuicao)}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-800/30">
+                    <td colSpan={6} className="px-4 py-3 text-right text-slate-400 text-sm font-medium">Total</td>
+                    <td className="px-4 py-3 text-right text-emerald-400 font-bold tabular-nums">{formatarMoeda(preview.totalComissao)}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           )}
         </>
       )}
-
-      {/* Tabela de faixas */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold text-white mb-4">Tabela de Faixas</h2>
-        <div className="grid grid-cols-3 sm:grid-cols-6 lg:grid-cols-11 gap-2">
-          {FAIXAS.map((f) => {
-            const pct = parseFloat(f.meta);
-            const ativa = !isNaN(pct) && preview && Math.floor(preview.percentualMeta / 10) * 10 === pct;
-            return (
-              <div key={f.meta} className={`rounded-xl p-3 text-center border ${ativa ? "bg-gr-500/15 border-gr-500/40" : "bg-slate-800 border-transparent"}`}>
-                <p className="text-slate-400 text-[10px]">Meta</p>
-                <p className="text-white font-bold text-xs">{f.meta}</p>
-                <p className="text-slate-400 text-[10px] mt-1">Comis.</p>
-                <p className={`font-bold text-xs ${f.cor}`}>{f.comissao}</p>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
@@ -451,7 +618,6 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
 // ─────────────────────────────────────────────────────────
 // ROOT
 // ─────────────────────────────────────────────────────────
-
 interface FrenteOpcao { equipeId: string; label: string }
 
 const FRENTE_CHIP_STYLE: Record<string, string> = {
@@ -492,7 +658,6 @@ export default function ComissaoPage() {
   if (perfil === "GESTOR" || perfil === "ADMINISTRADOR") {
     return (
       <div className="space-y-6">
-        {/* Seletor de frente — só frentes que o gestor gerencia */}
         {frentesGerenciadas.length > 1 && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-slate-500 font-medium mr-1">Frente:</span>
@@ -514,14 +679,13 @@ export default function ComissaoPage() {
           </div>
         )}
 
-        {frenteSelecionada
-          ? <GestorComissao key={frenteSelecionada} equipeId={frenteSelecionada} />
-          : (
-            <div className="flex items-center justify-center h-40">
-              <div className="w-6 h-6 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          )
-        }
+        {frenteSelecionada ? (
+          <GestorComissao key={frenteSelecionada} equipeId={frenteSelecionada} />
+        ) : (
+          <div className="flex items-center justify-center h-40">
+            <div className="w-6 h-6 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
       </div>
     );
   }

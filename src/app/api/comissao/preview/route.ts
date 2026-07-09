@@ -2,11 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { calcularComissao } from "@/constants/comissao";
+import { calcularComissaoMetas } from "@/lib/comissao";
 
-// GET /api/comissao/preview?competenciaId=X&equipeId=Y
-// Retorna projeção de comissão por consultor sem gravar no banco.
-// Para CONSULTOR retorna somente seus dados; GESTOR/ADMIN retorna equipe inteira.
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
@@ -19,7 +16,6 @@ export async function GET(req: NextRequest) {
 
   const perfil = session.user.perfil;
 
-  // Determina quais consultores buscar
   let whereConsultores: any = { ativo: true, perfil: "CONSULTOR" };
   if (perfil === "CONSULTOR") {
     whereConsultores.id = session.user.id;
@@ -36,40 +32,60 @@ export async function GET(req: NextRequest) {
 
   if (consultores.length === 0) return NextResponse.json([]);
 
-  // Meta: para GESTOR usa equipe própria; para ADMIN usa equipeIdParam
-  const equipeId = perfil === "GESTOR" ? session.user.equipeId : equipeIdParam ?? consultores[0].equipeId;
-  const meta = equipeId
-    ? await prisma.meta.findFirst({ where: { equipeId, competenciaId } })
-    : null;
+  const equipeId = perfil === "GESTOR"
+    ? (session.user as any).equipeId
+    : equipeIdParam ?? consultores[0].equipeId;
+
+  const [equipe, metas] = await Promise.all([
+    equipeId ? prisma.equipe.findUnique({ where: { id: equipeId }, select: { comissaoBase: true } }) : null,
+    equipeId ? prisma.meta.findMany({ where: { equipeId, competenciaId }, orderBy: { criadoEm: "asc" } }) : [],
+  ]);
+
+  const comissaoBase = Number(equipe?.comissaoBase ?? 0);
 
   const resultados = await Promise.all(
     consultores.map(async (consultor) => {
       const recebimentos = await prisma.recebimento.findMany({
         where: {
           consultorId: consultor.id,
-          contrato: {
-            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } },
-          },
+          contrato: { carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
         },
         select: { valor: true, valorAParte: true },
       });
 
-      // Comissão inclui "a parte"
-      const totalComissao = recebimentos.reduce(
+      const totalRecebido = recebimentos.reduce(
         (s, r) => s + Number(r.valor) + Number(r.valorAParte ?? 0),
         0
       );
-      const metaValor = meta ? Number(meta.valorAlvo) : 0;
-      const percentualMeta = metaValor > 0 ? (totalComissao / metaValor) * 100 : 0;
-      const { faixa, valor } = calcularComissao(totalComissao, percentualMeta);
+
+      const metasComNota = metas.map((m) => ({
+        id: m.id,
+        nome: m.nome,
+        tipo: m.tipo,
+        peso: Number(m.peso),
+        valorAlvo: m.valorAlvo ? Number(m.valorAlvo) : null,
+        thresholdsMonitoria: (m.thresholdsMonitoria as Record<string, number>) ?? null,
+        notaMonitoria: ((m.resultadosConsultores as Record<string, number>) ?? {})[consultor.id] ?? 0,
+      }));
+
+      const { totalComissao, breakdown } = calcularComissaoMetas(comissaoBase, metasComNota, totalRecebido);
+
+      const metaFin = metasComNota.find((m) => m.tipo === "FINANCEIRA");
+      const percentualMeta = metaFin?.valorAlvo ? (totalRecebido / metaFin.valorAlvo) * 100 : 0;
+      const faixaAplicada = breakdown.find((b) => b.tipo === "FINANCEIRA")?.multiplicador ?? 0;
 
       return {
         id: consultor.id,
         nome: consultor.nome,
-        recebido: totalComissao,
+        totalRecebido,
+        totalComissao,
+        comissaoBase,
+        breakdown,
+        // compat fields
+        recebido: totalRecebido,
         percentualMeta,
-        faixaAplicada: faixa,
-        valorFinal: valor,
+        faixaAplicada,
+        valorFinal: totalComissao,
       };
     })
   );

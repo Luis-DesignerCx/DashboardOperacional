@@ -151,6 +151,7 @@ model Equipe {
   gestorId       String?
   ativa          Boolean    @default(true)
   diasSemContato Int        @default(3)
+  comissaoBase   Decimal?   @db.Decimal(15, 2)
   criadoEm       DateTime   @default(now())
   atualizadoEm   DateTime   @updatedAt
 
@@ -390,9 +391,11 @@ model Meta {
   tipo             String      // FINANCEIRA | QUANTIDADE | MONITORIA
   percentualAlvo   Decimal?    @db.Decimal(5, 2)
   quantidadeAlvo   Int?
-  valorAlvo        Decimal?    @db.Decimal(15, 2)
-  peso             Decimal     @default(1) @db.Decimal(5, 2)
-  criadoEm         DateTime    @default(now())
+  valorAlvo             Decimal?    @db.Decimal(15, 2)
+  peso                  Decimal     @default(1) @db.Decimal(5, 2)
+  thresholdsMonitoria   Json?
+  resultadosConsultores Json?
+  criadoEm              DateTime    @default(now())
   atualizadoEm     DateTime    @updatedAt
 
   equipe           Equipe      @relation(fields: [equipeId], references: [id])
@@ -417,6 +420,7 @@ model Comissao {
   faixaAplicada  Decimal  @db.Decimal(5, 2)
   valorFinal     Decimal  @db.Decimal(15, 2)
   calculadoEm    DateTime @default(now())
+  breakdown      Json?
 
   equipe         Equipe   @relation(fields: [equipeId], references: [id])
 

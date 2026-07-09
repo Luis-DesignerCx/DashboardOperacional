@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Target, Plus, X, CheckCircle2, Loader2, Trash2, TrendingUp, Users, ClipboardCheck, Pencil } from "lucide-react";
+import { formatarMoeda } from "@/lib/utils";
 
 interface Meta {
   id: string;
@@ -11,6 +12,7 @@ interface Meta {
   quantidadeAlvo: number | null;
   valorAlvo: number | null;
   peso: number;
+  thresholdsMonitoria: Record<string, number> | null;
   equipe: { nome: string; tipo: string };
   competencia: { descricao: string };
   consultor: { nome: string } | null;
@@ -23,7 +25,7 @@ const TIPO_CONFIG = {
     label: "Financeira",
     icon: TrendingUp,
     cor: "text-sky-400 bg-sky-500/10 border-sky-500/20",
-    desc: "% da carteira de inadimplência que o consultor deve receber",
+    desc: "Valor em R$ que a equipe deve receber no mês",
   },
   QUANTIDADE: {
     label: "Quantidade",
@@ -35,8 +37,16 @@ const TIPO_CONFIG = {
     label: "Monitoria",
     icon: ClipboardCheck,
     cor: "text-emerald-400 bg-emerald-500/10 border-emerald-500/20",
-    desc: "Percentual de qualidade na monitoria (independente da carteira)",
+    desc: "Nota de qualidade — cada faixa tem uma nota mínima configurável",
   },
+};
+
+const FAIXAS_THRESH = [70, 80, 90, 100, 110, 120, 130, 140, 150, 160];
+
+const DEFAULT_THRESHOLDS: Record<string, number> = {
+  "70": 74, "80": 76, "90": 78, "100": 80,
+  "110": 82, "120": 83, "130": 85, "140": 86,
+  "150": 88, "160": 89,
 };
 
 const TIPO_EQUIPE_LABEL: Record<string, string> = {
@@ -47,7 +57,8 @@ const TIPO_EQUIPE_LABEL: Record<string, string> = {
 const FORM_VAZIO = {
   equipeId: "", competenciaId: "", consultorId: "",
   nome: "", tipo: "FINANCEIRA" as "FINANCEIRA" | "QUANTIDADE" | "MONITORIA",
-  percentualAlvo: "", quantidadeAlvo: "", peso: "1",
+  valorAlvo: "", quantidadeAlvo: "",
+  peso: "100",
 };
 
 export default function MetasPage() {
@@ -60,6 +71,7 @@ export default function MetasPage() {
   const [modalAberto, setModalAberto] = useState(false);
   const [editandoMeta, setEditandoMeta] = useState<Meta | null>(null);
   const [form, setForm] = useState({ ...FORM_VAZIO });
+  const [thresholds, setThresholds] = useState<Record<string, number>>({ ...DEFAULT_THRESHOLDS });
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [erro, setErro] = useState("");
@@ -82,7 +94,6 @@ export default function MetasPage() {
     });
   }, []);
 
-  // Carrega consultores quando equipe muda no form
   useEffect(() => {
     if (!form.equipeId) { setConsultoresDaEquipe([]); return; }
     const eq = equipes.find((e) => e.id === form.equipeId);
@@ -95,7 +106,8 @@ export default function MetasPage() {
   function abrirModal() {
     setEditandoMeta(null);
     setModalAberto(true);
-    setForm((f) => ({ ...FORM_VAZIO, equipeId: equipes[0]?.id ?? "", competenciaId: competencias[0]?.id ?? "" }));
+    setForm({ ...FORM_VAZIO, equipeId: equipes[0]?.id ?? "", competenciaId: competencias[0]?.id ?? "" });
+    setThresholds({ ...DEFAULT_THRESHOLDS });
     setErro("");
   }
 
@@ -106,33 +118,43 @@ export default function MetasPage() {
       equipeId: "", competenciaId: "", consultorId: "",
       nome: m.nome ?? "",
       tipo: m.tipo as "FINANCEIRA" | "QUANTIDADE" | "MONITORIA",
-      percentualAlvo: m.percentualAlvo != null ? String(m.percentualAlvo) : "",
+      valorAlvo: m.valorAlvo != null ? String(Number(m.valorAlvo)) : "",
       quantidadeAlvo: m.quantidadeAlvo != null ? String(m.quantidadeAlvo) : "",
-      peso: String(m.peso ?? 1),
+      peso: String(Math.round(Number(m.peso ?? 1) * 100)),
     });
+    setThresholds(m.thresholdsMonitoria ? { ...m.thresholdsMonitoria } : { ...DEFAULT_THRESHOLDS });
     setErro("");
   }
 
   async function salvarMeta() {
     setErro("");
-    if (!form.equipeId) { setErro("Selecione a equipe"); return; }
-    if (!form.competenciaId) { setErro("Selecione a competência"); return; }
+
+    if (!editandoMeta) {
+      if (!form.equipeId) { setErro("Selecione a equipe"); return; }
+      if (!form.competenciaId) { setErro("Selecione a competência"); return; }
+    }
+
+    const pesoDecimal = (parseFloat(form.peso) || 100) / 100;
 
     const payload: any = {
-      equipeId: form.equipeId,
-      competenciaId: form.competenciaId,
-      consultorId: form.consultorId || null,
       nome: form.nome,
       tipo: form.tipo,
-      peso: parseFloat(form.peso) || 1,
+      peso: pesoDecimal,
     };
 
-    if (form.tipo === "FINANCEIRA" || form.tipo === "MONITORIA") {
-      const pct = parseFloat(form.percentualAlvo.replace(",", "."));
-      if (!pct || pct <= 0 || pct > 100) { setErro("Informe um percentual entre 0 e 100"); return; }
-      payload.percentualAlvo = pct;
+    if (!editandoMeta) {
+      payload.equipeId = form.equipeId;
+      payload.competenciaId = form.competenciaId;
+      payload.consultorId = form.consultorId || null;
     }
-    if (form.tipo === "QUANTIDADE") {
+
+    if (form.tipo === "FINANCEIRA") {
+      const v = parseFloat(form.valorAlvo.replace(",", ".") || "0");
+      if (!v || v <= 0) { setErro("Informe o valor alvo em R$"); return; }
+      payload.valorAlvo = v;
+    } else if (form.tipo === "MONITORIA") {
+      payload.thresholdsMonitoria = thresholds;
+    } else if (form.tipo === "QUANTIDADE") {
       const qtd = parseInt(form.quantidadeAlvo, 10);
       if (!qtd || qtd <= 0) { setErro("Informe uma quantidade válida"); return; }
       payload.quantidadeAlvo = qtd;
@@ -167,9 +189,12 @@ export default function MetasPage() {
   }
 
   function renderAlvo(m: Meta) {
-    if (m.tipo === "FINANCEIRA") return `${Number(m.percentualAlvo ?? 0).toFixed(1)}% da carteira`;
+    if (m.tipo === "FINANCEIRA") return m.valorAlvo ? formatarMoeda(Number(m.valorAlvo)) : "—";
     if (m.tipo === "QUANTIDADE") return `${m.quantidadeAlvo ?? 0} clientes`;
-    if (m.tipo === "MONITORIA") return `${Number(m.percentualAlvo ?? 0).toFixed(1)}%`;
+    if (m.tipo === "MONITORIA") {
+      const notaBase = m.thresholdsMonitoria?.["100"];
+      return notaBase != null ? `Nota ≥ ${notaBase} → 100%` : "Monitoria";
+    }
     return "—";
   }
 
@@ -180,7 +205,7 @@ export default function MetasPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Metas</h1>
-          <p className="text-slate-400 text-sm mt-1">Metas individuais por consultor e competência</p>
+          <p className="text-slate-400 text-sm mt-1">Metas por frente e competência</p>
         </div>
         <button
           onClick={abrirModal}
@@ -198,7 +223,7 @@ export default function MetasPage() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
           <Target size={40} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 font-medium">Nenhuma meta configurada</p>
-          <p className="text-slate-400 text-sm mt-1">Crie metas financeiras, de quantidade ou de monitoria por consultor.</p>
+          <p className="text-slate-400 text-sm mt-1">Crie metas financeiras, de quantidade ou de monitoria.</p>
         </div>
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -233,7 +258,9 @@ export default function MetasPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right text-white font-semibold tabular-nums">{renderAlvo(m)}</td>
-                    <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{Number(m.peso).toFixed(1)}x</td>
+                    <td className="px-4 py-3 text-right text-slate-300 tabular-nums">
+                      {Math.round(Number(m.peso) * 100)}%
+                    </td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <button
@@ -259,14 +286,18 @@ export default function MetasPage() {
         </div>
       )}
 
-      {/* Modal nova meta */}
+      {/* Modal */}
       {modalAberto && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
               <div>
                 <h2 className="text-white font-semibold">{editandoMeta ? "Editar Meta" : "Nova Meta"}</h2>
-                <p className="text-slate-500 text-xs mt-0.5">{editandoMeta ? `${editandoMeta.nome || "Meta"} · ${editandoMeta.consultor?.nome ?? "Equipe toda"}` : "Defina a meta para um consultor nesta competência"}</p>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  {editandoMeta
+                    ? `${editandoMeta.nome || "Meta"} · ${editandoMeta.consultor?.nome ?? "Equipe toda"}`
+                    : "Defina a meta para a frente nesta competência"}
+                </p>
               </div>
               <button onClick={() => setModalAberto(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
                 <X size={16} />
@@ -286,7 +317,10 @@ export default function MetasPage() {
                       <button
                         key={t}
                         type="button"
-                        onClick={() => setForm((f) => ({ ...f, tipo: t, percentualAlvo: "", quantidadeAlvo: "" }))}
+                        onClick={() => {
+                          setForm((f) => ({ ...f, tipo: t, valorAlvo: "", quantidadeAlvo: "" }));
+                          if (t === "MONITORIA" && !editandoMeta) setThresholds({ ...DEFAULT_THRESHOLDS });
+                        }}
                         className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
                           ativo ? cfg.cor + " font-medium" : "border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400"
                         }`}
@@ -300,6 +334,7 @@ export default function MetasPage() {
                 <p className="text-[11px] text-slate-500 mt-1.5">{TIPO_CONFIG[form.tipo].desc}</p>
               </div>
 
+              {/* Equipe / Competência / Consultor — apenas no modo criação */}
               {!editandoMeta && (
                 <>
                   <div className="grid grid-cols-2 gap-3">
@@ -321,7 +356,7 @@ export default function MetasPage() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-slate-400 mb-1.5">Consultor (opcional — deixe em branco para meta da equipe)</label>
+                    <label className="block text-xs text-slate-400 mb-1.5">Consultor (opcional)</label>
                     <select className={inputCls} value={form.consultorId} onChange={(e) => setForm((f) => ({ ...f, consultorId: e.target.value }))}>
                       <option value="">Equipe toda</option>
                       {consultoresDaEquipe.map((c: any) => (
@@ -343,9 +378,26 @@ export default function MetasPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                {/* Alvo — campo varia pelo tipo */}
+                {/* Alvo */}
                 <div>
-                  {form.tipo === "QUANTIDADE" ? (
+                  {form.tipo === "FINANCEIRA" && (
+                    <>
+                      <label className="block text-xs text-slate-400 mb-1.5">Valor alvo (R$) *</label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
+                        <input
+                          className={inputCls + " pl-9"}
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          placeholder="0,00"
+                          value={form.valorAlvo}
+                          onChange={(e) => setForm((f) => ({ ...f, valorAlvo: e.target.value }))}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {form.tipo === "QUANTIDADE" && (
                     <>
                       <label className="block text-xs text-slate-400 mb-1.5">Qtd. clientes alvo *</label>
                       <input
@@ -357,44 +409,80 @@ export default function MetasPage() {
                         onChange={(e) => setForm((f) => ({ ...f, quantidadeAlvo: e.target.value }))}
                       />
                     </>
-                  ) : (
-                    <>
-                      <label className="block text-xs text-slate-400 mb-1.5">
-                        {form.tipo === "FINANCEIRA" ? "% da carteira alvo *" : "% de qualidade alvo *"}
-                      </label>
-                      <div className="relative">
-                        <input
-                          className={inputCls + " pr-8"}
-                          type="number"
-                          min="1"
-                          max="100"
-                          step="0.1"
-                          placeholder="Ex: 25"
-                          value={form.percentualAlvo}
-                          onChange={(e) => setForm((f) => ({ ...f, percentualAlvo: e.target.value }))}
-                        />
-                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                  )}
+                  {form.tipo === "MONITORIA" && (
+                    <div className="col-span-2">
+                      <label className="block text-xs text-slate-400 mb-1.5">Notas mínimas por faixa</label>
+                      <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left px-3 py-2 text-slate-400">Faixa</th>
+                              <th className="text-right px-3 py-2 text-slate-400">Nota mínima</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {FAIXAS_THRESH.map((f) => (
+                              <tr key={f} className="border-b border-slate-700/50 last:border-0">
+                                <td className="px-3 py-1.5 text-slate-300 font-medium">{f}%</td>
+                                <td className="px-3 py-1.5 text-right">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={thresholds[String(f)] ?? ""}
+                                    onChange={(e) => setThresholds((t) => ({ ...t, [String(f)]: parseFloat(e.target.value) || 0 }))}
+                                    className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-right focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
-                    </>
+                    </div>
                   )}
                 </div>
+
+                {form.tipo !== "MONITORIA" && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1.5">Peso na comissão (%)*</label>
+                    <div className="relative">
+                      <input
+                        className={inputCls + " pr-8"}
+                        type="number"
+                        min="1"
+                        max="100"
+                        step="1"
+                        placeholder="Ex: 90"
+                        value={form.peso}
+                        onChange={(e) => setForm((f) => ({ ...f, peso: e.target.value }))}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {form.tipo === "MONITORIA" && (
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Peso na comissão *</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Peso na comissão (%)*</label>
                   <div className="relative">
                     <input
                       className={inputCls + " pr-8"}
                       type="number"
-                      min="0.1"
-                      max="10"
-                      step="0.1"
-                      placeholder="Ex: 1"
+                      min="1"
+                      max="100"
+                      step="1"
+                      placeholder="Ex: 10"
                       value={form.peso}
                       onChange={(e) => setForm((f) => ({ ...f, peso: e.target.value }))}
                     />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">x</span>
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
                   </div>
                 </div>
-              </div>
+              )}
 
               {erro && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{erro}</p>}
             </div>
