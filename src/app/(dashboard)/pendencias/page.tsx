@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatarMoeda, formatarData } from "@/lib/utils";
-import { Bell, AlertTriangle, Clock, CheckCircle2, Plus, Search, X, Loader2, Phone } from "lucide-react";
+import { Bell, AlertTriangle, Clock, CheckCircle2, Plus, Search, X, Loader2, Phone, CalendarDays, Trash2, Pencil } from "lucide-react";
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
 
 export default function PendenciasPage() {
   const [promessasHoje, setPromessasHoje] = useState<any[]>([]);
   const [promessasVencidas, setPromessasVencidas] = useState<any[]>([]);
+  const [promessasFuturas, setPromessasFuturas] = useState<any[]>([]);
   const [agendadosHoje, setAgendadosHoje] = useState<any[]>([]);
   const [carregando, setCarregando] = useState(true);
 
@@ -35,18 +36,27 @@ export default function PendenciasPage() {
   const [salvandoEdit, setSalvandoEdit] = useState(false);
   const [erroEdit, setErroEdit] = useState("");
 
+  // Confirmação de exclusão
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState(false);
+
   function recarregar() {
     setCarregando(true);
     Promise.all([
-      fetch("/api/promessas?vencendoHoje=true").then((r) => r.json()),
       fetch("/api/promessas?status=ABERTA").then((r) => r.json()),
       fetch("/api/contatos?agendadosHoje=true").then((r) => r.json()),
-    ]).then(([hoje, abertas, agendados]) => {
-      setPromessasHoje(Array.isArray(hoje) ? hoje : []);
-      const vencidas = (Array.isArray(abertas) ? abertas : []).filter(
-        (p: any) => new Date(p.dataPrometida) < new Date() && !((Array.isArray(hoje) ? hoje : []).find((h: any) => h.id === p.id))
-      );
-      setPromessasVencidas(vencidas);
+    ]).then(([abertas, agendados]) => {
+      const agora = new Date();
+      const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+      const fimHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
+      const lista = Array.isArray(abertas) ? abertas : [];
+
+      setPromessasVencidas(lista.filter((p: any) => new Date(p.dataPrometida) < inicioHoje));
+      setPromessasHoje(lista.filter((p: any) => {
+        const d = new Date(p.dataPrometida);
+        return d >= inicioHoje && d <= fimHoje;
+      }));
+      setPromessasFuturas(lista.filter((p: any) => new Date(p.dataPrometida) > fimHoje));
       setAgendadosHoje(Array.isArray(agendados) ? agendados : []);
       setCarregando(false);
     });
@@ -140,6 +150,18 @@ export default function PendenciasPage() {
     recarregar();
   }
 
+  async function excluirPromessa(id: string) {
+    setExcluindo(true);
+    const res = await fetch(`/api/promessas?id=${id}`, { method: "DELETE" });
+    setExcluindo(false);
+    if (res.ok) {
+      setConfirmandoExclusao(null);
+      recarregar();
+    }
+  }
+
+  const totalAbertas = promessasVencidas.length + promessasHoje.length + promessasFuturas.length;
+
   if (carregando) return (
     <div className="flex justify-center py-16">
       <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
@@ -152,8 +174,8 @@ export default function PendenciasPage() {
         <div className="flex items-center gap-3">
           <Bell size={24} className="text-amber-400" />
           <div>
-            <h1 className="text-2xl font-bold text-white">Minhas Tarefas Diárias</h1>
-            <p className="text-slate-400 text-sm">Ações prioritárias para hoje</p>
+            <h1 className="text-2xl font-bold text-white">Minhas Tarefas</h1>
+            <p className="text-slate-400 text-sm">{totalAbertas} promessa{totalAbertas !== 1 ? "s" : ""} em aberto · {agendadosHoje.length} retorno{agendadosHoje.length !== 1 ? "s" : ""} hoje</p>
           </div>
         </div>
         <button
@@ -164,83 +186,93 @@ export default function PendenciasPage() {
         </button>
       </div>
 
-      {/* Central de Pendências */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-        <h2 className="text-sm font-semibold text-white mb-4">Central de Pendências</h2>
-        <div className="space-y-3">
-          <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasHoje.length > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-slate-800 border-slate-700"}`}>
-            <div className="flex items-center gap-3">
-              <Clock size={16} className={promessasHoje.length > 0 ? "text-amber-400" : "text-slate-500"} />
-              <div>
-                <p className="text-white text-sm font-medium">Promessas vencendo hoje</p>
-                <p className="text-slate-400 text-xs">{formatarMoeda(promessasHoje.reduce((s, p) => s + Number(p.valorPrometido), 0))} agendado</p>
-              </div>
+      {/* Resumo */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasVencidas.length > 0 ? "bg-red-500/10 border-red-500/20" : "bg-slate-900 border-slate-800"}`}>
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle size={15} className={promessasVencidas.length > 0 ? "text-red-400" : "text-slate-500"} />
+            <div>
+              <p className="text-white text-xs font-medium">Vencidas</p>
+              <p className="text-slate-400 text-[10px]">{formatarMoeda(promessasVencidas.reduce((s, p) => s + Number(p.valorPrometido), 0))}</p>
             </div>
-            <span className={`text-lg font-bold ${promessasHoje.length > 0 ? "text-amber-400" : "text-slate-400"}`}>{promessasHoje.length}</span>
           </div>
-
-          <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasVencidas.length > 0 ? "bg-red-500/10 border-red-500/20" : "bg-slate-800 border-slate-700"}`}>
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={16} className={promessasVencidas.length > 0 ? "text-red-400" : "text-slate-500"} />
-              <div>
-                <p className="text-white text-sm font-medium">Promessas vencidas</p>
-                <p className="text-slate-400 text-xs">{formatarMoeda(promessasVencidas.reduce((s, p) => s + Number(p.valorPrometido), 0))} não recebido</p>
-              </div>
+          <span className={`text-lg font-bold ${promessasVencidas.length > 0 ? "text-red-400" : "text-slate-500"}`}>{promessasVencidas.length}</span>
+        </div>
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasHoje.length > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-slate-900 border-slate-800"}`}>
+          <div className="flex items-center gap-2.5">
+            <Clock size={15} className={promessasHoje.length > 0 ? "text-amber-400" : "text-slate-500"} />
+            <div>
+              <p className="text-white text-xs font-medium">Vencem hoje</p>
+              <p className="text-slate-400 text-[10px]">{formatarMoeda(promessasHoje.reduce((s, p) => s + Number(p.valorPrometido), 0))}</p>
             </div>
-            <span className={`text-lg font-bold ${promessasVencidas.length > 0 ? "text-red-400" : "text-slate-400"}`}>{promessasVencidas.length}</span>
           </div>
-
-          <div className={`flex items-center justify-between p-3 rounded-xl border ${agendadosHoje.length > 0 ? "bg-sky-500/10 border-sky-500/20" : "bg-slate-800 border-slate-700"}`}>
-            <div className="flex items-center gap-3">
-              <Phone size={16} className={agendadosHoje.length > 0 ? "text-sky-400" : "text-slate-500"} />
-              <div>
-                <p className="text-white text-sm font-medium">Retornos agendados para hoje</p>
-                <p className="text-slate-400 text-xs">Ligar depois / Aguardar retorno</p>
-              </div>
+          <span className={`text-lg font-bold ${promessasHoje.length > 0 ? "text-amber-400" : "text-slate-500"}`}>{promessasHoje.length}</span>
+        </div>
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasFuturas.length > 0 ? "bg-sky-500/10 border-sky-500/20" : "bg-slate-900 border-slate-800"}`}>
+          <div className="flex items-center gap-2.5">
+            <CalendarDays size={15} className={promessasFuturas.length > 0 ? "text-sky-400" : "text-slate-500"} />
+            <div>
+              <p className="text-white text-xs font-medium">Futuras</p>
+              <p className="text-slate-400 text-[10px]">{formatarMoeda(promessasFuturas.reduce((s, p) => s + Number(p.valorPrometido), 0))}</p>
             </div>
-            <span className={`text-lg font-bold ${agendadosHoje.length > 0 ? "text-sky-400" : "text-slate-400"}`}>{agendadosHoje.length}</span>
           </div>
+          <span className={`text-lg font-bold ${promessasFuturas.length > 0 ? "text-sky-400" : "text-slate-500"}`}>{promessasFuturas.length}</span>
+        </div>
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${agendadosHoje.length > 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-slate-900 border-slate-800"}`}>
+          <div className="flex items-center gap-2.5">
+            <Phone size={15} className={agendadosHoje.length > 0 ? "text-emerald-400" : "text-slate-500"} />
+            <div>
+              <p className="text-white text-xs font-medium">Retornos hoje</p>
+              <p className="text-slate-400 text-[10px]">Ligar / Aguardar</p>
+            </div>
+          </div>
+          <span className={`text-lg font-bold ${agendadosHoje.length > 0 ? "text-emerald-400" : "text-slate-500"}`}>{agendadosHoje.length}</span>
         </div>
       </div>
 
-      <Section
-        titulo="Promessas Vencendo Hoje"
-        count={promessasHoje.length}
-        icon={Clock}
-        cor="text-amber-400"
-        vazio="Nenhuma promessa para hoje"
-      >
-        {promessasHoje.map((p) => <CardPromessa key={p.id} promessa={p} onEditar={() => abrirEditar(p)} />)}
+      {/* Promessas vencidas */}
+      <Section titulo="Promessas Vencidas" count={promessasVencidas.length} icon={AlertTriangle} cor="text-red-400" vazio="Nenhuma promessa vencida">
+        {promessasVencidas.map((p) => (
+          <CardPromessa key={p.id} promessa={p} variante="vencida"
+            onEditar={() => abrirEditar(p)}
+            onExcluir={() => setConfirmandoExclusao(p.id)}
+          />
+        ))}
       </Section>
 
-      <Section
-        titulo="Promessas Vencidas"
-        count={promessasVencidas.length}
-        icon={AlertTriangle}
-        cor="text-red-400"
-        vazio="Nenhuma promessa vencida"
-      >
-        {promessasVencidas.map((p) => <CardPromessa key={p.id} promessa={p} vencida onEditar={() => abrirEditar(p)} />)}
+      {/* Promessas de hoje */}
+      <Section titulo="Vencem Hoje" count={promessasHoje.length} icon={Clock} cor="text-amber-400" vazio="Nenhuma promessa para hoje">
+        {promessasHoje.map((p) => (
+          <CardPromessa key={p.id} promessa={p} variante="hoje"
+            onEditar={() => abrirEditar(p)}
+            onExcluir={() => setConfirmandoExclusao(p.id)}
+          />
+        ))}
       </Section>
 
+      {/* Promessas futuras */}
+      <Section titulo="Próximas Promessas" count={promessasFuturas.length} icon={CalendarDays} cor="text-sky-400" vazio="Nenhuma promessa futura cadastrada">
+        {promessasFuturas.map((p) => (
+          <CardPromessa key={p.id} promessa={p} variante="futura"
+            onEditar={() => abrirEditar(p)}
+            onExcluir={() => setConfirmandoExclusao(p.id)}
+          />
+        ))}
+      </Section>
+
+      {/* Retornos agendados */}
       {agendadosHoje.length > 0 && (
-        <Section
-          titulo="Retornos Agendados Hoje"
-          count={agendadosHoje.length}
-          icon={Phone}
-          cor="text-sky-400"
-          vazio=""
-        >
+        <Section titulo="Retornos Agendados Hoje" count={agendadosHoje.length} icon={Phone} cor="text-emerald-400" vazio="">
           {agendadosHoje.map((c: any) => (
-            <div key={c.id} className="bg-slate-900 border border-sky-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
+            <div key={c.id} className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
               <div>
                 <p className="text-white font-medium text-sm">{c.contrato?.cliente?.nome || "—"}</p>
-                <p className="text-slate-500 text-xs">{c.contrato?.numero} · {c.consultor?.nome}</p>
+                <p className="text-slate-400 text-xs">{c.contrato?.numero} · {c.consultor?.nome}</p>
                 {c.observacao && <p className="text-slate-400 text-xs mt-0.5 italic">{c.observacao}</p>}
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-sky-400 text-xs font-medium">{c.status === "LIGAR_DEPOIS" ? "Ligar depois" : "Aguardando retorno"}</p>
-                {c.agendadoPara && <p className="text-slate-500 text-xs">{new Date(c.agendadoPara).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>}
+                <p className="text-emerald-400 text-xs font-medium">{c.status === "LIGAR_DEPOIS" ? "Ligar depois" : "Aguardando retorno"}</p>
+                {c.agendadoPara && <p className="text-slate-400 text-xs">{new Date(c.agendadoPara).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>}
               </div>
             </div>
           ))}
@@ -254,7 +286,7 @@ export default function PendenciasPage() {
             <div className="flex items-center justify-between p-5 border-b border-slate-800">
               <div>
                 <h2 className="text-white font-semibold">Nova Promessa de Pagamento</h2>
-                <p className="text-slate-500 text-xs mt-0.5">Registre o compromisso do cliente</p>
+                <p className="text-slate-400 text-xs mt-0.5">Registre o compromisso do cliente</p>
               </div>
               <button onClick={() => setModalAberto(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
                 <X size={16} />
@@ -272,7 +304,7 @@ export default function PendenciasPage() {
                   </div>
                   {buscando && <div className="flex justify-center py-3"><Loader2 size={18} className="animate-spin text-slate-500" /></div>}
                   {!buscando && resultadosBusca.length === 0 && buscaContrato.length >= 2 && (
-                    <p className="text-slate-500 text-sm text-center py-3">Nenhum contrato encontrado</p>
+                    <p className="text-slate-400 text-sm text-center py-3">Nenhum contrato encontrado</p>
                   )}
                   {resultadosBusca.length > 0 && (
                     <div className="space-y-1.5 max-h-60 overflow-y-auto">
@@ -281,7 +313,7 @@ export default function PendenciasPage() {
                           className="w-full flex items-center justify-between bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-3 text-left transition-colors">
                           <div>
                             <p className="text-white text-sm font-medium">{item.contrato.cliente.nome}</p>
-                            <p className="text-slate-500 text-xs font-mono">{item.contrato.numero} · {item.contrato.empresa.nome}</p>
+                            <p className="text-slate-400 text-xs font-mono">{item.contrato.numero} · {item.contrato.empresa.nome}</p>
                           </div>
                           <p className="text-white text-xs font-semibold tabular-nums">{formatarMoeda(Number(item.contrato.valorTotalAberto ?? 0))}</p>
                         </button>
@@ -356,7 +388,7 @@ export default function PendenciasPage() {
             <div className="flex items-center justify-between p-5 border-b border-slate-800">
               <div>
                 <h2 className="text-white font-semibold">Editar Promessa</h2>
-                <p className="text-slate-500 text-xs mt-0.5">{modalEditar.contrato?.cliente?.nome}</p>
+                <p className="text-slate-400 text-xs mt-0.5">{modalEditar.contrato?.cliente?.nome}</p>
               </div>
               <button onClick={() => setModalEditar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
                 <X size={16} />
@@ -403,6 +435,31 @@ export default function PendenciasPage() {
           </div>
         </div>
       )}
+
+      {/* Modal confirmar exclusão */}
+      {confirmandoExclusao && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-red-500/30 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
+            <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
+              <Trash2 size={20} className="text-red-400" />
+            </div>
+            <div>
+              <p className="text-white font-semibold">Excluir promessa?</p>
+              <p className="text-slate-400 text-sm mt-1">Esta ação não pode ser desfeita.</p>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmandoExclusao(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                Cancelar
+              </button>
+              <button onClick={() => excluirPromessa(confirmandoExclusao)} disabled={excluindo}
+                className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-red-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                {excluindo ? <><Loader2 size={14} className="animate-spin" /> Excluindo...</> : <><Trash2 size={14} /> Excluir</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -420,7 +477,7 @@ function Section({ titulo, count, icon: Icon, cor, vazio, children }: any) {
       {count === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
           <CheckCircle2 size={28} className="mx-auto mb-2 text-slate-700" />
-          <p className="text-slate-500 text-sm">{vazio}</p>
+          <p className="text-slate-400 text-sm">{vazio}</p>
         </div>
       ) : (
         <div className="space-y-2">{children}</div>
@@ -429,25 +486,47 @@ function Section({ titulo, count, icon: Icon, cor, vazio, children }: any) {
   );
 }
 
-function CardPromessa({ promessa: p, vencida, onEditar }: { promessa: any; vencida?: boolean; onEditar: () => void }) {
+function CardPromessa({
+  promessa: p,
+  variante,
+  onEditar,
+  onExcluir,
+}: {
+  promessa: any;
+  variante: "vencida" | "hoje" | "futura";
+  onEditar: () => void;
+  onExcluir: () => void;
+}) {
   const cliente = p.contrato?.cliente;
+  const borderCor =
+    variante === "vencida" ? "border-red-500/20" :
+    variante === "hoje"    ? "border-amber-500/20" :
+                             "border-sky-500/20";
+  const dataCor =
+    variante === "vencida" ? "text-red-400" :
+    variante === "hoje"    ? "text-amber-400" :
+                             "text-sky-400";
+
   return (
-    <div className={`bg-slate-900 border rounded-xl p-4 flex items-center justify-between gap-4 ${vencida ? "border-red-500/20" : "border-amber-500/20"}`}>
-      <div>
-        <p className="text-white font-medium text-sm">{cliente?.nome || "—"}</p>
-        <p className="text-slate-500 text-xs">{p.contrato?.numero} · {p.contrato?.empresa?.nome}</p>
-        {p.observacao && <p className="text-slate-400 text-xs mt-0.5 italic">{p.observacao}</p>}
+    <div className={`bg-slate-900 border ${borderCor} rounded-xl p-4 flex items-center justify-between gap-4`}>
+      <div className="flex-1 min-w-0">
+        <p className="text-white font-medium text-sm truncate">{cliente?.nome || "—"}</p>
+        <p className="text-slate-400 text-xs">{p.contrato?.numero} · {p.contrato?.empresa?.nome}</p>
+        {p.observacao && <p className="text-slate-400 text-xs mt-0.5 italic truncate">{p.observacao}</p>}
       </div>
-      <div className="text-right flex items-center gap-3">
-        <div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="text-right">
           <p className="text-white font-semibold tabular-nums text-sm">{formatarMoeda(p.valorPrometido)}</p>
-          <p className={`text-xs tabular-nums ${vencida ? "text-red-400" : "text-amber-400"}`}>{formatarData(p.dataPrometida)}</p>
+          <p className={`text-xs tabular-nums ${dataCor}`}>{formatarData(p.dataPrometida)}</p>
           <p className="text-slate-400 text-xs">{p.formaPagamento}</p>
         </div>
-        <button onClick={onEditar}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors text-xs"
-          title="Editar promessa">
-          ✏️
+        <button onClick={onEditar} title="Editar"
+          className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors">
+          <Pencil size={14} />
+        </button>
+        <button onClick={onExcluir} title="Excluir"
+          className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+          <Trash2 size={14} />
         </button>
       </div>
     </div>

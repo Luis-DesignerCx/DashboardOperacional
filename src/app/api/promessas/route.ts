@@ -117,3 +117,21 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json(promessas);
 }
+
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ erro: "ID obrigatório" }, { status: 400 });
+
+  const promessa = await prisma.promessa.findUnique({ where: { id }, select: { consultorId: true, status: true } });
+  if (!promessa) return NextResponse.json({ erro: "Promessa não encontrada" }, { status: 404 });
+  if (session.user.perfil === "CONSULTOR" && promessa.consultorId !== session.user.id) {
+    return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  await prisma.promessa.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}
