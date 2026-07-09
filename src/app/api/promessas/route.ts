@@ -9,11 +9,13 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
-  const { contratoId, valorPrometido, dataPrometida, formaPagamento, observacao, parcelasIds } = await req.json();
+  const { contratoId, valorPrometido, dataPrometida, formaPagamento, observacao, parcelasIds, tipoContato } = await req.json();
 
   if (!contratoId || !valorPrometido || !dataPrometida || !formaPagamento) {
     return NextResponse.json({ erro: "Campos obrigatórios ausentes" }, { status: 400 });
   }
+
+  const isLink = tipoContato === "LINK_ENVIADO";
 
   const promessa = await prisma.promessa.create({
     data: {
@@ -32,9 +34,11 @@ export async function POST(req: NextRequest) {
     data: {
       contratoId,
       consultorId: session.user.id,
-      tipo: "LIGACAO",
-      status: "PROMESSA_PAGAMENTO",
-      observacao: `Promessa: R$ ${valorPrometido} para ${new Date(dataPrometida).toLocaleDateString("pt-BR")}`,
+      tipo: isLink ? "WHATSAPP" : "LIGACAO",
+      status: isLink ? "LINK_ENVIADO" : "PROMESSA_PAGAMENTO",
+      observacao: isLink
+        ? `Link enviado: R$ ${valorPrometido} — parcelas: ${Array.isArray(parcelasIds) && parcelasIds.length > 0 ? parcelasIds.length : "não especificadas"}`
+        : `Promessa: R$ ${valorPrometido} para ${new Date(dataPrometida).toLocaleDateString("pt-BR")}`,
     },
   });
 

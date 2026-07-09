@@ -68,7 +68,14 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     },
   });
 
-  const consultorIds = [...new Set(carteiraData.map((c) => c.consultorId))];
+  const consultorIdsCarteira = [...new Set(carteiraData.map((c) => c.consultorId))];
+
+  // Inclui também consultores cadastrados nesta equipe mas sem contratos na competência
+  const consultoresDaFrente = await prisma.usuario.findMany({
+    where: { equipeId, perfil: "CONSULTOR", ativo: true },
+    select: { id: true },
+  });
+  const consultorIds = [...new Set([...consultorIdsCarteira, ...consultoresDaFrente.map((c) => c.id)])];
 
   const [consultores, recebimentos] = await Promise.all([
     consultorIds.length > 0

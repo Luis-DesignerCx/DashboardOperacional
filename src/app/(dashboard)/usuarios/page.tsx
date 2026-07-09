@@ -50,7 +50,9 @@ const FRENTE_COR: Record<string, string> = {
 
 function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; frentesAdicionais: { equipe: Equipe }[] }) {
   if (!equipe) return <span className="text-slate-400">—</span>;
-  const todas = [equipe, ...frentesAdicionais.map((f) => f.equipe)];
+  // Junta principal + adicionais e remove duplicatas pelo id
+  const todas = [equipe, ...frentesAdicionais.map((f) => f.equipe)]
+    .filter((e, i, arr) => arr.findIndex((x) => x.id === e.id) === i);
   return (
     <div className="flex flex-wrap gap-1">
       {todas.map((e) => (

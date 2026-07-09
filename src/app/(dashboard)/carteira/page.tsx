@@ -135,6 +135,7 @@ export default function CarteiraPage() {
   const [promRapForm, setPromRapForm] = useState({ valor: "", data: new Date().toISOString().slice(0, 10), formaPagamento: "PIX", observacao: "", parcelasIds: [] as string[] });
   const [salvandoPromRap, setSalvandoPromRap] = useState(false);
   const [erroPromRap, setErroPromRap] = useState("");
+  const [promRapModo, setPromRapModo] = useState<"PROMESSA" | "LINK">("PROMESSA");
   const [contratoRecebimento, setContratoRecebimento] = useState<Contrato | null>(null);
   const [recebForm, setRecebForm] = useState({ valor: "", valorAParte: "", formaPagamento: "PIX", observacao: "", data: new Date().toISOString().slice(0, 10), parcelasIds: [] as string[] });
   const [salvandoReceb, setSalvandoReceb] = useState(false);
@@ -397,8 +398,9 @@ export default function CarteiraPage() {
     carregarPagina(competenciaId, 1, false, busca, sort);
   }
 
-  function abrirPromessaRapida(c: Contrato) {
+  function abrirPromessaRapida(c: Contrato, modo: "PROMESSA" | "LINK" = "PROMESSA") {
     setModalPromRap(c);
+    setPromRapModo(modo);
     setPromRapForm({ valor: "", data: new Date().toISOString().slice(0, 10), formaPagamento: "PIX", observacao: "", parcelasIds: [] });
     setErroPromRap("");
   }
@@ -429,6 +431,7 @@ export default function CarteiraPage() {
         formaPagamento: promRapForm.formaPagamento,
         observacao: promRapForm.observacao || null,
         parcelasIds: promRapForm.parcelasIds,
+        tipoContato: promRapModo === "LINK" ? "LINK_ENVIADO" : undefined,
       }),
     });
     const data = await res.json();
@@ -1160,7 +1163,6 @@ export default function CarteiraPage() {
                         <option value="ACIONADO">Acionado</option>
                         <option value="VISUALIZOU_SEM_RESPOSTA">Visualizou, não respondeu</option>
                         <option value="NAO_ATENDE">Não atende</option>
-                        <option value="NAO_RESPONDE_MENSAGENS">Não responde mensagens</option>
                         <option value="CONTATO_INEXISTENTE">Contato inexistente</option>
                         <option value="EM_NEGOCIACAO">Em negociação</option>
                         <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
@@ -1218,6 +1220,14 @@ export default function CarteiraPage() {
                     </div>
                   )}
 
+                  {/* Link enviado: aviso de redirecionamento */}
+                  {atendForm.status === "LINK_ENVIADO" && (
+                    <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3">
+                      <p className="text-sky-300 text-xs font-medium">Informe o valor e as parcelas cobertas pelo link enviado.</p>
+                      <p className="text-slate-500 text-xs mt-0.5">O contato será registrado automaticamente para hoje.</p>
+                    </div>
+                  )}
+
                   {/* Regularizado: aviso se há parcelas em atraso */}
                   {atendForm.status === "REGULARIZADO" && modalAtend.parcelas.some(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0) && (
                     <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3">
@@ -1246,12 +1256,12 @@ export default function CarteiraPage() {
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
-              {atendForm.status === "PROMESSA_PAGAMENTO" ? (
+              {(atendForm.status === "PROMESSA_PAGAMENTO" || atendForm.status === "LINK_ENVIADO") ? (
                 <button
-                  onClick={() => { const c = modalAtend; setModalAtend(null); abrirPromessaRapida(c!); }}
+                  onClick={() => { const c = modalAtend; const modo = atendForm.status === "LINK_ENVIADO" ? "LINK" : "PROMESSA"; setModalAtend(null); abrirPromessaRapida(c!, modo); }}
                   className="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
                 >
-                  <Calendar size={14} /> Registrar promessa
+                  <Calendar size={14} /> {atendForm.status === "LINK_ENVIADO" ? "Informar link enviado" : "Registrar promessa"}
                 </button>
               ) : (
                 <button onClick={salvarAtendimento} disabled={salvandoAtend}
@@ -1270,7 +1280,7 @@ export default function CarteiraPage() {
           <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-slate-800">
               <div>
-                <h2 className="text-white font-semibold flex items-center gap-2"><Calendar size={16} className="text-purple-400" /> Promessa de Pagamento</h2>
+                <h2 className="text-white font-semibold flex items-center gap-2"><Calendar size={16} className="text-purple-400" /> {promRapModo === "LINK" ? "Link de Pagamento Enviado" : "Promessa de Pagamento"}</h2>
                 <p className="text-slate-500 text-xs mt-0.5 truncate max-w-[280px]">{modalPromRap.cliente.nome} · {modalPromRap.numero}</p>
               </div>
               <button onClick={() => setModalPromRap(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
@@ -1309,9 +1319,10 @@ export default function CarteiraPage() {
                     onChange={(e) => setPromRapForm((f) => ({ ...f, valor: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Data combinada *</label>
-                  <input type="date" className={inputCls} value={promRapForm.data}
-                    onChange={(e) => setPromRapForm((f) => ({ ...f, data: e.target.value }))} />
+                  <label className="block text-xs text-slate-400 mb-1.5">{promRapModo === "LINK" ? "Data (hoje)" : "Data combinada *"}</label>
+                  <input type="date" className={inputCls + (promRapModo === "LINK" ? " opacity-60 cursor-not-allowed" : "")} value={promRapForm.data}
+                    readOnly={promRapModo === "LINK"}
+                    onChange={promRapModo === "LINK" ? undefined : (e) => setPromRapForm((f) => ({ ...f, data: e.target.value }))} />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
@@ -1341,7 +1352,7 @@ export default function CarteiraPage() {
               </button>
               <button onClick={salvarPromessaRapida} disabled={salvandoPromRap}
                 className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
-                {salvandoPromRap ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Calendar size={14} /> Registrar promessa</>}
+                {salvandoPromRap ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Calendar size={14} /> {promRapModo === "LINK" ? "Salvar link enviado" : "Registrar promessa"}</>}
               </button>
             </div>
           </div>
