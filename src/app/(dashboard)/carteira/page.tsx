@@ -424,9 +424,7 @@ export default function CarteiraPage() {
 
     setSalvandoAtend(false);
     if (!res.ok) { setErroAtend(data.erro || "Erro ao registrar"); return; }
-    // Recarrega histórico e atualiza lista
-    const hist = await fetch(`/api/contatos?contratoId=${modalAtend.id}`).then((r) => r.json()).catch(() => []);
-    setHistorico(Array.isArray(hist) ? hist : []);
+    setModalAtend(null);
     setAtendForm({ tipo: "LIGACAO", status: "ACIONADO", observacao: "", agendadoPara: "" });
     carregarPagina(competenciaId, 1, false, busca, sort);
   }

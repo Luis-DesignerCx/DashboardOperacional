@@ -88,15 +88,16 @@ export async function GET(req: NextRequest) {
   if (status) where.status = status;
   if (session.user.perfil === "CONSULTOR" && !todas) where.consultorId = session.user.id;
   if (session.user.perfil === "GESTOR" && !todas) {
-    // Gestor vê promessas dos consultores da sua equipe
     const equipeId = (session.user as any).equipeId;
+    const idsPermitidos: string[] = [session.user.id];
     if (equipeId) {
       const consultores = await prisma.usuario.findMany({
         where: { equipeId, ativo: true },
         select: { id: true },
       });
-      where.consultorId = { in: consultores.map((c) => c.id) };
+      consultores.forEach((c) => { if (!idsPermitidos.includes(c.id)) idsPermitidos.push(c.id); });
     }
+    where.consultorId = { in: idsPermitidos };
   }
 
   if (hoje) {

@@ -40,26 +40,27 @@ export default function PendenciasPage() {
   const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState(false);
 
-  function recarregar() {
+  async function recarregar() {
     setCarregando(true);
-    Promise.all([
-      fetch("/api/promessas?status=ABERTA").then((r) => r.json()),
-      fetch("/api/contatos?agendadosHoje=true").then((r) => r.json()),
-    ]).then(([abertas, agendados]) => {
-      const agora = new Date();
-      const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
-      const fimHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
-      const lista = Array.isArray(abertas) ? abertas : [];
+    const agora = new Date();
+    const inicioHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+    const fimHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
 
-      setPromessasVencidas(lista.filter((p: any) => new Date(p.dataPrometida) < inicioHoje));
-      setPromessasHoje(lista.filter((p: any) => {
-        const d = new Date(p.dataPrometida);
-        return d >= inicioHoje && d <= fimHoje;
-      }));
-      setPromessasFuturas(lista.filter((p: any) => new Date(p.dataPrometida) > fimHoje));
-      setAgendadosHoje(Array.isArray(agendados) ? agendados : []);
-      setCarregando(false);
-    });
+    const [abertas, agendados] = await Promise.all([
+      fetch("/api/promessas?status=ABERTA").then((r) => r.json()).catch(() => []),
+      fetch("/api/contatos?agendadosHoje=true").then((r) => r.json()).catch(() => []),
+    ]);
+
+    const lista: any[] = Array.isArray(abertas) ? abertas : [];
+
+    // Comparar apenas pela parte da data (YYYY-MM-DD) para evitar desvio de fuso horário
+    const hojeStr = `${agora.getFullYear()}-${String(agora.getMonth() + 1).padStart(2, "0")}-${String(agora.getDate()).padStart(2, "0")}`;
+
+    setPromessasVencidas(lista.filter((p) => (p.dataPrometida ?? "").slice(0, 10) < hojeStr));
+    setPromessasHoje(lista.filter((p) => (p.dataPrometida ?? "").slice(0, 10) === hojeStr));
+    setPromessasFuturas(lista.filter((p) => (p.dataPrometida ?? "").slice(0, 10) > hojeStr));
+    setAgendadosHoje(Array.isArray(agendados) ? agendados : []);
+    setCarregando(false);
   }
 
   useEffect(() => {
