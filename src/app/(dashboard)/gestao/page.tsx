@@ -25,14 +25,27 @@ const FAIXA_COR: Record<string, string> = {
 
 const TIPO_ORDEM = ["FLASH", "CRA_1_30", "CR_31_90", "CR_PDD_91_180", "CR_PDD_181"];
 
-// Sub-faixas da frente PDD 91+
-const SUB_FAIXAS = [
-  { label: "Todos 91+",    diasMin: 91,  diasMax: undefined },
-  { label: "91–120 dias",  diasMin: 91,  diasMax: 120 },
-  { label: "121–150 dias", diasMin: 121, diasMax: 150 },
-  { label: "151–180 dias", diasMin: 151, diasMax: 180 },
-  { label: "181+ dias",    diasMin: 181, diasMax: undefined },
-];
+// Sub-faixas por tipo de frente
+const SUB_FAIXAS_MAP: Record<string, Array<{ label: string; diasMin: number; diasMax?: number }>> = {
+  CR_31_90: [
+    { label: "Todos 31-90", diasMin: 31, diasMax: 90 },
+    { label: "31–60 dias",  diasMin: 31, diasMax: 60 },
+    { label: "61–90 dias",  diasMin: 61, diasMax: 90 },
+  ],
+  CR_PDD_91_180: [
+    { label: "Todos 91+",    diasMin: 91,  diasMax: undefined },
+    { label: "91–120 dias",  diasMin: 91,  diasMax: 120 },
+    { label: "121–150 dias", diasMin: 121, diasMax: 150 },
+    { label: "151–180 dias", diasMin: 151, diasMax: 180 },
+    { label: "181+ dias",    diasMin: 181, diasMax: undefined },
+  ],
+};
+
+// Cor dos botões de sub-faixa por tipo
+const SUB_FAIXA_COR: Record<string, string> = {
+  CR_31_90:      "bg-blue-500/20 text-blue-300 border border-blue-500/30",
+  CR_PDD_91_180: "bg-orange-500/20 text-orange-300 border border-orange-500/30",
+};
 
 interface EquipeUsuario { id: string; perfil: string; }
 interface Equipe { id: string; nome: string; tipo: string; usuarios: EquipeUsuario[]; }
@@ -53,9 +66,7 @@ export default function GestaoPage() {
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = useState("");
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const [subFaixa, setSubFaixa] = useState(0); // índice em SUB_FAIXAS
-
-  const isPDD91 = (tipo: string) => tipo === "CR_PDD_91_180";
+  const [subFaixa, setSubFaixa] = useState(0); // índice em SUB_FAIXAS_MAP[tipo]
 
   useEffect(() => {
     Promise.all([
@@ -89,10 +100,13 @@ export default function GestaoPage() {
     setExpandidos(new Set());
 
     let url = `/api/gestao/${equipeId}?competenciaId=${competenciaId}`;
-    if (equipe && isPDD91(equipe.tipo)) {
-      const sf = SUB_FAIXAS[subFaixa];
-      url += `&diasMin=${sf.diasMin}`;
-      if (sf.diasMax !== undefined) url += `&diasMax=${sf.diasMax}`;
+    if (equipe) {
+      const subFaixas = SUB_FAIXAS_MAP[equipe.tipo];
+      if (subFaixas) {
+        const sf = subFaixas[subFaixa] ?? subFaixas[0];
+        url += `&diasMin=${sf.diasMin}`;
+        if (sf.diasMax !== undefined) url += `&diasMax=${sf.diasMax}`;
+      }
     }
 
     fetch(url)
@@ -119,7 +133,8 @@ export default function GestaoPage() {
   const totalAP   = filtrados.reduce((s, c) => s + c.recebidoAParte, 0);
   const eficiencia = totalInad > 0 ? Math.min((totalRec / totalInad) * 100, 100) : 0;
 
-  const ehPDD91 = equipeSelecionada ? isPDD91(equipeSelecionada.tipo) : false;
+  const subFaixasAtivas = equipeSelecionada ? (SUB_FAIXAS_MAP[equipeSelecionada.tipo] ?? null) : null;
+  const corSubFaixa = equipeSelecionada ? (SUB_FAIXA_COR[equipeSelecionada.tipo] ?? "bg-gr-500/20 text-gr-300 border border-gr-500/30") : "";
 
   return (
     <div className="flex gap-0 h-[calc(100vh-4rem)] -m-6 overflow-hidden">
@@ -182,16 +197,16 @@ export default function GestaoPage() {
           </select>
         </div>
 
-        {/* Sub-faixas PDD 91+ */}
-        {ehPDD91 && (
+        {/* Sub-faixas (CR 31-90 e PDD 91+) */}
+        {subFaixasAtivas && (
           <div className="flex gap-1 px-6 pt-3 pb-0 flex-shrink-0">
-            {SUB_FAIXAS.map((sf, i) => (
+            {subFaixasAtivas.map((sf, i) => (
               <button
                 key={i}
                 onClick={() => setSubFaixa(i)}
                 className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
                   subFaixa === i
-                    ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                    ? corSubFaixa
                     : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
                 }`}
               >
