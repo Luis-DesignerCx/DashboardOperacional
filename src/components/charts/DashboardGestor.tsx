@@ -100,7 +100,7 @@ export function DashboardGestor() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <p className="text-slate-400 text-sm">% da Meta</p>
           <p className={`text-2xl font-bold mt-1 ${dados.percentualMeta >= 100 ? "text-emerald-400" : dados.percentualMeta >= 70 ? "text-gr-400" : "text-slate-400"}`}>
-            {dados.percentualMeta.toFixed(1)}%
+            {(dados.percentualMeta ?? 0).toFixed(1)}%
           </p>
           {dados.metaAlvo && <p className="text-xs text-slate-500 mt-1">Meta: {formatarMoeda(dados.metaAlvo)}</p>}
         </div>
@@ -165,7 +165,7 @@ export function DashboardGestor() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="flex justify-between mb-3">
             <p className="text-sm font-medium text-white">Meta da Equipe</p>
-            <span className="text-sm font-bold text-gr-400">{dados.percentualMeta.toFixed(1)}%</span>
+            <span className="text-sm font-bold text-gr-400">{(dados.percentualMeta ?? 0).toFixed(1)}%</span>
           </div>
           <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
             <div

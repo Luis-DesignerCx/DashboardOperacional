@@ -127,7 +127,7 @@ export function DashboardConsultor() {
         />
         <CardMetrica
           titulo="% da Meta"
-          valor={`${dados.percentualMeta.toFixed(1)}%`}
+          valor={`${(dados.percentualMeta ?? 0).toFixed(1)}%`}
           sub={proximaFaixa ? `Próxima faixa: ${proximaFaixa}%` : "Meta atingida!"}
           icon={CheckCircle2}
           cor={dados.percentualMeta >= 100 ? "bg-emerald-500" : dados.percentualMeta >= 70 ? "bg-gr-500" : "bg-slate-600"}
@@ -147,7 +147,7 @@ export function DashboardConsultor() {
           <div className="flex justify-between items-center mb-3">
             <p className="text-sm font-medium text-white">Progresso da Meta</p>
             <span className={`text-sm font-bold ${dados.percentualMeta >= 100 ? "text-emerald-400" : "text-gr-400"}`}>
-              {dados.percentualMeta.toFixed(1)}%
+              {(dados.percentualMeta ?? 0).toFixed(1)}%
             </span>
           </div>
           <div className="h-3 bg-slate-800 rounded-full overflow-hidden">

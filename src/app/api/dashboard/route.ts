@@ -131,8 +131,8 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     promessasVencidas: promessasVencidasAgg._count,
     valorPromessasVencidas: Number(promessasVencidasAgg._sum.valorPrometido ?? 0),
     agendadosHoje,
-    percentualMeta: meta ? Math.round((valorRecebido / Number(meta.valorAlvo)) * 10000) / 100 : 0,
-    metaAlvo: meta ? Number(meta.valorAlvo) : null,
+    percentualMeta: (meta && meta.valorAlvo && Number(meta.valorAlvo) > 0) ? Math.round((valorRecebido / Number(meta.valorAlvo)) * 10000) / 100 : 0,
+    metaAlvo: (meta && meta.valorAlvo) ? Number(meta.valorAlvo) : null,
   };
 }
 
@@ -268,8 +268,8 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     inadimplenciaInicial,
     recebido,
     baixado,
-    percentualMeta: meta ? Math.round((baixado / Number(meta.valorAlvo)) * 10000) / 100 : 0,
-    metaAlvo: meta ? Number(meta.valorAlvo) : null,
+    percentualMeta: (meta && meta.valorAlvo && Number(meta.valorAlvo) > 0) ? Math.round((baixado / Number(meta.valorAlvo)) * 10000) / 100 : 0,
+    metaAlvo: (meta && meta.valorAlvo) ? Number(meta.valorAlvo) : null,
     aprovacoesPendentes,
     totalConsultores: consultores.length,
     rankingConsultores,

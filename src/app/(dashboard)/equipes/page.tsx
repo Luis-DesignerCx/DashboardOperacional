@@ -34,7 +34,7 @@ const COR_FRENTE: Record<string, string> = {
 // Frentes que pertencem a cada departamento
 const DEPT: Record<string, string[]> = {
   "CRA - Cobrança": ["FLASH", "CRA_1_30"],
-  "CR - Cobrança":  ["CR_31_90", "CR_PDD_91_180", "CR_PDD_181"],
+  "CR - Cobrança":  ["CR_31_90", "CR_PDD_91_180"],
 };
 
 const COR_DEPT: Record<string, string> = {
