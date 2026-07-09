@@ -95,14 +95,14 @@ export default function ConsultaPage() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
           <Search size={40} className="mx-auto mb-3 text-slate-700" />
           <p className="text-slate-400 text-sm">Digite pelo menos 2 caracteres para pesquisar</p>
-          <p className="text-slate-600 text-xs mt-1">Funciona com nome, CPF, telefone ou número do contrato</p>
+          <p className="text-slate-400 text-xs mt-1">Funciona com nome, CPF, telefone ou número do contrato</p>
         </div>
       )}
 
       {/* Sem resultados */}
       {buscou && resultados.length === 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
-          <AlertCircle size={36} className="mx-auto mb-3 text-slate-600" />
+          <AlertCircle size={36} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 text-sm">Nenhum cliente encontrado para "{query}"</p>
         </div>
       )}
@@ -131,19 +131,19 @@ export default function ConsultaPage() {
                       {/* Contrato + empresa */}
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className="text-xs font-mono text-slate-400">{c.numero}</span>
-                        <span className="text-slate-600 text-xs">·</span>
+                        <span className="text-slate-400 text-xs">·</span>
                         <span className="text-xs text-slate-400 flex items-center gap-1">
                           <Building2 size={11} /> {c.empresa.nome}
                         </span>
                         {c.cliente.cpf && (
                           <>
-                            <span className="text-slate-600 text-xs">·</span>
+                            <span className="text-slate-400 text-xs">·</span>
                             <span className="text-xs text-slate-500 font-mono">{c.cliente.cpf}</span>
                           </>
                         )}
                         {c.cliente.telefones && (
                           <>
-                            <span className="text-slate-600 text-xs">·</span>
+                            <span className="text-slate-400 text-xs">·</span>
                             <span className="text-xs text-slate-500">{c.cliente.telefones}</span>
                           </>
                         )}
@@ -157,11 +157,11 @@ export default function ConsultaPage() {
                             <span className="text-xs text-white font-medium">{carteira.consultor.nome}</span>
                             {carteira.consultor.equipe && (
                               <>
-                                <span className="text-slate-600 text-xs">·</span>
+                                <span className="text-slate-400 text-xs">·</span>
                                 <span className="text-xs text-slate-400">{carteira.consultor.equipe.nome}</span>
                               </>
                             )}
-                            <span className="text-slate-600 text-xs">·</span>
+                            <span className="text-slate-400 text-xs">·</span>
                             <span className="text-xs text-slate-500">{carteira.competencia.descricao}</span>
                           </div>
                         ) : (

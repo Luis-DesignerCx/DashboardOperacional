@@ -89,7 +89,7 @@ export default function HistoricoPage() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
           <FileSpreadsheet size={40} className="text-slate-700 mx-auto mb-3" />
           <p className="text-slate-400 font-medium">Nenhuma competência encontrada</p>
-          <p className="text-slate-600 text-sm mt-1">Importe uma planilha para começar.</p>
+          <p className="text-slate-400 text-sm mt-1">Importe uma planilha para começar.</p>
         </div>
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -117,7 +117,7 @@ export default function HistoricoPage() {
                       <div>
                         <p className="text-white font-medium">{comp.descricao}</p>
                         {comp.fechadaEm && (
-                          <p className="text-xs text-slate-600">
+                          <p className="text-xs text-slate-400">
                             Fechada em {new Date(comp.fechadaEm).toLocaleDateString("pt-BR")}
                           </p>
                         )}
@@ -136,7 +136,7 @@ export default function HistoricoPage() {
                         <p className="text-slate-300 text-xs truncate max-w-[200px]">
                           {comp.ultimaImportacao.nomeArquivo}
                         </p>
-                        <p className="text-slate-600 text-xs">
+                        <p className="text-slate-400 text-xs">
                           {new Date(comp.ultimaImportacao.criadoEm).toLocaleDateString("pt-BR")}
                           {" · "}{comp.ultimaImportacao.totalContratos} contratos
                           {comp.ultimaImportacao.erros > 0 && (
@@ -145,14 +145,14 @@ export default function HistoricoPage() {
                         </p>
                       </div>
                     ) : (
-                      <span className="text-slate-600 text-xs">Sem importação</span>
+                      <span className="text-slate-400 text-xs">Sem importação</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
                     {comp.ultimaImportacao ? (
                       <ImportacaoStatusBadge status={comp.ultimaImportacao.status} />
                     ) : (
-                      <span className="text-xs text-slate-600">—</span>
+                      <span className="text-xs text-slate-400">—</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -170,7 +170,7 @@ export default function HistoricoPage() {
                       <button
                         onClick={() => exportar(comp.id, comp.descricao)}
                         disabled={exportando === comp.id || !comp.ultimaImportacao}
-                        className="flex items-center gap-1.5 text-xs text-gr-400 hover:text-gr-300 disabled:text-slate-600 disabled:cursor-not-allowed transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-gr-400 hover:text-gr-300 disabled:text-slate-400 disabled:cursor-not-allowed transition-colors"
                       >
                         <Download size={14} />
                         {exportando === comp.id ? "Exportando..." : "Exportar XLSX"}

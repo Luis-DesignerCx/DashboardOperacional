@@ -295,7 +295,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
             </div>
           ))}
         </div>
-        <p className="text-slate-600 text-xs mt-3">Abaixo de 100%: arredonda para baixo · Acima de 100%: arredonda se faltar até 2%</p>
+        <p className="text-slate-400 text-xs mt-3">Abaixo de 100%: arredonda para baixo · Acima de 100%: arredonda se faltar até 2%</p>
       </div>
 
       {/* Histórico */}
@@ -382,9 +382,9 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
         </div>
       ) : !preview ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
-          <DollarSign size={36} className="mx-auto mb-3 text-slate-600" />
+          <DollarSign size={36} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400">Nenhuma meta configurada para esta competência</p>
-          <p className="text-slate-600 text-sm mt-1">Aguarde seu gestor configurar a meta da equipe.</p>
+          <p className="text-slate-400 text-sm mt-1">Aguarde seu gestor configurar a meta da equipe.</p>
         </div>
       ) : (
         <>

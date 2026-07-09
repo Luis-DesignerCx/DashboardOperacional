@@ -179,7 +179,7 @@ export function DashboardConsultor() {
                 <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorPromessasHoje)} agendado</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${dados.promessasHoje > 0 ? "text-amber-400" : "text-slate-600"}`}>{dados.promessasHoje}</span>
+            <span className={`text-lg font-bold ${dados.promessasHoje > 0 ? "text-amber-400" : "text-slate-400"}`}>{dados.promessasHoje}</span>
           </Link>
 
           {/* Promessas vencidas */}
@@ -191,7 +191,7 @@ export function DashboardConsultor() {
                 <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorPromessasVencidas)} não recebido</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${dados.promessasVencidas > 0 ? "text-red-400" : "text-slate-600"}`}>{dados.promessasVencidas}</span>
+            <span className={`text-lg font-bold ${dados.promessasVencidas > 0 ? "text-red-400" : "text-slate-400"}`}>{dados.promessasVencidas}</span>
           </Link>
 
           {/* Retornos agendados */}
@@ -203,7 +203,7 @@ export function DashboardConsultor() {
                 <p className="text-slate-400 text-xs">Ligar depois / Aguardar retorno</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${dados.agendadosHoje > 0 ? "text-sky-400" : "text-slate-600"}`}>{dados.agendadosHoje}</span>
+            <span className={`text-lg font-bold ${dados.agendadosHoje > 0 ? "text-sky-400" : "text-slate-400"}`}>{dados.agendadosHoje}</span>
           </Link>
 
           {dados.promessasHoje === 0 && dados.promessasVencidas === 0 && dados.agendadosHoje === 0 && (

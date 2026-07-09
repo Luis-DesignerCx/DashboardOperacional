@@ -271,7 +271,7 @@ export default function GestaoPage() {
             </div>
           ) : filtrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-center">
-              <AlertCircle size={28} className="text-slate-600 mb-2" />
+              <AlertCircle size={28} className="text-slate-400 mb-2" />
               <p className="text-slate-500 text-sm">Nenhum consultor com carteira nesta frente</p>
             </div>
           ) : (
@@ -297,7 +297,7 @@ export default function GestaoPage() {
                         <div className="flex items-center gap-2.5">
                           {expandido
                             ? <ChevronDown size={15} className="text-gr-400 flex-shrink-0" />
-                            : <ChevronRight size={15} className="text-slate-600 flex-shrink-0" />}
+                            : <ChevronRight size={15} className="text-slate-400 flex-shrink-0" />}
                           <span className="text-white font-medium text-sm">{c.nome}</span>
                           {c.emFerias && (
                             <span className="flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
@@ -309,7 +309,7 @@ export default function GestaoPage() {
                         <span className="text-white text-sm tabular-nums font-medium text-right self-center">{formatarMoeda(c.inadimplencia)}</span>
                         <span className="text-emerald-400 text-sm tabular-nums font-semibold text-right self-center">{formatarMoeda(c.recebido)}</span>
                         <span className="text-sky-400 text-sm tabular-nums text-right self-center">
-                          {c.recebidoAParte > 0 ? formatarMoeda(c.recebidoAParte) : <span className="text-slate-600">—</span>}
+                          {c.recebidoAParte > 0 ? formatarMoeda(c.recebidoAParte) : <span className="text-slate-400">—</span>}
                         </span>
                         <div className="text-right self-center">
                           <span className={`text-sm font-bold tabular-nums ${
@@ -323,19 +323,19 @@ export default function GestaoPage() {
                       {expandido && (
                         <div className="bg-slate-900/60 border-t border-slate-800/50">
                           <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2 border-b border-slate-800/30">
-                            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider">Empresa</span>
-                            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider text-right">Inadimplência</span>
-                            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider text-right">Recebido</span>
-                            <span className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider text-right">A Parte</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Empresa</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Recebido</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">A Parte</span>
                           </div>
                           {c.porEmpresa.map((emp) => (
                             <div key={emp.id} className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-b border-slate-800/20 last:border-0 hover:bg-slate-800/20">
                               <span className="text-slate-300 text-sm">{emp.nome}</span>
                               <span className="text-slate-400 text-sm tabular-nums text-right">{formatarMoeda(emp.inadimplencia)}</span>
-                              <span className={`text-sm tabular-nums font-medium text-right ${emp.recebido > 0 ? "text-emerald-400" : "text-slate-600"}`}>
+                              <span className={`text-sm tabular-nums font-medium text-right ${emp.recebido > 0 ? "text-emerald-400" : "text-slate-400"}`}>
                                 {emp.recebido > 0 ? formatarMoeda(emp.recebido) : "—"}
                               </span>
-                              <span className={`text-sm tabular-nums text-right ${emp.recebidoAParte > 0 ? "text-sky-400" : "text-slate-600"}`}>
+                              <span className={`text-sm tabular-nums text-right ${emp.recebidoAParte > 0 ? "text-sky-400" : "text-slate-400"}`}>
                                 {emp.recebidoAParte > 0 ? formatarMoeda(emp.recebidoAParte) : "—"}
                               </span>
                             </div>

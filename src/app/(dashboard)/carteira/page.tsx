@@ -54,7 +54,7 @@ const STATUS_COR: Record<string, string> = {
   PROMESSA_QUEBRADA: "text-red-400",
   AGUARDANDO_RETORNO: "text-amber-300",
   LIGAR_DEPOIS: "text-amber-300",
-  CONTATO_INEXISTENTE: "text-slate-600",
+  CONTATO_INEXISTENTE: "text-slate-400",
   INADIMPLENCIA_EQUIVOCADA: "text-orange-400",
   SOLICITOU_CANCELAMENTO: "text-red-300",
   NAO_QUER_CONTATO: "text-slate-500",
@@ -612,9 +612,9 @@ export default function CarteiraPage() {
         </div>
       ) : filtrados.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
-          <AlertCircle size={32} className="mx-auto mb-3 text-slate-600" />
+          <AlertCircle size={32} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-500 text-sm">{busca ? "Nenhum resultado para a busca" : "Nenhum contrato na carteira"}</p>
-          <p className="text-slate-600 text-xs mt-1">Use os botões acima para adicionar clientes manualmente</p>
+          <p className="text-slate-400 text-xs mt-1">Use os botões acima para adicionar clientes manualmente</p>
         </div>
       ) : (
         <div className="space-y-6">
@@ -624,7 +624,7 @@ export default function CarteiraPage() {
               <div key={faixaLabel}>
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-xs font-bold uppercase tracking-wider ${faixaInfo.cor}`}>{faixaLabel}</span>
-                  <span className="text-xs text-slate-600">· {porFaixa[faixaLabel].length} contrato{porFaixa[faixaLabel].length !== 1 ? "s" : ""}</span>
+                  <span className="text-xs text-slate-400">· {porFaixa[faixaLabel].length} contrato{porFaixa[faixaLabel].length !== 1 ? "s" : ""}</span>
                   <div className="flex-1 h-px bg-slate-800 ml-1" />
                 </div>
                 <div className="space-y-2">
@@ -665,13 +665,13 @@ export default function CarteiraPage() {
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
                               <span className="text-xs text-slate-500 font-mono">{c.numero}</span>
-                              <span className="text-xs text-slate-600">·</span>
+                              <span className="text-xs text-slate-400">·</span>
                               <span className="text-xs text-slate-500 flex items-center gap-1">
                                 <Building2 size={11} /> {c.empresa.nome}
                               </span>
                               {ultimoContato && (
                                 <>
-                                  <span className="text-xs text-slate-600">·</span>
+                                  <span className="text-xs text-slate-400">·</span>
                                   <span className={`text-xs font-medium ${STATUS_COR[ultimoContato.status] ?? "text-slate-400"}`}>
                                     {STATUS_LABEL[ultimoContato.status] ?? ultimoContato.status}
                                   </span>
@@ -681,12 +681,12 @@ export default function CarteiraPage() {
                             {(c.cliente.telefones || c.cliente.emails) && (
                               <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                                 {c.cliente.telefones && (
-                                  <span className="text-xs text-slate-600 flex items-center gap-1">
-                                    <Phone size={10} /> {c.cliente.telefones.split(",")[0].trim()}
+                                  <span className="text-xs text-slate-400 flex items-center gap-1">
+                                    <Phone size={10} className="text-slate-500" /> {c.cliente.telefones.split(",")[0].trim()}
                                   </span>
                                 )}
                                 {c.cliente.emails && (
-                                  <span className="text-xs text-slate-600 truncate max-w-[200px]">
+                                  <span className="text-xs text-slate-400 truncate max-w-[200px]">
                                     {c.cliente.emails.split(",")[0].trim()}
                                   </span>
                                 )}
@@ -980,7 +980,7 @@ export default function CarteiraPage() {
               )}
 
               {!buscando && resultados.length === 0 && queryBusca.length >= 2 && (
-                <p className="text-slate-600 text-sm text-center py-4">Nenhum contrato sem carteira encontrado</p>
+                <p className="text-slate-400 text-sm text-center py-4">Nenhum contrato sem carteira encontrado</p>
               )}
 
               {resultados.length > 0 && (
@@ -1079,7 +1079,7 @@ export default function CarteiraPage() {
               {/* Seleção de parcelas */}
               {contratoRecebimento.parcelas.length > 0 && (
                 <div>
-                  <p className="text-xs text-slate-400 mb-2">Selecione as parcelas pagas <span className="text-slate-600">(o valor é preenchido automaticamente)</span></p>
+                  <p className="text-xs text-slate-400 mb-2">Selecione as parcelas pagas <span className="text-slate-400">(o valor é preenchido automaticamente)</span></p>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                     {contratoRecebimento.parcelas.map((p) => {
                       const checked = recebForm.parcelasIds.includes(p.id);
@@ -1140,7 +1140,7 @@ export default function CarteiraPage() {
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-400 mb-1.5">
                     Valor a parte (R$)
-                    <span className="ml-1 text-slate-600 font-normal">— antecipação ou valor fora da inadimplência</span>
+                    <span className="ml-1 text-slate-400 font-normal">— antecipação ou valor fora da inadimplência</span>
                   </label>
                   <input
                     className={inputCls}
@@ -1225,7 +1225,7 @@ export default function CarteiraPage() {
                 {carregandoHist ? (
                   <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-slate-500" /></div>
                 ) : historico.length === 0 ? (
-                  <p className="text-slate-600 text-sm text-center py-3">Nenhum contato registrado</p>
+                  <p className="text-slate-400 text-sm text-center py-3">Nenhum contato registrado</p>
                 ) : (
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {historico.map((h: any) => (
@@ -1233,13 +1233,13 @@ export default function CarteiraPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className={`text-xs font-medium ${STATUS_COR[h.status] ?? "text-slate-400"}`}>{STATUS_LABEL[h.status] ?? h.status}</span>
-                            <span className="text-slate-600 text-xs">·</span>
+                            <span className="text-slate-400 text-xs">·</span>
                             <span className="text-slate-500 text-xs">{h.tipo === "LIGACAO" ? "Ligação" : h.tipo === "WHATSAPP" ? "WhatsApp" : "E-mail"}</span>
                           </div>
                           {h.observacao && <p className="text-slate-400 text-xs mt-0.5 truncate">{h.observacao}</p>}
                           {h.agendadoPara && <p className="text-amber-400 text-xs mt-0.5 flex items-center gap-1"><Clock size={10} /> Agendado: {new Date(h.agendadoPara).toLocaleString("pt-BR")}</p>}
                         </div>
-                        <span className="text-slate-600 text-xs flex-shrink-0">{new Date(h.criadoEm).toLocaleDateString("pt-BR")}</span>
+                        <span className="text-slate-400 text-xs flex-shrink-0">{new Date(h.criadoEm).toLocaleDateString("pt-BR")}</span>
                       </div>
                     ))}
                   </div>
@@ -1386,7 +1386,7 @@ export default function CarteiraPage() {
               {/* Parcelas */}
               {modalPromRap.parcelas.length > 0 && (
                 <div>
-                  <p className="text-xs text-slate-400 mb-2">Parcelas incluídas na promessa <span className="text-slate-600">(valor preenchido automaticamente)</span></p>
+                  <p className="text-xs text-slate-400 mb-2">Parcelas incluídas na promessa <span className="text-slate-400">(valor preenchido automaticamente)</span></p>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                     {modalPromRap.parcelas.map((p) => {
                       const checked = promRapForm.parcelasIds.includes(p.id);

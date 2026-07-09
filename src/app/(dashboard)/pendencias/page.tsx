@@ -176,7 +176,7 @@ export default function PendenciasPage() {
                 <p className="text-slate-400 text-xs">{formatarMoeda(promessasHoje.reduce((s, p) => s + Number(p.valorPrometido), 0))} agendado</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${promessasHoje.length > 0 ? "text-amber-400" : "text-slate-600"}`}>{promessasHoje.length}</span>
+            <span className={`text-lg font-bold ${promessasHoje.length > 0 ? "text-amber-400" : "text-slate-400"}`}>{promessasHoje.length}</span>
           </div>
 
           <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasVencidas.length > 0 ? "bg-red-500/10 border-red-500/20" : "bg-slate-800 border-slate-700"}`}>
@@ -187,7 +187,7 @@ export default function PendenciasPage() {
                 <p className="text-slate-400 text-xs">{formatarMoeda(promessasVencidas.reduce((s, p) => s + Number(p.valorPrometido), 0))} não recebido</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${promessasVencidas.length > 0 ? "text-red-400" : "text-slate-600"}`}>{promessasVencidas.length}</span>
+            <span className={`text-lg font-bold ${promessasVencidas.length > 0 ? "text-red-400" : "text-slate-400"}`}>{promessasVencidas.length}</span>
           </div>
 
           <div className={`flex items-center justify-between p-3 rounded-xl border ${agendadosHoje.length > 0 ? "bg-sky-500/10 border-sky-500/20" : "bg-slate-800 border-slate-700"}`}>
@@ -198,7 +198,7 @@ export default function PendenciasPage() {
                 <p className="text-slate-400 text-xs">Ligar depois / Aguardar retorno</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${agendadosHoje.length > 0 ? "text-sky-400" : "text-slate-600"}`}>{agendadosHoje.length}</span>
+            <span className={`text-lg font-bold ${agendadosHoje.length > 0 ? "text-sky-400" : "text-slate-400"}`}>{agendadosHoje.length}</span>
           </div>
         </div>
       </div>
@@ -236,7 +236,7 @@ export default function PendenciasPage() {
               <div>
                 <p className="text-white font-medium text-sm">{c.contrato?.cliente?.nome || "—"}</p>
                 <p className="text-slate-500 text-xs">{c.contrato?.numero} · {c.consultor?.nome}</p>
-                {c.observacao && <p className="text-slate-600 text-xs mt-0.5 italic">{c.observacao}</p>}
+                {c.observacao && <p className="text-slate-400 text-xs mt-0.5 italic">{c.observacao}</p>}
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-sky-400 text-xs font-medium">{c.status === "LIGAR_DEPOIS" ? "Ligar depois" : "Aguardando retorno"}</p>
@@ -436,13 +436,13 @@ function CardPromessa({ promessa: p, vencida, onEditar }: { promessa: any; venci
       <div>
         <p className="text-white font-medium text-sm">{cliente?.nome || "—"}</p>
         <p className="text-slate-500 text-xs">{p.contrato?.numero} · {p.contrato?.empresa?.nome}</p>
-        {p.observacao && <p className="text-slate-600 text-xs mt-0.5 italic">{p.observacao}</p>}
+        {p.observacao && <p className="text-slate-400 text-xs mt-0.5 italic">{p.observacao}</p>}
       </div>
       <div className="text-right flex items-center gap-3">
         <div>
           <p className="text-white font-semibold tabular-nums text-sm">{formatarMoeda(p.valorPrometido)}</p>
           <p className={`text-xs tabular-nums ${vencida ? "text-red-400" : "text-amber-400"}`}>{formatarData(p.dataPrometida)}</p>
-          <p className="text-slate-600 text-xs">{p.formaPagamento}</p>
+          <p className="text-slate-400 text-xs">{p.formaPagamento}</p>
         </div>
         <button onClick={onEditar}
           className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors text-xs"

@@ -231,7 +231,7 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
                         <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">
                           {frente.total.contratos}
                         </td>
-                        <td className="pt-3 pb-0.5 text-right text-slate-600 text-[10px]">100%</td>
+                        <td className="pt-3 pb-0.5 text-right text-slate-400 text-[10px]">100%</td>
                       </tr>
                     </tfoot>
                   </table>

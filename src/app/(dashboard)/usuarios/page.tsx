@@ -49,7 +49,7 @@ const FRENTE_COR: Record<string, string> = {
 };
 
 function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; frentesAdicionais: { equipe: Equipe }[] }) {
-  if (!equipe) return <span className="text-slate-600">—</span>;
+  if (!equipe) return <span className="text-slate-400">—</span>;
   const todas = [equipe, ...frentesAdicionais.map((f) => f.equipe)];
   return (
     <div className="flex flex-wrap gap-1">
@@ -290,7 +290,7 @@ export default function UsuariosPage() {
               );
             })}
             {usuarios.length === 0 && (
-              <tr><td colSpan={6} className="text-center text-slate-600 text-sm py-12">Nenhum usuário encontrado</td></tr>
+              <tr><td colSpan={6} className="text-center text-slate-400 text-sm py-12">Nenhum usuário encontrado</td></tr>
             )}
           </tbody>
         </table>
@@ -337,7 +337,7 @@ export default function UsuariosPage() {
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">
                     Frente de cobrança
-                    {meuPerfil === "GESTOR" && <span className="ml-1 text-slate-600">(pode alterar antes de subir nova base)</span>}
+                    {meuPerfil === "GESTOR" && <span className="ml-1 text-slate-400">(pode alterar antes de subir nova base)</span>}
                   </label>
                   <select className={inputCls} value={form.equipeId}
                     onChange={(e) => setForm((f) => ({ ...f, equipeId: e.target.value }))}>
@@ -424,7 +424,7 @@ export default function UsuariosPage() {
               {/* Frentes já vinculadas */}
               <div className="space-y-2">
                 {frentesAdic.length === 0 ? (
-                  <p className="text-slate-600 text-sm text-center py-3">Nenhuma frente adicional vinculada</p>
+                  <p className="text-slate-400 text-sm text-center py-3">Nenhuma frente adicional vinculada</p>
                 ) : (
                   frentesAdic.map((f) => (
                     <div key={f.id} className="flex items-center justify-between bg-slate-800 rounded-xl px-4 py-2.5">

@@ -86,7 +86,7 @@ export default function SolicitacoesPage() {
         </div>
       ) : filtradas.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
-          <ClipboardList size={40} className="mx-auto mb-3 text-slate-600" />
+          <ClipboardList size={40} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400">Nenhuma solicitação encontrada</p>
         </div>
       ) : (

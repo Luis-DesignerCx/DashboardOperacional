@@ -116,7 +116,7 @@ export default function ClienteDetalhe() {
               <span className="flex items-center gap-1.5 text-slate-400 text-sm">
                 <Phone size={13} />
                 {telefones[0]}
-                {telefones.length > 1 && <span className="text-slate-600">+{telefones.length - 1}</span>}
+                {telefones.length > 1 && <span className="text-slate-400">+{telefones.length - 1}</span>}
               </span>
             )}
             {emails.length > 0 && (
@@ -199,7 +199,7 @@ export default function ClienteDetalhe() {
                 <div className="flex items-center gap-2">
                   <User size={13} className="text-gr-400" />
                   <span className="text-white text-sm">{contrato.carteiras[0].consultor.nome}</span>
-                  <span className="text-slate-600 text-xs">· {contrato.carteiras[0].competencia.descricao}</span>
+                  <span className="text-slate-400 text-xs">· {contrato.carteiras[0].competencia.descricao}</span>
                 </div>
               </div>
             )}
@@ -215,7 +215,7 @@ export default function ClienteDetalhe() {
               {contrato.parcelas.map((p) => (
                 <div key={p.numero} className="flex items-center justify-between py-1.5 border-b border-slate-800/50 last:border-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-slate-600 text-xs w-5 text-right">{p.numero}</span>
+                    <span className="text-slate-400 text-xs w-5 text-right">{p.numero}</span>
                     <span className="text-slate-400 text-xs">
                       {new Date(p.dataVencimento).toLocaleDateString("pt-BR")}
                     </span>
@@ -265,7 +265,7 @@ export default function ClienteDetalhe() {
                   <div key={c.id} className="py-1.5 border-b border-slate-800/50 last:border-0">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-slate-400">{c.tipo}</span>
-                      <span className="text-xs text-slate-600">·</span>
+                      <span className="text-xs text-slate-400">·</span>
                       <span className="text-xs text-slate-300">{c.status.replace(/_/g, " ")}</span>
                     </div>
                     {c.observacao && <p className="text-slate-500 text-xs mt-0.5">{c.observacao}</p>}

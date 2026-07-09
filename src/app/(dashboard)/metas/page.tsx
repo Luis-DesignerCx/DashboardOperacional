@@ -173,9 +173,9 @@ export default function MetasPage() {
         </div>
       ) : metas.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
-          <Target size={40} className="mx-auto mb-3 text-slate-600" />
+          <Target size={40} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 font-medium">Nenhuma meta configurada</p>
-          <p className="text-slate-600 text-sm mt-1">Crie metas financeiras, de quantidade ou de monitoria por consultor.</p>
+          <p className="text-slate-400 text-sm mt-1">Crie metas financeiras, de quantidade ou de monitoria por consultor.</p>
         </div>
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
@@ -200,7 +200,7 @@ export default function MetasPage() {
                   <tr key={m.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3 text-white font-medium">{m.nome || "—"}</td>
                     <td className="px-4 py-3 text-slate-300">
-                      {m.consultor ? m.consultor.nome : <span className="text-slate-600 text-xs">Equipe toda</span>}
+                      {m.consultor ? m.consultor.nome : <span className="text-slate-400 text-xs">Equipe toda</span>}
                     </td>
                     <td className="px-4 py-3 text-slate-400">{m.equipe.nome}</td>
                     <td className="px-4 py-3 text-slate-400">{m.competencia.descricao}</td>
@@ -215,7 +215,7 @@ export default function MetasPage() {
                       <button
                         onClick={() => excluirMeta(m.id)}
                         disabled={excluindo === m.id}
-                        className="p-1.5 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-40"
+                        className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors disabled:opacity-40"
                       >
                         {excluindo === m.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                       </button>

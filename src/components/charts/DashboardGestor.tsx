@@ -188,7 +188,7 @@ export function DashboardGestor() {
                 <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorAgendadoHoje)} agendado</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${dados.promessasHoje > 0 ? "text-amber-400" : "text-slate-600"}`}>{dados.promessasHoje}</span>
+            <span className={`text-lg font-bold ${dados.promessasHoje > 0 ? "text-amber-400" : "text-slate-400"}`}>{dados.promessasHoje}</span>
           </Link>
 
           <Link href="/pendencias" className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/15 transition-colors">
@@ -199,7 +199,7 @@ export function DashboardGestor() {
                 <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorPromessasVencidas)} não recebido</p>
               </div>
             </div>
-            <span className={`text-lg font-bold ${dados.promessasVencidas > 0 ? "text-red-400" : "text-slate-600"}`}>{dados.promessasVencidas}</span>
+            <span className={`text-lg font-bold ${dados.promessasVencidas > 0 ? "text-red-400" : "text-slate-400"}`}>{dados.promessasVencidas}</span>
           </Link>
 
           {dados.promessasHoje === 0 && dados.promessasVencidas === 0 && (

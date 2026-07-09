@@ -207,7 +207,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                 })}
               </div>
               {equipeIds.length === 0 && (
-                <p className="text-[9px] text-slate-600 mt-1.5">Nenhum selecionado = todas</p>
+                <p className="text-[9px] text-slate-400 mt-1.5">Nenhum selecionado = todas</p>
               )}
             </div>
           ) : (

@@ -198,7 +198,7 @@ export default function FrentesPage() {
               <span className={`text-sm font-semibold ${COR_DEPT[dept].split(" ")[0]}`}>
                 {dept}
               </span>
-              <span className="text-slate-600 text-xs">
+              <span className="text-slate-400 text-xs">
                 {frentesDept.reduce((s, f) => s + f.usuarios.filter(u => u.perfil === "CONSULTOR").length, 0)} colaboradores
               </span>
             </div>
@@ -246,7 +246,7 @@ export default function FrentesPage() {
                     {/* Lista de colaboradores */}
                     <div className="flex-1 space-y-1.5 min-h-[40px]">
                       {consultores.length === 0 && (
-                        <p className="text-slate-600 text-xs">Nenhum colaborador cadastrado</p>
+                        <p className="text-slate-400 text-xs">Nenhum colaborador cadastrado</p>
                       )}
                       {consultores.map((u) => (
                         <div
@@ -272,13 +272,13 @@ export default function FrentesPage() {
                             <button
                               onClick={() => toggleFerias(f.id, u.id, u.emFerias)}
                               title={u.emFerias ? "Retornar de férias" : "Colocar em férias"}
-                              className={`p-1 rounded transition-colors ${u.emFerias ? "text-amber-400 hover:text-amber-300" : "text-slate-600 hover:text-amber-400"}`}
+                              className={`p-1 rounded transition-colors ${u.emFerias ? "text-amber-400 hover:text-amber-300" : "text-slate-400 hover:text-amber-400"}`}
                             >
                               <Palmtree size={12} />
                             </button>
                             <button
                               onClick={() => removerColaborador(f.id, u.id)}
-                              className="p-1 text-slate-600 hover:text-red-400 transition-colors"
+                              className="p-1 text-slate-400 hover:text-red-400 transition-colors"
                               title="Remover"
                             >
                               <Trash2 size={12} />

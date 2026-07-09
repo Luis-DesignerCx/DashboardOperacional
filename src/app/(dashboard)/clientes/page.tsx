@@ -314,7 +314,7 @@ export default function ClientesPage() {
                         <td className="px-4 py-3 text-slate-400 text-xs">
                           {telefone ? (
                             <span className="flex items-center gap-1">
-                              <Phone size={11} className="text-slate-600" />
+                              <Phone size={11} className="text-slate-400" />
                               {telefone}
                             </span>
                           ) : "—"}
@@ -326,7 +326,7 @@ export default function ClientesPage() {
                               {STATUS_LABEL[uc.status] ?? uc.status}
                             </span>
                           ) : (
-                            <span className="text-slate-600 text-xs">—</span>
+                            <span className="text-slate-400 text-xs">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3 text-right text-white font-semibold tabular-nums">{formatarMoeda(totalAberto)}</td>
@@ -538,7 +538,7 @@ export default function ClientesPage() {
                       </div>
                       {h.observacao && <p className="text-slate-300 text-xs mt-1.5">{h.observacao}</p>}
                       {h.agendadoPara && <p className="text-indigo-400 text-xs mt-1">Agendado: {new Date(h.agendadoPara).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>}
-                      <p className="text-slate-600 text-[10px] mt-1">por {h.consultor.nome}</p>
+                      <p className="text-slate-400 text-[10px] mt-1">por {h.consultor.nome}</p>
                     </div>
                   ))}
                 </div>

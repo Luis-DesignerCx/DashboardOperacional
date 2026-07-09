@@ -88,7 +88,7 @@ export default function RelatoriosPage() {
               <div className="space-y-2">
                 {dados.rankingConsultores.map((c: any, i: number) => (
                   <div key={c.id} className="flex items-center gap-3 py-2 border-b border-slate-800/50 last:border-0">
-                    <span className={`w-6 text-center text-xs font-bold ${i === 0 ? "text-amber-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-amber-700" : "text-slate-600"}`}>
+                    <span className={`w-6 text-center text-xs font-bold ${i === 0 ? "text-amber-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-amber-700" : "text-slate-400"}`}>
                       {i + 1}
                     </span>
                     <span className="flex-1 text-sm text-white">{c.nome}</span>
