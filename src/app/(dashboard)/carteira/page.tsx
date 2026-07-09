@@ -15,7 +15,7 @@ interface Contrato {
   maiorDiasAtraso: number | null;
   valorTotalAberto: number | null;
   statusContrato: string | null;
-  cliente: { id: string; nome: string; telefones: string | null };
+  cliente: { id: string; nome: string; telefones: string | null; emails: string | null };
   empresa: { nome: string };
   contatos: { tipo: string; status: string; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string }[];
@@ -678,6 +678,20 @@ export default function CarteiraPage() {
                                 </>
                               )}
                             </div>
+                            {(c.cliente.telefones || c.cliente.emails) && (
+                              <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                                {c.cliente.telefones && (
+                                  <span className="text-xs text-slate-600 flex items-center gap-1">
+                                    <Phone size={10} /> {c.cliente.telefones.split(",")[0].trim()}
+                                  </span>
+                                )}
+                                {c.cliente.emails && (
+                                  <span className="text-xs text-slate-600 truncate max-w-[200px]">
+                                    {c.cliente.emails.split(",")[0].trim()}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-4 flex-shrink-0">
                             <div className="text-right">
@@ -1301,6 +1315,14 @@ export default function CarteiraPage() {
                     </div>
                   )}
 
+                  {/* Promessa de pagamento: aviso de redirecionamento */}
+                  {atendForm.status === "PROMESSA_PAGAMENTO" && (
+                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
+                      <p className="text-purple-300 text-xs font-medium">Você será direcionado para o cadastro de promessa.</p>
+                      <p className="text-slate-500 text-xs mt-0.5">O contato será registrado automaticamente ao salvar a promessa.</p>
+                    </div>
+                  )}
+
                   {/* Regularizado: aviso se há parcelas em atraso */}
                   {atendForm.status === "REGULARIZADO" && modalAtend.parcelas.some(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0) && (
                     <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3">
@@ -1329,10 +1351,19 @@ export default function CarteiraPage() {
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
-              <button onClick={salvarAtendimento} disabled={salvandoAtend}
-                className="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
-                {salvandoAtend ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Phone size={14} /> Registrar contato</>}
-              </button>
+              {atendForm.status === "PROMESSA_PAGAMENTO" ? (
+                <button
+                  onClick={() => { const c = modalAtend; setModalAtend(null); abrirPromessaRapida(c!); }}
+                  className="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <Calendar size={14} /> Registrar promessa
+                </button>
+              ) : (
+                <button onClick={salvarAtendimento} disabled={salvandoAtend}
+                  className="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                  {salvandoAtend ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Phone size={14} /> Registrar contato</>}
+                </button>
+              )}
             </div>
           </div>
         </div>

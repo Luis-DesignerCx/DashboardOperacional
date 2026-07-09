@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
             statusContrato: true,
             statusRecuperacao: true,
             totalParcelasVencidas: true,
-            cliente: { select: { id: true, nome: true, telefones: true } },
+            cliente: { select: { id: true, nome: true, telefones: true, emails: true } },
             empresa: { select: { id: true, nome: true } },
             contatos: {
               orderBy: { criadoEm: "desc" },

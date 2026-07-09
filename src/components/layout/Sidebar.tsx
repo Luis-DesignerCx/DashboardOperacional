@@ -23,8 +23,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard",            href: "/dashboard",   icon: LayoutDashboard, perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
   { label: "Consulta",             href: "/consulta",    icon: Search,          perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
   { label: "Minha Carteira",       href: "/carteira",    icon: FolderOpen,      perfis: ["CONSULTOR"] },
-  { label: "Clientes",             href: "/clientes",    icon: Users,           perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
-  { label: "Central de Pendências",href: "/pendencias",  icon: Bell,            perfis: ["CONSULTOR", "GESTOR"] },
+  { label: "Clientes",             href: "/clientes",    icon: Users,           perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Minhas Tarefas",       href: "/pendencias",  icon: Bell,            perfis: ["CONSULTOR", "GESTOR"] },
   { label: "Importação",           href: "/importacao",  icon: Upload,          perfis: ["ADMINISTRADOR", "GESTOR"] },
   { label: "Histórico",            href: "/historico",   icon: History,         perfis: ["ADMINISTRADOR", "GESTOR"] },
   { label: "Usuários",              href: "/usuarios",    icon: UserCog,         perfis: ["ADMINISTRADOR", "GESTOR"] },
@@ -50,6 +50,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [pendentes, setPendentes] = useState(0);
+  const [promessasHoje, setPromessasHoje] = useState(0);
   const { equipeIds, toggleEquipe, clearFilter } = useFrente();
 
   useEffect(() => {
@@ -64,6 +65,21 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
     };
     fetchPendentes();
     const interval = setInterval(fetchPendentes, 60_000);
+    return () => clearInterval(interval);
+  }, [perfil]);
+
+  useEffect(() => {
+    if (!["CONSULTOR", "GESTOR"].includes(perfil)) return;
+    const fetchPromessas = () => {
+      fetch("/api/promessas?vencendoHoje=true")
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data)) setPromessasHoje(data.length);
+        })
+        .catch(() => {});
+    };
+    fetchPromessas();
+    const interval = setInterval(fetchPromessas, 60_000);
     return () => clearInterval(interval);
   }, [perfil]);
 
@@ -136,6 +152,14 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                   )}
                   {collapsed && item.href === "/solicitacoes" && pendentes > 0 && (
                     <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full" />
+                  )}
+                  {!collapsed && item.href === "/pendencias" && promessasHoje > 0 && (
+                    <span className="ml-auto text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
+                      {promessasHoje > 99 ? "99+" : promessasHoje}
+                    </span>
+                  )}
+                  {collapsed && item.href === "/pendencias" && promessasHoje > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
                   )}
                 </Link>
               </li>
