@@ -40,9 +40,10 @@ interface EmpresaDist {
 interface Props {
   competenciaId: string;
   equipeIds: string[];
+  unificar91Plus?: boolean;
 }
 
-export function TabelaDistribuicao({ competenciaId, equipeIds }: Props) {
+export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }: Props) {
   const [frentes, setFrente] = useState<FrenteDist[]>([]);
   const [porEmpresa, setPorEmpresa] = useState<EmpresaDist[]>([]);
   const [modo, setModo] = useState<"saldo" | "recebido">("saldo");
@@ -72,7 +73,39 @@ export function TabelaDistribuicao({ competenciaId, equipeIds }: Props) {
     );
   }
 
-  const frentesComDados = frentes.filter((f) => f.consultores.length > 0);
+  // Para gestor: unifica eq-91-180 e eq-181plus em "91+"
+  const frentesProcessadas = (() => {
+    if (!unificar91Plus) return frentes;
+    const merged: FrenteDist[] = [];
+    let unificada: FrenteDist | null = null;
+    for (const f of frentes) {
+      if (f.equipeId === "eq-91-180" || f.equipeId === "eq-181plus") {
+        if (!unificada) {
+          unificada = { equipeId: "eq-91-180", label: "CR PDD — 91+ dias", consultores: [], total: { saldoAberto: 0, recebido: 0, contratos: 0 } };
+        }
+        // Mescla consultores (pode haver duplicatas entre as duas frentes para André/Pedro)
+        for (const c of f.consultores) {
+          const existing = unificada.consultores.find((x) => x.consultorId === c.consultorId);
+          if (existing) {
+            existing.saldoAberto += c.saldoAberto;
+            existing.recebido += c.recebido;
+            existing.contratos += c.contratos;
+          } else {
+            unificada.consultores.push({ ...c });
+          }
+        }
+        unificada.total.saldoAberto += f.total.saldoAberto;
+        unificada.total.recebido += f.total.recebido;
+        unificada.total.contratos += f.total.contratos;
+      } else {
+        merged.push(f);
+      }
+    }
+    if (unificada) merged.push(unificada);
+    return merged;
+  })();
+
+  const frentesComDados = frentesProcessadas.filter((f) => f.consultores.length > 0);
 
   const totalEmpresa = porEmpresa.reduce(
     (acc, e) => ({ saldoAberto: acc.saldoAberto + e.saldoAberto, recebido: acc.recebido + e.recebido, contratos: acc.contratos + e.contratos }),

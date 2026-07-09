@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
-  const { contratoId, valorPrometido, dataPrometida, formaPagamento, observacao } = await req.json();
+  const { contratoId, valorPrometido, dataPrometida, formaPagamento, observacao, parcelasIds } = await req.json();
 
   if (!contratoId || !valorPrometido || !dataPrometida || !formaPagamento) {
     return NextResponse.json({ erro: "Campos obrigatórios ausentes" }, { status: 400 });
@@ -23,6 +23,7 @@ export async function POST(req: NextRequest) {
       dataPrometida: new Date(dataPrometida),
       formaPagamento: formaPagamento as FormaPagamento,
       observacao: observacao || null,
+      parcelasIds: Array.isArray(parcelasIds) ? parcelasIds : [],
       status: "ABERTA",
     },
   });
@@ -40,19 +41,64 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(promessa, { status: 201 });
 }
 
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+
+  const { id, valorPrometido, dataPrometida, formaPagamento, observacao, parcelasIds, status } = await req.json();
+
+  if (!id) return NextResponse.json({ erro: "ID obrigatório" }, { status: 400 });
+
+  // Verifica que a promessa pertence ao consultor (ou é gestor/admin)
+  const promessa = await prisma.promessa.findUnique({ where: { id }, select: { consultorId: true } });
+  if (!promessa) return NextResponse.json({ erro: "Promessa não encontrada" }, { status: 404 });
+  if (session.user.perfil === "CONSULTOR" && promessa.consultorId !== session.user.id) {
+    return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  const atualizada = await prisma.promessa.update({
+    where: { id },
+    data: {
+      ...(valorPrometido !== undefined && { valorPrometido: new Decimal(valorPrometido) }),
+      ...(dataPrometida !== undefined && { dataPrometida: new Date(dataPrometida) }),
+      ...(formaPagamento !== undefined && { formaPagamento: formaPagamento as FormaPagamento }),
+      ...(observacao !== undefined && { observacao: observacao || null }),
+      ...(parcelasIds !== undefined && { parcelasIds: Array.isArray(parcelasIds) ? parcelasIds : [] }),
+      ...(status !== undefined && { status }),
+    },
+  });
+
+  return NextResponse.json(atualizada);
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
   const contratoId = searchParams.get("contratoId");
+  const clienteId = searchParams.get("clienteId");
   const status = searchParams.get("status");
   const hoje = searchParams.get("vencendoHoje") === "true";
+  const todas = searchParams.get("todas") === "true";
 
   const where: any = {};
   if (contratoId) where.contratoId = contratoId;
+  if (clienteId) where.contrato = { clienteId };
   if (status) where.status = status;
-  if (session.user.perfil === "CONSULTOR") where.consultorId = session.user.id;
+  if (session.user.perfil === "CONSULTOR" && !todas) where.consultorId = session.user.id;
+  if (session.user.perfil === "GESTOR" && !todas) {
+    // Gestor vê promessas dos consultores da sua equipe
+    const equipeId = (session.user as any).equipeId;
+    if (equipeId) {
+      const consultores = await prisma.usuario.findMany({
+        where: { equipeId, ativo: true },
+        select: { id: true },
+      });
+      where.consultorId = { in: consultores.map((c) => c.id) };
+    }
+  }
+
   if (hoje) {
     const inicioHoje = new Date(); inicioHoje.setHours(0, 0, 0, 0);
     const fimHoje = new Date(); fimHoje.setHours(23, 59, 59, 999);

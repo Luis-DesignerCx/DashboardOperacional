@@ -2,8 +2,54 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
-import { Search, AlertCircle, ChevronRight, Phone, Loader2 } from "lucide-react";
+import { Search, AlertCircle, ChevronRight, Phone, Loader2, History, X, MessageCircle, Mail, PhoneCall, DollarSign, CheckCircle2, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
+
+const STATUS_COR: Record<string, string> = {
+  SEM_CONTATO: "bg-slate-600 text-slate-200",
+  CONTATO_REALIZADO: "bg-sky-600 text-sky-100",
+  VISUALIZOU_SEM_RESPOSTA: "bg-slate-500 text-slate-200",
+  NAO_RESPONDE_MENSAGENS: "bg-slate-700 text-slate-300",
+  PROMESSA_PAGAMENTO: "bg-amber-500 text-amber-100",
+  PROMESSA_QUEBRADA: "bg-red-600 text-red-100",
+  RECEBIDO_PARCIAL: "bg-lime-600 text-lime-100",
+  REGULARIZADO: "bg-emerald-600 text-emerald-100",
+  LIGAR_DEPOIS: "bg-indigo-600 text-indigo-100",
+  AGUARDANDO_RETORNO: "bg-violet-600 text-violet-100",
+  INADIMPLENCIA_EQUIVOCADA: "bg-orange-500 text-orange-100",
+  NEGATIVADO: "bg-red-800 text-red-100",
+  FALECIDO: "bg-zinc-700 text-zinc-200",
+  ACORDO_JURIDICO: "bg-blue-700 text-blue-100",
+  DISPUTA_JUDICIAL: "bg-rose-700 text-rose-100",
+  OUTROS: "bg-slate-600 text-slate-200",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  SEM_CONTATO: "Sem contato",
+  CONTATO_REALIZADO: "Contato realizado",
+  VISUALIZOU_SEM_RESPOSTA: "Visualizou sem resposta",
+  NAO_RESPONDE_MENSAGENS: "Não responde mensagens",
+  PROMESSA_PAGAMENTO: "Promessa de pagamento",
+  PROMESSA_QUEBRADA: "Promessa quebrada",
+  RECEBIDO_PARCIAL: "Recebido parcial",
+  REGULARIZADO: "Regularizado",
+  LIGAR_DEPOIS: "Ligar depois",
+  AGUARDANDO_RETORNO: "Aguardando retorno",
+  INADIMPLENCIA_EQUIVOCADA: "Inadimplência equivocada",
+  NEGATIVADO: "Negativado",
+  FALECIDO: "Falecido",
+  ACORDO_JURIDICO: "Acordo jurídico",
+  DISPUTA_JUDICIAL: "Disputa judicial",
+  OUTROS: "Outros",
+};
+
+const TIPO_ICON: Record<string, React.ReactNode> = {
+  WHATSAPP: <MessageCircle size={12} />,
+  LIGACAO: <PhoneCall size={12} />,
+  EMAIL: <Mail size={12} />,
+};
+
+interface UltimoContato { status: string; criadoEm: string }
 
 interface Cliente {
   id: string;
@@ -11,6 +57,7 @@ interface Cliente {
   cpf: string | null;
   telefones: string | null;
   emails: string | null;
+  ultimoContato: UltimoContato | null;
   contratos: {
     id: string;
     numero: string;
@@ -19,6 +66,38 @@ interface Cliente {
     maiorDiasAtraso: number | null;
   }[];
 }
+
+interface ContatoHistorico {
+  id: string;
+  tipo: string;
+  status: string;
+  observacao: string | null;
+  agendadoPara: string | null;
+  criadoEm: string;
+  consultor: { nome: string };
+  contrato: { numero: string };
+}
+
+interface Promessa {
+  id: string;
+  valorPrometido: number;
+  dataPrometida: string;
+  status: string;
+  formaPagamento: string;
+  observacao: string | null;
+  consultor: { nome: string };
+  contrato: { numero: string; empresa: { nome: string } };
+}
+
+const PROMESSA_STATUS_COR: Record<string, string> = {
+  ABERTA: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+  PAGA: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+  QUEBRADA: "bg-red-500/10 text-red-400 border border-red-500/20",
+  CANCELADA: "bg-slate-700 text-slate-400 border border-slate-600",
+};
+const PROMESSA_STATUS_LABEL: Record<string, string> = {
+  ABERTA: "Aberta", PAGA: "Paga", QUEBRADA: "Quebrada", CANCELADA: "Cancelada",
+};
 
 export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
@@ -30,6 +109,16 @@ export default function ClientesPage() {
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Modal histórico
+  const [modalHistorico, setModalHistorico] = useState<{ clienteId: string; nome: string } | null>(null);
+  const [historico, setHistorico] = useState<ContatoHistorico[]>([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
+
+  // Modal promessas
+  const [modalPromessas, setModalPromessas] = useState<{ clienteId: string; nome: string } | null>(null);
+  const [promessas, setPromessas] = useState<Promessa[]>([]);
+  const [carregandoPromessas, setCarregandoPromessas] = useState(false);
 
   async function carregarPagina(q: string, pg: number, append = false) {
     if (pg === 1 && !append) setCarregando(true);
@@ -46,6 +135,24 @@ export default function ClientesPage() {
     setTemMais(data.temMais ?? false);
     setCarregando(false);
     setCarregandoMais(false);
+  }
+
+  async function abrirHistorico(cliente: Cliente) {
+    setModalHistorico({ clienteId: cliente.id, nome: cliente.nome });
+    setHistorico([]);
+    setCarregandoHistorico(true);
+    const data = await fetch(`/api/contatos?clienteId=${cliente.id}`).then((r) => r.json()).catch(() => []);
+    setHistorico(Array.isArray(data) ? data : []);
+    setCarregandoHistorico(false);
+  }
+
+  async function abrirPromessas(cliente: Cliente) {
+    setModalPromessas({ clienteId: cliente.id, nome: cliente.nome });
+    setPromessas([]);
+    setCarregandoPromessas(true);
+    const data = await fetch(`/api/promessas?clienteId=${cliente.id}&todas=true`).then((r) => r.json()).catch(() => []);
+    setPromessas(Array.isArray(data) ? data : []);
+    setCarregandoPromessas(false);
   }
 
   // Carga inicial
@@ -126,7 +233,7 @@ export default function ClientesPage() {
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Cliente</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Telefone</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Empresa</th>
-                    <th className="text-right px-4 py-3 text-slate-400 font-medium">Contratos</th>
+                    <th className="text-left px-4 py-3 text-slate-400 font-medium">Último status</th>
                     <th className="text-right px-4 py-3 text-slate-400 font-medium">Em aberto</th>
                     <th className="px-4 py-3" />
                   </tr>
@@ -136,6 +243,7 @@ export default function ClientesPage() {
                     const totalAberto = c.contratos.reduce((s, ct) => s + Number(ct.valorTotalAberto ?? 0), 0);
                     const nomeEmpresas = Array.from(new Set(c.contratos.map((ct) => ct.empresa.nome))).join(", ");
                     const telefone = c.telefones ? c.telefones.split(",")[0] : null;
+                    const uc = c.ultimoContato;
                     return (
                       <tr key={c.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                         <td className="px-4 py-3">
@@ -153,12 +261,36 @@ export default function ClientesPage() {
                           ) : "—"}
                         </td>
                         <td className="px-4 py-3 text-slate-400 text-xs">{nomeEmpresas || "—"}</td>
-                        <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{c.contratos.length}</td>
+                        <td className="px-4 py-3">
+                          {uc ? (
+                            <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${STATUS_COR[uc.status] ?? "bg-slate-700 text-slate-300"}`}>
+                              {STATUS_LABEL[uc.status] ?? uc.status}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600 text-xs">—</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right text-white font-semibold tabular-nums">{formatarMoeda(totalAberto)}</td>
                         <td className="px-4 py-3">
-                          <Link href={`/clientes/${c.id}`} className="flex items-center justify-center p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
-                            <ChevronRight size={16} />
-                          </Link>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => abrirPromessas(c)}
+                              title="Ver promessas"
+                              className="p-1.5 text-slate-400 hover:text-purple-400 hover:bg-purple-500/10 rounded-lg transition-colors"
+                            >
+                              <DollarSign size={14} />
+                            </button>
+                            <button
+                              onClick={() => abrirHistorico(c)}
+                              title="Histórico de contatos"
+                              className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 rounded-lg transition-colors"
+                            >
+                              <History size={14} />
+                            </button>
+                            <Link href={`/clientes/${c.id}`} className="flex items-center justify-center p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                              <ChevronRight size={16} />
+                            </Link>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -191,6 +323,134 @@ export default function ClientesPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Modal promessas */}
+      {modalPromessas && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800 flex-shrink-0">
+              <div>
+                <h2 className="text-white font-semibold flex items-center gap-2"><DollarSign size={16} className="text-purple-400" /> Promessas</h2>
+                <p className="text-slate-500 text-xs mt-0.5 truncate max-w-xs">{modalPromessas.nome}</p>
+              </div>
+              <button onClick={() => setModalPromessas(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-5">
+              {carregandoPromessas ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : promessas.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">Nenhuma promessa registrada.</div>
+              ) : (
+                <div className="space-y-3">
+                  {promessas.map((p) => (
+                    <div key={p.id} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3.5">
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PROMESSA_STATUS_COR[p.status] ?? "bg-slate-700 text-slate-300"}`}>
+                            {p.status === "ABERTA" ? <Clock size={9} className="inline mr-1" /> : p.status === "PAGA" ? <CheckCircle2 size={9} className="inline mr-1" /> : <XCircle size={9} className="inline mr-1" />}
+                            {PROMESSA_STATUS_LABEL[p.status] ?? p.status}
+                          </span>
+                          {p.contrato?.numero && (
+                            <span className="text-[10px] text-slate-500 bg-slate-700/60 px-1.5 py-0.5 rounded">{p.contrato.numero}</span>
+                          )}
+                        </div>
+                        <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{formatarMoeda(Number(p.valorPrometido))}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-slate-500">
+                        <span>Vence: <span className={new Date(p.dataPrometida) < new Date() && p.status === "ABERTA" ? "text-red-400" : "text-slate-300"}>{new Date(p.dataPrometida).toLocaleDateString("pt-BR")}</span></span>
+                        <span>·</span>
+                        <span>{p.formaPagamento.replace("_", " ")}</span>
+                        <span>·</span>
+                        <span>por {p.consultor.nome.split(" ")[0]}</span>
+                      </div>
+                      {p.observacao && <p className="text-slate-400 text-xs mt-1.5">{p.observacao}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-slate-800 flex-shrink-0">
+              <button onClick={() => setModalPromessas(null)}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal histórico de contatos */}
+      {modalHistorico && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800 flex-shrink-0">
+              <div>
+                <h2 className="text-white font-semibold">Histórico de Contatos</h2>
+                <p className="text-slate-500 text-xs mt-0.5 truncate max-w-xs">{modalHistorico.nome}</p>
+              </div>
+              <button onClick={() => setModalHistorico(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-5">
+              {carregandoHistorico ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : historico.length === 0 ? (
+                <div className="text-center py-8 text-slate-500 text-sm">Nenhum contato registrado.</div>
+              ) : (
+                <div className="space-y-3">
+                  {historico.map((h) => (
+                    <div key={h.id} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3.5">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="flex items-center gap-1 text-slate-400 text-xs">
+                            {TIPO_ICON[h.tipo]}
+                            {h.tipo === "WHATSAPP" ? "WhatsApp" : h.tipo === "LIGACAO" ? "Ligação" : "Email"}
+                          </span>
+                          <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${STATUS_COR[h.status] ?? "bg-slate-700 text-slate-300"}`}>
+                            {STATUS_LABEL[h.status] ?? h.status}
+                          </span>
+                          {h.contrato?.numero && (
+                            <span className="text-[10px] text-slate-500 bg-slate-700/60 px-1.5 py-0.5 rounded">
+                              {h.contrato.numero}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-slate-500 flex-shrink-0">
+                          {new Date(h.criadoEm).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                      </div>
+                      {h.observacao && <p className="text-slate-300 text-xs mt-2">{h.observacao}</p>}
+                      {h.agendadoPara && (
+                        <p className="text-indigo-400 text-xs mt-1.5">
+                          Agendado: {new Date(h.agendadoPara).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
+                      <p className="text-slate-600 text-[10px] mt-1.5">por {h.consultor.nome}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 border-t border-slate-800 flex-shrink-0">
+              <button onClick={() => setModalHistorico(null)}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

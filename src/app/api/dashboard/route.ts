@@ -47,8 +47,16 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   const iniComp = competencia ? new Date(competencia.ano, competencia.mes - 1, 1) : new Date(0);
   const fimComp = competencia ? new Date(competencia.ano, competencia.mes, 0, 23, 59, 59, 999) : new Date();
 
-  const [carteira, recebimentoAgg, recebimentosAParte, promessasHoje, promessasVencidas, meta] = await Promise.all([
-    // Seleção mínima: só o necessário para calcular totais
+  const [
+    carteira,
+    recebimentoAgg,
+    recebimentosAParte,
+    promessasHojeAgg,
+    promessasVencidasAgg,
+    promessasAbertasAgg,
+    agendadosHoje,
+    meta,
+  ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId, competenciaId, ativo: true },
       select: {
@@ -61,7 +69,6 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         },
       },
     }),
-    // SUM no banco — escopo: recebimentos registrados no mês da competência
     prisma.recebimento.aggregate({
       where: {
         consultorId,
@@ -70,7 +77,6 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       },
       _sum: { valor: true },
     }),
-    // SUM valorAParte em query separada (campo adicionado posteriormente)
     prisma.recebimento.findMany({
       where: {
         consultorId,
@@ -79,11 +85,27 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       },
       select: { valorAParte: true },
     }),
-    prisma.promessa.count({
+    prisma.promessa.aggregate({
       where: { consultorId, status: "ABERTA", dataPrometida: { gte: inicioHoje, lte: fimHoje } },
+      _count: true,
+      _sum: { valorPrometido: true },
     }),
-    prisma.promessa.count({
+    prisma.promessa.aggregate({
       where: { consultorId, status: "ABERTA", dataPrometida: { lt: inicioHoje } },
+      _count: true,
+      _sum: { valorPrometido: true },
+    }),
+    prisma.promessa.aggregate({
+      where: { consultorId, status: "ABERTA" },
+      _count: true,
+      _sum: { valorPrometido: true },
+    }),
+    prisma.contato.count({
+      where: {
+        consultorId,
+        status: { in: ["LIGAR_DEPOIS", "AGUARDANDO_RETORNO"] },
+        agendadoPara: { gte: inicioHoje, lte: fimHoje },
+      },
     }),
     prisma.meta.findFirst({
       where: { equipe: { usuarios: { some: { id: consultorId } } }, competenciaId },
@@ -93,7 +115,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
 
   const valorCarteira = carteira.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;
-  const promessasAbertas = carteira.reduce((s, c) => s + c.contrato.promessas.length, 0);
+  const promessasAbertas = promessasAbertasAgg._count;
   const valorRecebido = Number(recebimentoAgg._sum.valor ?? 0);
   const valorAParte = recebimentosAParte.reduce((s: number, r: any) => s + Number(r.valorAParte ?? 0), 0);
 
@@ -103,8 +125,12 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     valorAParte,
     totalClientes,
     promessasAbertas,
-    promessasHoje,
-    promessasVencidas,
+    valorPromessasAbertas: Number(promessasAbertasAgg._sum.valorPrometido ?? 0),
+    promessasHoje: promessasHojeAgg._count,
+    valorPromessasHoje: Number(promessasHojeAgg._sum.valorPrometido ?? 0),
+    promessasVencidas: promessasVencidasAgg._count,
+    valorPromessasVencidas: Number(promessasVencidasAgg._sum.valorPrometido ?? 0),
+    agendadosHoje,
     percentualMeta: meta ? Math.round((valorRecebido / Number(meta.valorAlvo)) * 10000) / 100 : 0,
     metaAlvo: meta ? Number(meta.valorAlvo) : null,
   };
@@ -141,7 +167,22 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
 
   const consultorIds = consultores.map((c) => c.id);
 
-  const [carteiras, recebidoAgg, baixadoAgg, rankingAgg, meta, aprovacoesPendentes] = await Promise.all([
+  const hoje = new Date();
+  const inicioHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  const fimHoje = new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate(), 23, 59, 59, 999);
+
+  const [
+    carteiras,
+    recebidoAgg,
+    baixadoAgg,
+    rankingAgg,
+    meta,
+    aprovacoesPendentes,
+    promessasHojeAgg,
+    promessasVencidasAgg,
+    clientesRegularizados,
+    recebidoHojeAgg,
+  ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId: { in: consultorIds }, competenciaId, ativo: true },
       select: { contrato: { select: { valorTotalAberto: true } } },
@@ -173,18 +214,50 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
       },
       _sum: { valor: true },
     }),
-    // Meta: se filtro de frente única, busca meta da frente; senão busca a primeira disponível
     equipeIds.length === 1
       ? prisma.meta.findFirst({ where: { equipeId: equipeIds[0], competenciaId }, select: { valorAlvo: true } })
       : semFiltro
         ? prisma.meta.findFirst({ where: { competenciaId }, select: { valorAlvo: true } })
         : prisma.meta.findFirst({ where: { equipeId: { in: equipeIds }, competenciaId }, select: { valorAlvo: true } }),
     prisma.solicitacao.count({ where: { status: "PENDENTE" } }),
+    // Promessas do dia
+    prisma.promessa.aggregate({
+      where: { consultorId: { in: consultorIds }, status: "ABERTA", dataPrometida: { gte: inicioHoje, lte: fimHoje } },
+      _count: true,
+      _sum: { valorPrometido: true },
+    }),
+    // Promessas vencidas
+    prisma.promessa.aggregate({
+      where: { consultorId: { in: consultorIds }, status: "ABERTA", dataPrometida: { lt: inicioHoje } },
+      _count: true,
+      _sum: { valorPrometido: true },
+    }),
+    // Clientes regularizados (statusRecuperacao = RECUPERADO_INTEGRALMENTE na carteira)
+    prisma.carteiraParcela.count({
+      where: {
+        consultorId: { in: consultorIds },
+        competenciaId,
+        ativo: true,
+        contrato: { statusRecuperacao: "RECUPERADO_INTEGRALMENTE" },
+      },
+    }),
+    // Recebido hoje para calcular eficiência
+    prisma.recebimento.aggregate({
+      where: {
+        consultorId: { in: consultorIds },
+        contrato: { carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        dataRecebimento: { gte: inicioHoje, lte: fimHoje },
+      },
+      _sum: { valor: true },
+    }),
   ]);
 
   const inadimplenciaInicial = carteiras.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const recebido = Number(recebidoAgg._sum.valor ?? 0);
   const baixado = Number(baixadoAgg._sum.valorBaixado ?? 0);
+  const valorAgendadoHoje = Number(promessasHojeAgg._sum.valorPrometido ?? 0);
+  const recebidoHoje = Number(recebidoHojeAgg._sum.valor ?? 0);
+  const eficienciaHoje = valorAgendadoHoje > 0 ? Math.round((recebidoHoje / valorAgendadoHoje) * 10000) / 100 : 0;
 
   const recebidoMap = new Map(rankingAgg.map((r) => [r.consultorId, Number(r._sum.valor ?? 0)]));
   const rankingConsultores = consultores
@@ -200,6 +273,12 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     aprovacoesPendentes,
     totalConsultores: consultores.length,
     rankingConsultores,
+    clientesRegularizados,
+    promessasHoje: promessasHojeAgg._count,
+    valorAgendadoHoje,
+    promessasVencidas: promessasVencidasAgg._count,
+    valorPromessasVencidas: Number(promessasVencidasAgg._sum.valorPrometido ?? 0),
+    eficienciaHoje,
   };
 }
 

@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import {
   FolderOpen, Search, Plus, X, AlertCircle,
   ChevronRight, UserPlus, Building2, Loader2, CheckCircle2, DollarSign, ArrowLeftRight, User,
+  Phone, History, Calendar, ArrowUpDown, Clock,
 } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 import Link from "next/link";
@@ -42,23 +43,62 @@ const STATUS_COR: Record<string, string> = {
   ACIONADO: "text-sky-400",
   EM_NEGOCIACAO: "text-amber-400",
   PROMESSA_PAGAMENTO: "text-purple-400",
+  LINK_ENVIADO: "text-purple-300",
   RECEBIDO: "text-emerald-400",
+  RECEBIDO_PARCIAL: "text-emerald-300",
+  REGULARIZADO: "text-emerald-400",
   NAO_ATENDE: "text-slate-500",
   SEM_RESPOSTA: "text-slate-500",
+  VISUALIZOU_SEM_RESPOSTA: "text-slate-400",
+  NAO_RESPONDE_MENSAGENS: "text-slate-400",
   PROMESSA_QUEBRADA: "text-red-400",
+  AGUARDANDO_RETORNO: "text-amber-300",
+  LIGAR_DEPOIS: "text-amber-300",
+  CONTATO_INEXISTENTE: "text-slate-600",
+  INADIMPLENCIA_EQUIVOCADA: "text-orange-400",
+  SOLICITOU_CANCELAMENTO: "text-red-300",
+  NAO_QUER_CONTATO: "text-slate-500",
+  OUTROS: "text-slate-400",
 };
 
 const STATUS_LABEL: Record<string, string> = {
   ACIONADO: "Acionado",
-  EM_NEGOCIACAO: "Negociando",
-  PROMESSA_PAGAMENTO: "Promessa",
+  EM_NEGOCIACAO: "Em negociação",
+  PROMESSA_PAGAMENTO: "Promessa de pagamento",
+  LINK_ENVIADO: "Link enviado",
   RECEBIDO: "Recebido",
+  RECEBIDO_PARCIAL: "Recebido parcial",
+  REGULARIZADO: "Regularizado",
   NAO_ATENDE: "Não atende",
   SEM_RESPOSTA: "Sem resposta",
+  VISUALIZOU_SEM_RESPOSTA: "Visualizou, não respondeu",
+  NAO_RESPONDE_MENSAGENS: "Não responde mensagens",
   PROMESSA_QUEBRADA: "Promessa quebrada",
   AGUARDANDO_RETORNO: "Aguardando retorno",
   LIGAR_DEPOIS: "Ligar depois",
+  CONTATO_INEXISTENTE: "Contato inexistente",
+  INADIMPLENCIA_EQUIVOCADA: "Inadimplência equivocada",
+  SOLICITOU_CANCELAMENTO: "Solicitou cancelamento",
+  ENCAMINHADO_RETENCAO: "Encaminhado jurídico",
+  NAO_QUER_CONTATO: "Não quer contato",
+  OUTROS: "Outros",
 };
+
+// Status que exigem campo de agendamento
+const STATUS_COM_AGENDA = ["LIGAR_DEPOIS", "AGUARDANDO_RETORNO"];
+// Status que exigem observação obrigatória
+const STATUS_OBS_OBRIG = ["OUTROS"];
+
+function getFaixa(dias: number | null): { label: string; cor: string } {
+  if (!dias || dias <= 0) return { label: "FLASH", cor: "text-sky-400" };
+  if (dias <= 30) return { label: "CRA — 1 a 30 dias", cor: "text-sky-400" };
+  if (dias <= 60) return { label: "CR — 31 a 60 dias", cor: "text-amber-400" };
+  if (dias <= 90) return { label: "CR — 61 a 90 dias", cor: "text-amber-400" };
+  if (dias <= 120) return { label: "CR PDD — 91 a 120 dias", cor: "text-orange-400" };
+  if (dias <= 150) return { label: "CR PDD — 121 a 150 dias", cor: "text-orange-400" };
+  if (dias <= 180) return { label: "CR PDD — 151 a 180 dias", cor: "text-red-400" };
+  return { label: "CR PDD — 181+ dias", cor: "text-red-400" };
+}
 
 function diasAtrasoColor(dias: number | null) {
   if (!dias) return "text-slate-400";
@@ -79,9 +119,22 @@ export default function CarteiraPage() {
   const [competenciaId, setCompetenciaId] = useState("");
   const [competencias, setCompetencias] = useState<any[]>([]);
   const [busca, setBusca] = useState("");
+  const [sort, setSort] = useState("diasAtraso");
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [modal, setModal] = useState<"buscar" | "novo" | "recebimento" | "externo" | null>(null);
+  // Modal atendimento (histórico + novo contato)
+  const [modalAtend, setModalAtend] = useState<Contrato | null>(null);
+  const [historico, setHistorico] = useState<any[]>([]);
+  const [carregandoHist, setCarregandoHist] = useState(false);
+  const [atendForm, setAtendForm] = useState({ tipo: "LIGACAO", status: "ACIONADO", observacao: "", agendadoPara: "" });
+  const [salvandoAtend, setSalvandoAtend] = useState(false);
+  const [erroAtend, setErroAtend] = useState("");
+  // Modal promessa rápida
+  const [modalPromRap, setModalPromRap] = useState<Contrato | null>(null);
+  const [promRapForm, setPromRapForm] = useState({ valor: "", data: new Date().toISOString().slice(0, 10), formaPagamento: "PIX", observacao: "", parcelasIds: [] as string[] });
+  const [salvandoPromRap, setSalvandoPromRap] = useState(false);
+  const [erroPromRap, setErroPromRap] = useState("");
   const [contratoRecebimento, setContratoRecebimento] = useState<Contrato | null>(null);
   const [recebForm, setRecebForm] = useState({ valor: "", valorAParte: "", formaPagamento: "PIX", observacao: "", data: new Date().toISOString().slice(0, 10), parcelasIds: [] as string[] });
   const [salvandoReceb, setSalvandoReceb] = useState(false);
@@ -121,9 +174,15 @@ export default function CarteiraPage() {
     });
   }, []);
 
-  async function carregarPagina(cId: string, pg: number, append = false) {
+  const buscaMainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function carregarPagina(cId: string, pg: number, append = false, buscaParam?: string, sortParam?: string) {
     if (!append) setCarregando(true); else setCarregandoMais(true);
-    const data = await fetch(`/api/carteira?competenciaId=${cId}&page=${pg}`).then((r) => r.json()).catch(() => ({}));
+    const b = buscaParam ?? busca;
+    const s = sortParam ?? sort;
+    const params = new URLSearchParams({ competenciaId: cId, page: String(pg), sort: s });
+    if (b) params.set("busca", b);
+    const data = await fetch(`/api/carteira?${params}`).then((r) => r.json()).catch(() => ({}));
     const contratos: ItemCarteira[] = Array.isArray(data.contratos) ? data.contratos : [];
     if (append) setCarteira((prev) => [...prev, ...contratos]);
     else { setCarteira(contratos); setTotalContratos(data.total ?? 0); setValorTotal(data.valorTotal ?? 0); }
@@ -137,8 +196,25 @@ export default function CarteiraPage() {
     if (!competenciaId) return;
     setPagina(1);
     setTemMais(false);
-    carregarPagina(competenciaId, 1);
+    carregarPagina(competenciaId, 1, false, busca, sort);
   }, [competenciaId]);
+
+  // Debounce busca — chama API server-side
+  useEffect(() => {
+    if (!competenciaId) return;
+    if (buscaMainTimer.current) clearTimeout(buscaMainTimer.current);
+    buscaMainTimer.current = setTimeout(() => {
+      setPagina(1);
+      carregarPagina(competenciaId, 1, false, busca, sort);
+    }, 350);
+  }, [busca]);
+
+  // Reload quando sort muda
+  useEffect(() => {
+    if (!competenciaId) return;
+    setPagina(1);
+    carregarPagina(competenciaId, 1, false, busca, sort);
+  }, [sort]);
 
   // Busca externo com debounce
   useEffect(() => {
@@ -286,6 +362,116 @@ export default function CarteiraPage() {
     carregarPagina(competenciaId, 1);
   }
 
+  async function abrirAtendimento(c: Contrato) {
+    setModalAtend(c);
+    setAtendForm({ tipo: "LIGACAO", status: "ACIONADO", observacao: "", agendadoPara: "" });
+    setErroAtend("");
+    setHistorico([]);
+    setCarregandoHist(true);
+    const data = await fetch(`/api/contatos?contratoId=${c.id}`).then((r) => r.json()).catch(() => []);
+    setHistorico(Array.isArray(data) ? data : []);
+    setCarregandoHist(false);
+  }
+
+  async function salvarAtendimento() {
+    if (!modalAtend) return;
+    setErroAtend("");
+
+    // Validação REGULARIZADO: só permite se não há parcelas em atraso
+    if (atendForm.status === "REGULARIZADO") {
+      const parcelasEmAtraso = modalAtend.parcelas.filter((p) => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0);
+      if (parcelasEmAtraso.length > 0) {
+        setErroAtend(`Não é possível marcar como Regularizado — há ${parcelasEmAtraso.length} parcela(s) em atraso em aberto`);
+        return;
+      }
+    }
+
+    if (atendForm.status === "OUTROS" && !atendForm.observacao.trim()) {
+      setErroAtend("Observação obrigatória para status 'Outros'"); return;
+    }
+    if (STATUS_COM_AGENDA.includes(atendForm.status) && !atendForm.agendadoPara) {
+      setErroAtend("Informe a data/hora para agendamento"); return;
+    }
+    if (atendForm.status === "INADIMPLENCIA_EQUIVOCADA" && !atendForm.observacao.trim()) {
+      setErroAtend("Descreva o motivo da inadimplência equivocada"); return;
+    }
+    setSalvandoAtend(true);
+    const res = await fetch("/api/contatos", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contratoId: modalAtend.id,
+        tipo: atendForm.tipo,
+        status: atendForm.status,
+        observacao: atendForm.observacao || null,
+        agendadoPara: atendForm.agendadoPara || null,
+      }),
+    });
+    const data = await res.json();
+
+    // Para inadimplência equivocada: cria solicitação automática para o gestor
+    if (res.ok && atendForm.status === "INADIMPLENCIA_EQUIVOCADA") {
+      await fetch("/api/solicitacoes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: "INADIMPLENCIA_EQUIVOCADA",
+          contratoId: modalAtend.id,
+          motivo: atendForm.observacao || `Inadimplência equivocada identificada no contrato ${modalAtend.numero}`,
+        }),
+      });
+    }
+
+    setSalvandoAtend(false);
+    if (!res.ok) { setErroAtend(data.erro || "Erro ao registrar"); return; }
+    // Recarrega histórico e atualiza lista
+    const hist = await fetch(`/api/contatos?contratoId=${modalAtend.id}`).then((r) => r.json()).catch(() => []);
+    setHistorico(Array.isArray(hist) ? hist : []);
+    setAtendForm({ tipo: "LIGACAO", status: "ACIONADO", observacao: "", agendadoPara: "" });
+    carregarPagina(competenciaId, 1, false, busca, sort);
+  }
+
+  function abrirPromessaRapida(c: Contrato) {
+    setModalPromRap(c);
+    setPromRapForm({ valor: "", data: new Date().toISOString().slice(0, 10), formaPagamento: "PIX", observacao: "", parcelasIds: [] });
+    setErroPromRap("");
+  }
+
+  function toggleParcelaPromRap(parcela: { id: string; valorTotalAberto: number }) {
+    setPromRapForm((f) => {
+      const jaSelected = f.parcelasIds.includes(parcela.id);
+      const novosIds = jaSelected ? f.parcelasIds.filter((id) => id !== parcela.id) : [...f.parcelasIds, parcela.id];
+      const total = modalPromRap?.parcelas.filter((p) => novosIds.includes(p.id)).reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0) ?? 0;
+      return { ...f, parcelasIds: novosIds, valor: novosIds.length > 0 ? total.toFixed(2).replace(".", ",") : f.valor };
+    });
+  }
+
+  async function salvarPromessaRapida() {
+    if (!modalPromRap) return;
+    setErroPromRap("");
+    const valor = parseFloat(promRapForm.valor.replace(",", "."));
+    if (!valor || valor <= 0) { setErroPromRap("Informe um valor válido"); return; }
+    if (!promRapForm.data) { setErroPromRap("Informe a data da promessa"); return; }
+    setSalvandoPromRap(true);
+    const res = await fetch("/api/promessas", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contratoId: modalPromRap.id,
+        valorPrometido: valor,
+        dataPrometida: promRapForm.data,
+        formaPagamento: promRapForm.formaPagamento,
+        observacao: promRapForm.observacao || null,
+        parcelasIds: promRapForm.parcelasIds,
+      }),
+    });
+    const data = await res.json();
+    setSalvandoPromRap(false);
+    if (!res.ok) { setErroPromRap(data.erro || "Erro ao registrar"); return; }
+    setModalPromRap(null);
+    carregarPagina(competenciaId, 1, false, busca, sort);
+  }
+
   async function salvarNovoCliente() {
     setErroNovo("");
     if (!novoForm.nomeCliente || !novoForm.numeroContrato) {
@@ -307,15 +493,20 @@ export default function CarteiraPage() {
 
   const empresas = Array.from(new Set(carteira.map((i) => i.contrato.empresa.nome))).sort();
 
-  const filtrados = carteira.filter((item) => {
-    const q = busca.toLowerCase();
-    const passaBusca =
-      item.contrato.cliente.nome.toLowerCase().includes(q) ||
-      item.contrato.numero.toLowerCase().includes(q) ||
-      item.contrato.empresa.nome.toLowerCase().includes(q);
-    const passaEmpresa = !empresaFiltro || item.contrato.empresa.nome === empresaFiltro;
-    return passaBusca && passaEmpresa;
-  });
+  // Filtro de empresa client-side (sort/busca são server-side)
+  const filtrados = empresaFiltro
+    ? carteira.filter((item) => item.contrato.empresa.nome === empresaFiltro)
+    : carteira;
+
+  // Agrupar por faixa de inadimplência
+  const porFaixa = filtrados.reduce<Record<string, ItemCarteira[]>>((acc, item) => {
+    const faixaLabel = getFaixa(item.contrato.maiorDiasAtraso).label;
+    if (!acc[faixaLabel]) acc[faixaLabel] = [];
+    acc[faixaLabel].push(item);
+    return acc;
+  }, {});
+  const ordemFaixas = ["FLASH", "CRA — 1 a 30 dias", "CR — 31 a 60 dias", "CR — 61 a 90 dias", "CR PDD — 91 a 120 dias", "CR PDD — 121 a 150 dias", "CR PDD — 151 a 180 dias", "CR PDD — 181+ dias"];
+  const faixasPresentes = ordemFaixas.filter((f) => porFaixa[f]?.length > 0);
 
   return (
     <div className="space-y-5">
@@ -359,16 +550,30 @@ export default function CarteiraPage() {
         </div>
       </div>
 
-      {/* Busca */}
-      <div className="relative">
-        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
-        <input
-          type="text"
-          placeholder="Filtrar por cliente ou contrato..."
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
-        />
+      {/* Busca + Ordenação */}
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Buscar por cliente ou contrato (busca em toda a carteira)..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <ArrowUpDown size={14} className="text-slate-500 flex-shrink-0" />
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+          >
+            <option value="diasAtraso">Dias em atraso</option>
+            <option value="parcelasAtraso">Parcelas em atraso</option>
+            <option value="parcelasAberto">Valor em aberto</option>
+          </select>
+        </div>
       </div>
 
       {/* Filtros por empresa */}
@@ -400,7 +605,7 @@ export default function CarteiraPage() {
         </div>
       )}
 
-      {/* Lista */}
+      {/* Lista por faixa */}
       {carregando ? (
         <div className="flex justify-center py-16">
           <div className="w-8 h-8 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
@@ -408,90 +613,118 @@ export default function CarteiraPage() {
       ) : filtrados.length === 0 ? (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
           <AlertCircle size={32} className="mx-auto mb-3 text-slate-600" />
-          <p className="text-slate-500 text-sm">Nenhum contrato na carteira</p>
+          <p className="text-slate-500 text-sm">{busca ? "Nenhum resultado para a busca" : "Nenhum contrato na carteira"}</p>
           <p className="text-slate-600 text-xs mt-1">Use os botões acima para adicionar clientes manualmente</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filtrados.map((item) => {
-            const c = item.contrato;
-            const ultimoContato = c.contatos[0];
-            const temPromessa = c.promessas.length > 0;
-            const totalRecebido = c.recebimentos.reduce((s, r) => s + Number(r.valor), 0);
-            const totalAParte = c.recebimentos.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
-
+        <div className="space-y-6">
+          {faixasPresentes.map((faixaLabel) => {
+            const faixaInfo = getFaixa(porFaixa[faixaLabel][0].contrato.maiorDiasAtraso);
             return (
-              <div key={item.id} className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition-colors group">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-white font-semibold text-sm">{c.cliente.nome}</p>
-                      {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
-                        <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                          <CheckCircle2 size={9} /> Recuperado
-                        </span>
-                      )}
-                      {c.statusRecuperacao === "RECUPERACAO_PARCIAL" && (
-                        <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium">
-                          Rec. parcial · {formatarMoeda(totalRecebido)}
-                        </span>
-                      )}
-                      {totalAParte > 0 && (
-                        <button
-                          onClick={() => setModalAParte(c)}
-                          className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-medium hover:bg-sky-500/20 transition-colors"
-                        >
-                          A Parte · {formatarMoeda(totalAParte)}
-                        </button>
-                      )}
-                      {temPromessa && c.statusRecuperacao === "INADIMPLENTE" && (
-                        <span className="text-[10px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-medium">promessa aberta</span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-1 flex-wrap">
-                      <span className="text-xs text-slate-500 font-mono">{c.numero}</span>
-                      <span className="text-xs text-slate-600">·</span>
-                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                        <Building2 size={11} /> {c.empresa.nome}
-                      </span>
-                      {ultimoContato && (
-                        <>
-                          <span className="text-xs text-slate-600">·</span>
-                          <span className={`text-xs ${STATUS_COR[ultimoContato.status] ?? "text-slate-400"}`}>
-                            {STATUS_LABEL[ultimoContato.status] ?? ultimoContato.status}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4 flex-shrink-0">
-                    <div className="text-right">
-                      <p className="text-white font-semibold text-sm tabular-nums">
-                        {formatarMoeda(Number(c.valorTotalAberto ?? 0))}
-                      </p>
-                      <p className={`text-xs font-medium tabular-nums ${diasAtrasoColor(c.maiorDiasAtraso)}`}>
-                        {c.maiorDiasAtraso ?? 0}d em atraso
-                      </p>
-                    </div>
-                    <div className="flex gap-1">
-                      {c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
-                        <button
-                          onClick={() => abrirRecebimento(c)}
-                          title="Registrar recebimento"
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-                        >
-                          <DollarSign size={15} />
-                        </button>
-                      )}
-                      <Link
-                        href={`/clientes/${c.cliente.id}`}
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors"
-                        title="Ver ficha do cliente"
-                      >
-                        <ChevronRight size={15} />
-                      </Link>
-                    </div>
-                  </div>
+              <div key={faixaLabel}>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className={`text-xs font-bold uppercase tracking-wider ${faixaInfo.cor}`}>{faixaLabel}</span>
+                  <span className="text-xs text-slate-600">· {porFaixa[faixaLabel].length} contrato{porFaixa[faixaLabel].length !== 1 ? "s" : ""}</span>
+                  <div className="flex-1 h-px bg-slate-800 ml-1" />
+                </div>
+                <div className="space-y-2">
+                  {porFaixa[faixaLabel].map((item) => {
+                    const c = item.contrato;
+                    const ultimoContato = c.contatos[0];
+                    const temPromessa = c.promessas.length > 0;
+                    const totalRecebido = c.recebimentos.reduce((s, r) => s + Number(r.valor), 0);
+                    const totalAParte = c.recebimentos.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
+
+                    return (
+                      <div key={item.id} className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition-colors group">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-white font-semibold text-sm">{c.cliente.nome}</p>
+                              {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
+                                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                                  <CheckCircle2 size={9} /> Recuperado
+                                </span>
+                              )}
+                              {c.statusRecuperacao === "RECUPERACAO_PARCIAL" && (
+                                <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium">
+                                  Rec. parcial · {formatarMoeda(totalRecebido)}
+                                </span>
+                              )}
+                              {totalAParte > 0 && (
+                                <button
+                                  onClick={() => setModalAParte(c)}
+                                  className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-medium hover:bg-sky-500/20 transition-colors"
+                                >
+                                  A Parte · {formatarMoeda(totalAParte)}
+                                </button>
+                              )}
+                              {temPromessa && c.statusRecuperacao === "INADIMPLENTE" && (
+                                <span className="text-[10px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-medium">promessa aberta</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 mt-1 flex-wrap">
+                              <span className="text-xs text-slate-500 font-mono">{c.numero}</span>
+                              <span className="text-xs text-slate-600">·</span>
+                              <span className="text-xs text-slate-500 flex items-center gap-1">
+                                <Building2 size={11} /> {c.empresa.nome}
+                              </span>
+                              {ultimoContato && (
+                                <>
+                                  <span className="text-xs text-slate-600">·</span>
+                                  <span className={`text-xs font-medium ${STATUS_COR[ultimoContato.status] ?? "text-slate-400"}`}>
+                                    {STATUS_LABEL[ultimoContato.status] ?? ultimoContato.status}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-4 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="text-white font-semibold text-sm tabular-nums">
+                                {formatarMoeda(Number(c.valorTotalAberto ?? 0))}
+                              </p>
+                              <p className={`text-xs font-medium tabular-nums ${diasAtrasoColor(c.maiorDiasAtraso)}`}>
+                                {c.maiorDiasAtraso ?? 0}d em atraso
+                              </p>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => abrirAtendimento(c)}
+                                title="Registrar atendimento"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
+                              >
+                                <Phone size={15} />
+                              </button>
+                              <button
+                                onClick={() => abrirPromessaRapida(c)}
+                                title="Registrar promessa"
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
+                              >
+                                <Calendar size={15} />
+                              </button>
+                              {c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
+                                <button
+                                  onClick={() => abrirRecebimento(c)}
+                                  title="Registrar recebimento"
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
+                                >
+                                  <DollarSign size={15} />
+                                </button>
+                              )}
+                              <Link
+                                href={`/clientes/${c.cliente.id}`}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors"
+                                title="Ver ficha do cliente"
+                              >
+                                <ChevronRight size={15} />
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -500,10 +733,10 @@ export default function CarteiraPage() {
       )}
 
       {/* Carregar mais */}
-      {!carregando && temMais && !busca && !empresaFiltro && (
+      {!carregando && temMais && !empresaFiltro && (
         <div className="flex justify-center pt-2">
           <button
-            onClick={() => carregarPagina(competenciaId, pagina + 1, true)}
+            onClick={() => carregarPagina(competenciaId, pagina + 1, true, busca, sort)}
             disabled={carregandoMais}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
           >
@@ -951,6 +1184,238 @@ export default function CarteiraPage() {
                   ? <><Loader2 size={14} className="animate-spin" /> Salvando...</>
                   : <><CheckCircle2 size={14} /> Confirmar recebimento</>
                 }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Atendimento (histórico + novo contato) */}
+      {modalAtend && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800 flex-shrink-0">
+              <div>
+                <h2 className="text-white font-semibold flex items-center gap-2"><History size={16} className="text-sky-400" /> Atendimento</h2>
+                <p className="text-slate-500 text-xs mt-0.5 truncate max-w-[320px]">{modalAtend.cliente.nome} · {modalAtend.numero}</p>
+              </div>
+              <button onClick={() => setModalAtend(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-5 space-y-5">
+              {/* Histórico */}
+              <div>
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Histórico de contatos</p>
+                {carregandoHist ? (
+                  <div className="flex justify-center py-4"><Loader2 size={16} className="animate-spin text-slate-500" /></div>
+                ) : historico.length === 0 ? (
+                  <p className="text-slate-600 text-sm text-center py-3">Nenhum contato registrado</p>
+                ) : (
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {historico.map((h: any) => (
+                      <div key={h.id} className="flex items-start gap-3 bg-slate-800 rounded-xl px-3 py-2.5">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs font-medium ${STATUS_COR[h.status] ?? "text-slate-400"}`}>{STATUS_LABEL[h.status] ?? h.status}</span>
+                            <span className="text-slate-600 text-xs">·</span>
+                            <span className="text-slate-500 text-xs">{h.tipo === "LIGACAO" ? "Ligação" : h.tipo === "WHATSAPP" ? "WhatsApp" : "E-mail"}</span>
+                          </div>
+                          {h.observacao && <p className="text-slate-400 text-xs mt-0.5 truncate">{h.observacao}</p>}
+                          {h.agendadoPara && <p className="text-amber-400 text-xs mt-0.5 flex items-center gap-1"><Clock size={10} /> Agendado: {new Date(h.agendadoPara).toLocaleString("pt-BR")}</p>}
+                        </div>
+                        <span className="text-slate-600 text-xs flex-shrink-0">{new Date(h.criadoEm).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Novo contato */}
+              <div className="border-t border-slate-800 pt-4">
+                <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Novo registro</p>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Canal *</label>
+                      <select className={inputCls} value={atendForm.tipo} onChange={(e) => setAtendForm((f) => ({ ...f, tipo: e.target.value }))}>
+                        <option value="LIGACAO">Ligação</option>
+                        <option value="WHATSAPP">WhatsApp</option>
+                        <option value="EMAIL">E-mail</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Status *</label>
+                      <select className={inputCls} value={atendForm.status} onChange={(e) => setAtendForm((f) => ({ ...f, status: e.target.value }))}>
+                        <option value="ACIONADO">Acionado</option>
+                        <option value="VISUALIZOU_SEM_RESPOSTA">Visualizou, não respondeu</option>
+                        <option value="NAO_ATENDE">Não atende</option>
+                        <option value="NAO_RESPONDE_MENSAGENS">Não responde mensagens</option>
+                        <option value="CONTATO_INEXISTENTE">Contato inexistente</option>
+                        <option value="EM_NEGOCIACAO">Em negociação</option>
+                        <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
+                        <option value="LIGAR_DEPOIS">Ligar depois</option>
+                        <option value="LINK_ENVIADO">Link enviado – aguardando pagamento</option>
+                        <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
+                        <option value="RECEBIDO_PARCIAL">Recebido parcial</option>
+                        <option value="REGULARIZADO">Regularizado</option>
+                        <option value="SOLICITOU_CANCELAMENTO">Solicitou cancelamento / Jurídico</option>
+                        <option value="NAO_QUER_CONTATO">Não quer mais contato</option>
+                        <option value="INADIMPLENCIA_EQUIVOCADA">Inadimplência equivocada</option>
+                        <option value="OUTROS">Outros</option>
+                      </select>
+                    </div>
+                  </div>
+                  {STATUS_COM_AGENDA.includes(atendForm.status) && (
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Data/hora para {atendForm.status === "LIGAR_DEPOIS" ? "ligar" : "retorno"} *</label>
+                      <input type="datetime-local" className={inputCls} value={atendForm.agendadoPara}
+                        onChange={(e) => setAtendForm((f) => ({ ...f, agendadoPara: e.target.value }))} />
+                    </div>
+                  )}
+
+                  {/* Recebido parcial: mostra parcelas em aberto */}
+                  {atendForm.status === "RECEBIDO_PARCIAL" && modalAtend.parcelas.length > 0 && (
+                    <div className="bg-lime-500/5 border border-lime-500/20 rounded-xl p-3">
+                      <p className="text-lime-400 text-xs font-medium mb-2">Parcelas ainda em aberto</p>
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {modalAtend.parcelas.filter(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0).map((p) => (
+                          <div key={p.id} className="flex justify-between text-xs bg-slate-800/60 rounded-lg px-2.5 py-1.5">
+                            <span className="text-slate-400">Parcela {p.numero} · <span className="text-amber-400">{p.diasAtraso}d atraso</span></span>
+                            <span className="text-slate-200 font-medium tabular-nums">{formatarMoeda(Number(p.valorTotalAberto))}</span>
+                          </div>
+                        ))}
+                        {modalAtend.parcelas.filter(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0).length === 0 && (
+                          <p className="text-slate-500 text-xs">Nenhuma parcela em atraso encontrada.</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Inadimplência equivocada: aviso de solicitação automática */}
+                  {atendForm.status === "INADIMPLENCIA_EQUIVOCADA" && (
+                    <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl p-3">
+                      <p className="text-orange-400 text-xs font-medium">Uma solicitação será enviada ao gestor para análise e aprovação.</p>
+                      <p className="text-slate-500 text-xs mt-0.5">Descreva o motivo na observação abaixo.</p>
+                    </div>
+                  )}
+
+                  {/* Regularizado: aviso se há parcelas em atraso */}
+                  {atendForm.status === "REGULARIZADO" && modalAtend.parcelas.some(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0) && (
+                    <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3">
+                      <p className="text-red-400 text-xs font-medium">Atenção: há parcelas em aberto com atraso.</p>
+                      <p className="text-slate-500 text-xs mt-0.5">Confirme se todas as parcelas foram realmente quitadas antes de marcar como regularizado.</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1.5">
+                      Observação {(STATUS_OBS_OBRIG.includes(atendForm.status) || atendForm.status === "INADIMPLENCIA_EQUIVOCADA") ? "*" : ""}
+                    </label>
+                    <textarea rows={2} className={inputCls + " resize-none"} placeholder="Descreva o atendimento..."
+                      value={atendForm.observacao} onChange={(e) => setAtendForm((f) => ({ ...f, observacao: e.target.value }))} />
+                  </div>
+                </div>
+              </div>
+
+              {erroAtend && (
+                <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{erroAtend}</p>
+              )}
+            </div>
+
+            <div className="flex gap-3 p-5 border-t border-slate-800 flex-shrink-0">
+              <button onClick={() => setModalAtend(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                Fechar
+              </button>
+              <button onClick={salvarAtendimento} disabled={salvandoAtend}
+                className="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                {salvandoAtend ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Phone size={14} /> Registrar contato</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Promessa rápida */}
+      {modalPromRap && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+              <div>
+                <h2 className="text-white font-semibold flex items-center gap-2"><Calendar size={16} className="text-purple-400" /> Promessa de Pagamento</h2>
+                <p className="text-slate-500 text-xs mt-0.5 truncate max-w-[280px]">{modalPromRap.cliente.nome} · {modalPromRap.numero}</p>
+              </div>
+              <button onClick={() => setModalPromRap(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              {/* Parcelas */}
+              {modalPromRap.parcelas.length > 0 && (
+                <div>
+                  <p className="text-xs text-slate-400 mb-2">Parcelas incluídas na promessa <span className="text-slate-600">(valor preenchido automaticamente)</span></p>
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {modalPromRap.parcelas.map((p) => {
+                      const checked = promRapForm.parcelasIds.includes(p.id);
+                      return (
+                        <button key={p.id} type="button" onClick={() => toggleParcelaPromRap(p)}
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors ${checked ? "bg-purple-500/10 border-purple-500/40 text-purple-300" : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600"}`}>
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${checked ? "bg-purple-500 border-purple-500" : "border-slate-600"}`}>
+                              {checked && <CheckCircle2 size={10} className="text-white" />}
+                            </div>
+                            <span>Parcela {p.numero}</span>
+                            <span className={`text-xs ${p.diasAtraso > 90 ? "text-red-400" : p.diasAtraso > 30 ? "text-amber-400" : "text-sky-400"}`}>{p.diasAtraso}d</span>
+                          </div>
+                          <span className="font-semibold tabular-nums">{formatarMoeda(Number(p.valorTotalAberto ?? 0))}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">Valor prometido (R$) *</label>
+                  <input className={inputCls} placeholder="0,00" value={promRapForm.valor}
+                    onChange={(e) => setPromRapForm((f) => ({ ...f, valor: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1.5">Data combinada *</label>
+                  <input type="date" className={inputCls} value={promRapForm.data}
+                    onChange={(e) => setPromRapForm((f) => ({ ...f, data: e.target.value }))} />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
+                  <select className={inputCls} value={promRapForm.formaPagamento}
+                    onChange={(e) => setPromRapForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
+                    <option value="PIX">PIX</option>
+                    <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                    <option value="BOLETO">Boleto</option>
+                    <option value="TED">Transferência (TED)</option>
+                    <option value="DINHEIRO">Dinheiro</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-slate-400 mb-1.5">Observação</label>
+                  <textarea rows={2} className={inputCls + " resize-none"} placeholder="Opcional"
+                    value={promRapForm.observacao} onChange={(e) => setPromRapForm((f) => ({ ...f, observacao: e.target.value }))} />
+                </div>
+              </div>
+              {erroPromRap && (
+                <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{erroPromRap}</p>
+              )}
+            </div>
+            <div className="flex gap-3 px-5 pb-5">
+              <button onClick={() => setModalPromRap(null)}
+                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                Cancelar
+              </button>
+              <button onClick={salvarPromessaRapida} disabled={salvandoPromRap}
+                className="flex-1 bg-purple-600 hover:bg-purple-500 disabled:bg-purple-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                {salvandoPromRap ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Calendar size={14} /> Registrar promessa</>}
               </button>
             </div>
           </div>

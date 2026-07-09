@@ -2,5 +2,11 @@
   "buildCommand": "prisma generate && next build",
   "installCommand": "npm install",
   "framework": "nextjs",
-  "regions": ["gru1"]
+  "regions": ["gru1"],
+  "crons": [
+    {
+      "path": "/api/cron/quebrar-promessas",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

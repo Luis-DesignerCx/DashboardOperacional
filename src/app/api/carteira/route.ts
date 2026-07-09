@@ -14,7 +14,8 @@ export async function GET(req: NextRequest) {
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
 
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
-  const busca = searchParams.get("busca")?.trim();
+  const busca = searchParams.get("busca")?.trim() || "";
+  const sort = searchParams.get("sort") ?? "diasAtraso"; // diasAtraso | parcelasAtraso | parcelasAberto
   const skip = (page - 1) * PAGE_SIZE;
 
   const where: any = { competenciaId, ativo: true };
@@ -26,6 +27,16 @@ export async function GET(req: NextRequest) {
         { numero: { contains: busca, mode: "insensitive" } },
       ],
     };
+  }
+
+  // Ordenação
+  let orderBy: any;
+  if (sort === "parcelasAtraso") {
+    orderBy = { contrato: { totalParcelasVencidas: "desc" } };
+  } else if (sort === "parcelasAberto") {
+    orderBy = { contrato: { valorTotalAberto: "desc" } };
+  } else {
+    orderBy = { contrato: { maiorDiasAtraso: "desc" } };
   }
 
   const [total, contratos] = await Promise.all([
@@ -44,12 +55,13 @@ export async function GET(req: NextRequest) {
             valorTotalAberto: true,
             statusContrato: true,
             statusRecuperacao: true,
+            totalParcelasVencidas: true,
             cliente: { select: { id: true, nome: true, telefones: true } },
             empresa: { select: { id: true, nome: true } },
             contatos: {
               orderBy: { criadoEm: "desc" },
               take: 1,
-              select: { tipo: true, status: true, criadoEm: true },
+              select: { tipo: true, status: true, criadoEm: true, agendadoPara: true },
             },
             promessas: {
               where: { status: "ABERTA" },
@@ -61,18 +73,17 @@ export async function GET(req: NextRequest) {
             },
             parcelas: {
               where: { paga: false },
-              select: { id: true, numero: true, valorTotalAberto: true, diasAtraso: true },
+              select: { id: true, numero: true, valorTotalAberto: true, diasAtraso: true, dataVencimento: true },
               orderBy: { numero: "asc" },
             },
           },
         },
         consultor: { select: { id: true, nome: true } },
       },
-      orderBy: { contrato: { maiorDiasAtraso: "desc" } },
+      orderBy,
     }),
   ]);
 
-  // Soma total de valor em aberto dos contratos carregados nesta página
   const valorTotal = contratos.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
 
   return NextResponse.json({

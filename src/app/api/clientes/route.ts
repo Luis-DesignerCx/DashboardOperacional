@@ -53,6 +53,11 @@ export async function GET(req: NextRequest) {
             empresa: { select: { nome: true } },
             valorTotalAberto: true,
             maiorDiasAtraso: true,
+            contatos: {
+              select: { status: true, criadoEm: true },
+              orderBy: { criadoEm: "desc" },
+              take: 1,
+            },
           },
         },
       },
@@ -62,8 +67,15 @@ export async function GET(req: NextRequest) {
     }),
   ]);
 
+  const clientesComStatus = clientes.map((c) => {
+    const ultimoContato = c.contratos
+      .flatMap((ct) => ct.contatos)
+      .sort((a, b) => new Date(b.criadoEm).getTime() - new Date(a.criadoEm).getTime())[0] ?? null;
+    return { ...c, ultimoContato };
+  });
+
   return NextResponse.json({
-    clientes,
+    clientes: clientesComStatus,
     total,
     page,
     pageSize: PAGE_SIZE,

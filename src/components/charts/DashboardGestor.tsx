@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
-import { AlertTriangle, Award } from "lucide-react";
+import { AlertTriangle, Award, CheckCircle2, Clock, Users, TrendingUp } from "lucide-react";
 import { useFrente } from "@/contexts/FrenteContext";
 import { TabelaDistribuicao } from "@/components/charts/TabelaDistribuicao";
+import Link from "next/link";
 
 interface DadosGestor {
   inadimplenciaInicial: number;
@@ -15,6 +16,12 @@ interface DadosGestor {
   aprovacoesPendentes: number;
   totalConsultores: number;
   rankingConsultores: Array<{ id: string; nome: string; recebido: number }>;
+  clientesRegularizados: number;
+  promessasHoje: number;
+  valorAgendadoHoje: number;
+  promessasVencidas: number;
+  valorPromessasVencidas: number;
+  eficienciaHoje: number;
 }
 
 export function DashboardGestor() {
@@ -42,7 +49,6 @@ export function DashboardGestor() {
       });
   }, []);
 
-  // Recarrega quando o filtro de frente muda
   useEffect(() => {
     if (competenciaId) carregarDashboard(competenciaId, equipeIds);
   }, [equipeIds]);
@@ -77,7 +83,7 @@ export function DashboardGestor() {
         </div>
       </div>
 
-      {/* KPIs */}
+      {/* KPIs principais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <p className="text-slate-400 text-sm">Inadimplência Inicial</p>
@@ -100,6 +106,60 @@ export function DashboardGestor() {
         </div>
       </div>
 
+      {/* KPIs operacionais */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-slate-900 border border-emerald-500/20 rounded-2xl p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-400 text-sm">Clientes Regularizados</p>
+              <p className="text-2xl font-bold text-emerald-400 mt-1">{dados.clientesRegularizados}</p>
+              <p className="text-xs text-slate-500 mt-1">100% quitados</p>
+            </div>
+            <div className="p-2 rounded-xl bg-emerald-500/10">
+              <CheckCircle2 size={18} className="text-emerald-400" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-slate-900 border border-amber-500/20 rounded-2xl p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-400 text-sm">Promessas para Hoje</p>
+              <p className="text-2xl font-bold text-amber-400 mt-1">{dados.promessasHoje}</p>
+              <p className="text-xs text-slate-500 mt-1">{formatarMoeda(dados.valorAgendadoHoje)} agendado</p>
+            </div>
+            <div className="p-2 rounded-xl bg-amber-500/10">
+              <Clock size={18} className="text-amber-400" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-400 text-sm">Valor Agendado Hoje</p>
+              <p className="text-2xl font-bold text-white mt-1">{formatarMoeda(dados.valorAgendadoHoje)}</p>
+              <p className="text-xs text-slate-500 mt-1">{dados.promessasHoje} promessa(s)</p>
+            </div>
+            <div className="p-2 rounded-xl bg-slate-700">
+              <TrendingUp size={18} className="text-slate-300" />
+            </div>
+          </div>
+        </div>
+        <div className={`bg-slate-900 border rounded-2xl p-5 ${dados.eficienciaHoje >= 80 ? "border-emerald-500/20" : dados.eficienciaHoje >= 50 ? "border-amber-500/20" : "border-slate-800"}`}>
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-slate-400 text-sm">Eficiência do Dia</p>
+              <p className={`text-2xl font-bold mt-1 ${dados.eficienciaHoje >= 80 ? "text-emerald-400" : dados.eficienciaHoje >= 50 ? "text-amber-400" : "text-slate-400"}`}>
+                {dados.eficienciaHoje.toFixed(1)}%
+              </p>
+              <p className="text-xs text-slate-500 mt-1">Recebido ÷ Agendado</p>
+            </div>
+            <div className={`p-2 rounded-xl ${dados.eficienciaHoje >= 80 ? "bg-emerald-500/10" : dados.eficienciaHoje >= 50 ? "bg-amber-500/10" : "bg-slate-700"}`}>
+              <Users size={18} className={dados.eficienciaHoje >= 80 ? "text-emerald-400" : dados.eficienciaHoje >= 50 ? "text-amber-400" : "text-slate-400"} />
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Barra de meta */}
       {dados.metaAlvo && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
@@ -115,6 +175,41 @@ export function DashboardGestor() {
           </div>
         </div>
       )}
+
+      {/* Tarefas Diárias */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <h2 className="text-sm font-semibold text-white mb-4">Tarefas Diárias</h2>
+        <div className="space-y-3">
+          <Link href="/pendencias" className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl hover:bg-amber-500/15 transition-colors">
+            <div className="flex items-center gap-3">
+              <Clock size={16} className="text-amber-400" />
+              <div>
+                <p className="text-white text-sm font-medium">Promessas vencendo hoje</p>
+                <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorAgendadoHoje)} agendado</p>
+              </div>
+            </div>
+            <span className={`text-lg font-bold ${dados.promessasHoje > 0 ? "text-amber-400" : "text-slate-600"}`}>{dados.promessasHoje}</span>
+          </Link>
+
+          <Link href="/pendencias" className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/15 transition-colors">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={16} className="text-red-400" />
+              <div>
+                <p className="text-white text-sm font-medium">Promessas vencidas</p>
+                <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorPromessasVencidas)} não recebido</p>
+              </div>
+            </div>
+            <span className={`text-lg font-bold ${dados.promessasVencidas > 0 ? "text-red-400" : "text-slate-600"}`}>{dados.promessasVencidas}</span>
+          </Link>
+
+          {dados.promessasHoje === 0 && dados.promessasVencidas === 0 && (
+            <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+              <CheckCircle2 size={16} className="text-emerald-400" />
+              <p className="text-emerald-300 text-sm">Nenhuma pendência para hoje!</p>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Ranking consultores */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
@@ -141,8 +236,8 @@ export function DashboardGestor() {
         </div>
       </div>
 
-      {/* Distribuição por frente / empresa */}
-      <TabelaDistribuicao competenciaId={competenciaId} equipeIds={equipeIds} />
+      {/* Distribuição por frente / empresa — frentes 91-180 e 181+ unificadas como 91+ */}
+      <TabelaDistribuicao competenciaId={competenciaId} equipeIds={equipeIds} unificar91Plus />
     </div>
   );
 }

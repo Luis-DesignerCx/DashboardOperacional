@@ -35,6 +35,8 @@ enum TipoContato {
 enum StatusContato {
   NAO_ATENDE
   SEM_RESPOSTA
+  VISUALIZOU_SEM_RESPOSTA
+  NAO_RESPONDE_MENSAGENS
   CONTATO_INEXISTENTE
   ACIONADO
   EM_NEGOCIACAO
@@ -44,6 +46,8 @@ enum StatusContato {
   PROMESSA_PAGAMENTO
   PROMESSA_QUEBRADA
   RECEBIDO
+  RECEBIDO_PARCIAL
+  REGULARIZADO
   SOLICITOU_CANCELAMENTO
   ENCAMINHADO_RETENCAO
   INADIMPLENCIA_EQUIVOCADA
@@ -305,13 +309,14 @@ model CarteiraParcela {
 // ─── CONTATO ──────────────────────────────────────────────────────────────────
 
 model Contato {
-  id          String        @id @default(cuid())
-  contratoId  String
-  consultorId String
-  tipo        TipoContato
-  status      StatusContato
-  observacao  String?
-  criadoEm    DateTime      @default(now())
+  id           String        @id @default(cuid())
+  contratoId   String
+  consultorId  String
+  tipo         TipoContato
+  status       StatusContato
+  observacao   String?
+  agendadoPara DateTime?
+  criadoEm     DateTime      @default(now())
 
   contrato    Contrato      @relation(fields: [contratoId], references: [id])
   consultor   Usuario       @relation(fields: [consultorId], references: [id])
@@ -332,6 +337,7 @@ model Promessa {
   formaPagamento FormaPagamento
   status         StatusPromessa @default(ABERTA)
   observacao     String?
+  parcelasIds    String[]       @default([])
   criadoEm       DateTime       @default(now())
   atualizadoEm   DateTime       @updatedAt
 

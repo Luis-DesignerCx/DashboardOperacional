@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
-import { TrendingUp, DollarSign, AlertCircle, Clock, CheckCircle2, Layers } from "lucide-react";
+import { TrendingUp, DollarSign, AlertCircle, Clock, CheckCircle2, Layers, Calendar, AlertTriangle, Phone } from "lucide-react";
+import Link from "next/link";
 
 interface DadosConsultor {
   valorCarteira: number;
@@ -10,8 +11,12 @@ interface DadosConsultor {
   valorAParte: number;
   totalClientes: number;
   promessasAbertas: number;
+  valorPromessasAbertas: number;
   promessasHoje: number;
+  valorPromessasHoje: number;
   promessasVencidas: number;
+  valorPromessasVencidas: number;
+  agendadosHoje: number;
   percentualMeta: number;
   metaAlvo: number | null;
 }
@@ -82,16 +87,16 @@ export function DashboardConsultor() {
         </select>
       </div>
 
-      {/* Alertas de pendências */}
+      {/* Alertas */}
       {(dados.promessasHoje > 0 || dados.promessasVencidas > 0) && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 flex items-start gap-3">
           <AlertCircle size={18} className="text-amber-400 flex-shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="text-amber-300 font-medium">Atenção às promessas</p>
             <p className="text-slate-400 mt-0.5">
-              {dados.promessasHoje > 0 && `${dados.promessasHoje} promessa(s) vencem hoje`}
+              {dados.promessasHoje > 0 && `${dados.promessasHoje} promessa(s) vencem hoje · ${formatarMoeda(dados.valorPromessasHoje)}`}
               {dados.promessasHoje > 0 && dados.promessasVencidas > 0 && " · "}
-              {dados.promessasVencidas > 0 && `${dados.promessasVencidas} promessa(s) vencida(s)`}
+              {dados.promessasVencidas > 0 && `${dados.promessasVencidas} vencida(s) · ${formatarMoeda(dados.valorPromessasVencidas)}`}
             </p>
           </div>
         </div>
@@ -130,7 +135,7 @@ export function DashboardConsultor() {
         <CardMetrica
           titulo="Promessas Abertas"
           valor={String(dados.promessasAbertas)}
-          sub={`${dados.promessasHoje} para hoje`}
+          sub={formatarMoeda(dados.valorPromessasAbertas)}
           icon={Clock}
           cor="bg-amber-500"
         />
@@ -159,6 +164,56 @@ export function DashboardConsultor() {
           </div>
         </div>
       )}
+
+      {/* Minhas Tarefas Diárias */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <h2 className="text-sm font-semibold text-white mb-4">Minhas Tarefas Diárias</h2>
+        <div className="space-y-3">
+
+          {/* Promessas vencendo hoje */}
+          <Link href="/pendencias" className="flex items-center justify-between p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl hover:bg-amber-500/15 transition-colors">
+            <div className="flex items-center gap-3">
+              <Clock size={16} className="text-amber-400" />
+              <div>
+                <p className="text-white text-sm font-medium">Promessas vencendo hoje</p>
+                <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorPromessasHoje)} agendado</p>
+              </div>
+            </div>
+            <span className={`text-lg font-bold ${dados.promessasHoje > 0 ? "text-amber-400" : "text-slate-600"}`}>{dados.promessasHoje}</span>
+          </Link>
+
+          {/* Promessas vencidas */}
+          <Link href="/pendencias" className="flex items-center justify-between p-3 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/15 transition-colors">
+            <div className="flex items-center gap-3">
+              <AlertTriangle size={16} className="text-red-400" />
+              <div>
+                <p className="text-white text-sm font-medium">Promessas vencidas</p>
+                <p className="text-slate-400 text-xs">{formatarMoeda(dados.valorPromessasVencidas)} não recebido</p>
+              </div>
+            </div>
+            <span className={`text-lg font-bold ${dados.promessasVencidas > 0 ? "text-red-400" : "text-slate-600"}`}>{dados.promessasVencidas}</span>
+          </Link>
+
+          {/* Retornos agendados */}
+          <Link href="/carteira" className="flex items-center justify-between p-3 bg-sky-500/10 border border-sky-500/20 rounded-xl hover:bg-sky-500/15 transition-colors">
+            <div className="flex items-center gap-3">
+              <Phone size={16} className="text-sky-400" />
+              <div>
+                <p className="text-white text-sm font-medium">Retornos agendados para hoje</p>
+                <p className="text-slate-400 text-xs">Ligar depois / Aguardar retorno</p>
+              </div>
+            </div>
+            <span className={`text-lg font-bold ${dados.agendadosHoje > 0 ? "text-sky-400" : "text-slate-600"}`}>{dados.agendadosHoje}</span>
+          </Link>
+
+          {dados.promessasHoje === 0 && dados.promessasVencidas === 0 && dados.agendadosHoje === 0 && (
+            <div className="flex items-center gap-2 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+              <CheckCircle2 size={16} className="text-emerald-400" />
+              <p className="text-emerald-300 text-sm">Nenhuma pendência para hoje!</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
