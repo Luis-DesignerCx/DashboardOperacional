@@ -67,7 +67,13 @@ export async function GET(req: NextRequest) {
     where,
     include: {
       consultor: { select: { nome: true } },
-      contrato: { select: { numero: true } },
+      contrato: {
+        select: {
+          numero: true,
+          empresa: { select: { nome: true } },
+          cliente: { select: { nome: true, telefones: true, emails: true } },
+        },
+      },
     },
     orderBy: { criadoEm: "desc" },
   });

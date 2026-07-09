@@ -254,23 +254,32 @@ export default function PendenciasPage() {
       </Section>
 
       {/* Retornos agendados */}
-      {agendadosHoje.length > 0 && (
-        <Section titulo="Retornos Agendados Hoje" count={agendadosHoje.length} icon={Phone} cor="text-emerald-400" vazio="">
-          {agendadosHoje.map((c: any) => (
+      <Section titulo="Retornos Agendados Hoje" count={agendadosHoje.length} icon={Phone} cor="text-emerald-400" vazio="Nenhum retorno agendado para hoje">
+        {agendadosHoje.map((c: any) => {
+          const cli = c.contrato?.cliente;
+          const tel = cli?.telefones ? cli.telefones.split(",")[0].trim() : null;
+          const email = cli?.emails ? cli.emails.split(",")[0].trim() : null;
+          return (
             <div key={c.id} className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-white font-medium text-sm">{c.contrato?.cliente?.nome || "—"}</p>
-                <p className="text-slate-400 text-xs">{c.contrato?.numero} · {c.consultor?.nome}</p>
-                {c.observacao && <p className="text-slate-400 text-xs mt-0.5 italic">{c.observacao}</p>}
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium text-sm truncate">{cli?.nome || "—"}</p>
+                <p className="text-slate-400 text-xs">{c.contrato?.numero} · {c.contrato?.empresa?.nome}</p>
+                {(tel || email) && (
+                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    {tel && <span className="text-xs text-slate-400 flex items-center gap-1"><Phone size={10} className="text-slate-500" /> {tel}</span>}
+                    {email && <span className="text-xs text-slate-400 truncate max-w-[200px]">{email}</span>}
+                  </div>
+                )}
+                {c.observacao && <p className="text-slate-400 text-xs mt-0.5 italic truncate">{c.observacao}</p>}
               </div>
               <div className="text-right flex-shrink-0">
                 <p className="text-emerald-400 text-xs font-medium">{c.status === "LIGAR_DEPOIS" ? "Ligar depois" : "Aguardando retorno"}</p>
                 {c.agendadoPara && <p className="text-slate-400 text-xs">{new Date(c.agendadoPara).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</p>}
               </div>
             </div>
-          ))}
-        </Section>
-      )}
+          );
+        })}
+      </Section>
 
       {/* Modal nova promessa */}
       {modalAberto && (
@@ -500,11 +509,20 @@ function CardPromessa({
     variante === "hoje"    ? "text-amber-400" :
                              "text-sky-400";
 
+  const tel = cliente?.telefones ? cliente.telefones.split(",")[0].trim() : null;
+  const email = cliente?.emails ? cliente.emails.split(",")[0].trim() : null;
+
   return (
     <div className={`bg-slate-900 border ${borderCor} rounded-xl p-4 flex items-center justify-between gap-4`}>
       <div className="flex-1 min-w-0">
         <p className="text-white font-medium text-sm truncate">{cliente?.nome || "—"}</p>
         <p className="text-slate-400 text-xs">{p.contrato?.numero} · {p.contrato?.empresa?.nome}</p>
+        {(tel || email) && (
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            {tel && <span className="text-xs text-slate-400 flex items-center gap-1"><Phone size={10} className="text-slate-500" /> {tel}</span>}
+            {email && <span className="text-xs text-slate-400 truncate max-w-[200px]">{email}</span>}
+          </div>
+        )}
         {p.observacao && <p className="text-slate-400 text-xs mt-0.5 italic truncate">{p.observacao}</p>}
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
