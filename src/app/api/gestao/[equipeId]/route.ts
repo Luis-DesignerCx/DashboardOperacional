@@ -3,6 +3,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+// Retorna o filtro de maiorDiasAtraso para cada tipo de equipe
+function getDiasFilter(tipo: string): { gte?: number; lte?: number } | undefined {
+  switch (tipo) {
+    case "FLASH":         return { lte: 0 };
+    case "CRA_1_30":      return { gte: 1,  lte: 30  };
+    case "CR_31_90":      return { gte: 31, lte: 90  };
+    case "CR_PDD_91_180": return { gte: 91, lte: 180 };
+    case "CR_PDD_181":    return { gte: 181 };
+    default:              return undefined;
+  }
+}
+
 export async function GET(req: NextRequest, { params }: { params: { equipeId: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
@@ -15,31 +27,51 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
   const competenciaId = searchParams.get("competenciaId");
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
 
-  const [consultores, carteiraData, recebimentos] = await Promise.all([
+  // Busca o tipo da equipe para determinar a faixa de dias
+  const equipeInfo = await prisma.equipe.findUnique({
+    where: { id: equipeId },
+    select: { tipo: true },
+  });
+
+  const diasFilter = equipeInfo ? getDiasFilter(equipeInfo.tipo) : undefined;
+
+  // Filtro para carteiraParcela: por faixa de dias OU por equipeId do consultor (fallback)
+  const carteiraWhere: any = { competenciaId, ativo: true };
+  if (diasFilter) {
+    carteiraWhere.contrato = { maiorDiasAtraso: diasFilter };
+  } else {
+    carteiraWhere.consultor = { equipeId };
+  }
+
+  // Carrega carteiras e empresas
+  const carteiraData = await prisma.carteiraParcela.findMany({
+    where: carteiraWhere,
+    select: {
+      consultorId: true,
+      contratoId: true,
+      contrato: {
+        select: {
+          empresaId: true,
+          valorTotalAberto: true,
+          empresa: { select: { id: true, nome: true } },
+        },
+      },
+    },
+  });
+
+  // Ids únicos de consultores que têm carteira nessa faixa
+  const consultorIds = [...new Set(carteiraData.map((c) => c.consultorId))];
+
+  // Busca info dos consultores + recebimentos em paralelo
+  const [consultores, recebimentos] = await Promise.all([
     prisma.usuario.findMany({
-      where: { equipeId, perfil: "CONSULTOR", ativo: true },
+      where: { id: { in: consultorIds }, perfil: "CONSULTOR", ativo: true },
       select: { id: true, nome: true, emFerias: true },
       orderBy: { nome: "asc" },
     }),
-    // Inadimplência por consultor por empresa
-    prisma.carteiraParcela.findMany({
-      where: { consultor: { equipeId }, competenciaId, ativo: true },
-      select: {
-        consultorId: true,
-        contratoId: true,
-        contrato: {
-          select: {
-            empresaId: true,
-            valorTotalAberto: true,
-            empresa: { select: { id: true, nome: true } },
-          },
-        },
-      },
-    }),
-    // Recebimentos por consultor por empresa
     prisma.recebimento.findMany({
       where: {
-        consultor: { equipeId },
+        consultorId: { in: consultorIds },
         contrato: { carteiras: { some: { competenciaId, ativo: true } } },
       },
       select: {
