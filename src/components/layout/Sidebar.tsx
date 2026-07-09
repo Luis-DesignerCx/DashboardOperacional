@@ -50,8 +50,17 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [pendentes, setPendentes] = useState(0);
-  const [promessasHoje, setPromessasHoje] = useState(0);
+  // Total real retornado pela API
+  const [totalTarefasHoje, setTotalTarefasHoje] = useState(0);
   const { equipeIds, toggleEquipe, clearFilter } = useFrente();
+
+  // Chave de "visto" baseada no dia — zera automaticamente no próximo dia
+  const seenKey = `pendencias_seen_${new Date().toISOString().slice(0, 10)}`;
+  const seenCount = (): number => parseInt(typeof window !== "undefined" ? (localStorage.getItem(seenKey) ?? "0") : "0", 10);
+  const markSeen = (n: number) => { if (typeof window !== "undefined") localStorage.setItem(seenKey, String(n)); };
+
+  // Badge só aparece quando o total atual supera o que o usuário já viu
+  const promessasHoje = Math.max(0, totalTarefasHoje - seenCount());
 
   useEffect(() => {
     if (!["ADMINISTRADOR", "GESTOR"].includes(perfil)) return;
@@ -74,7 +83,12 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
       fetch("/api/promessas?vencendoHoje=true")
         .then((r) => r.json())
         .then((data) => {
-          if (Array.isArray(data)) setPromessasHoje(data.length);
+          if (!Array.isArray(data)) return;
+          setTotalTarefasHoje(data.length);
+          // Se o usuário já está na página de tarefas, marca como visto imediatamente
+          if (typeof window !== "undefined" && window.location.pathname === "/pendencias") {
+            markSeen(data.length);
+          }
         })
         .catch(() => {});
     };
@@ -83,9 +97,13 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
     return () => clearInterval(interval);
   }, [perfil]);
 
-  // Limpa o badge ao visitar a página de tarefas
+  // Ao entrar na página de tarefas: marca o total atual como "visto"
   useEffect(() => {
-    if (pathname === "/pendencias") setPromessasHoje(0);
+    if (pathname === "/pendencias") {
+      markSeen(totalTarefasHoje);
+      // Força re-render para ocultar o badge imediatamente
+      setTotalTarefasHoje((t) => t);
+    }
   }, [pathname]);
 
   const itensVisiveis = NAV_ITEMS.filter((item) => item.perfis.includes(perfil));
