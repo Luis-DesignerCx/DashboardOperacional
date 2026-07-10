@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useSession } from "next-auth/react";
 import {
   FolderOpen, Search, Plus, X, AlertCircle,
   ChevronRight, UserPlus, Building2, Loader2, CheckCircle2, DollarSign, ArrowLeftRight, User,
-  Phone, History, Calendar, ArrowUpDown, Clock,
+  Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2,
 } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 import Link from "next/link";
@@ -110,6 +111,10 @@ function diasAtrasoColor(dias: number | null) {
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
 
 export default function CarteiraPage() {
+  const { data: session } = useSession();
+  const perfil = (session?.user as any)?.perfil as string | undefined;
+  const isGestorOuAdmin = perfil === "GESTOR" || perfil === "ADMINISTRADOR";
+
   const [carteira, setCarteira] = useState<ItemCarteira[]>([]);
   const [totalContratos, setTotalContratos] = useState(0);
   const [valorTotal, setValorTotal] = useState(0);
@@ -137,10 +142,12 @@ export default function CarteiraPage() {
   const [erroPromRap, setErroPromRap] = useState("");
   const [promRapModo, setPromRapModo] = useState<"PROMESSA" | "LINK">("PROMESSA");
   const [contratoRecebimento, setContratoRecebimento] = useState<Contrato | null>(null);
-  const [recebForm, setRecebForm] = useState({ valor: "", valorAParte: "", formaPagamento: "PIX", observacao: "", data: new Date().toISOString().slice(0, 10), parcelasIds: [] as string[] });
+  const [recebForm, setRecebForm] = useState({ valor: "", valorManual: false, valorAParte: "", formaPagamento: "PIX", observacao: "", data: new Date().toISOString().slice(0, 10), parcelasIds: [] as string[] });
   const [salvandoReceb, setSalvandoReceb] = useState(false);
   const [erroReceb, setErroReceb] = useState("");
   const [modalAParte, setModalAParte] = useState<Contrato | null>(null);
+  const [editandoAParte, setEditandoAParte] = useState<{ id: string; valor: string; formaPagamento: string } | null>(null);
+  const [salvandoEditAParte, setSalvandoEditAParte] = useState(false);
 
 
   // Estado modal recebimento externo (outra carteira)
@@ -279,6 +286,7 @@ export default function CarteiraPage() {
     setContratoRecebimento(c);
     setRecebForm({
       valor: "",
+      valorManual: false,
       valorAParte: "",
       formaPagamento: "PIX",
       observacao: "",
@@ -295,16 +303,20 @@ export default function CarteiraPage() {
       const novosIds = jaSelected
         ? f.parcelasIds.filter((id) => id !== parcela.id)
         : [...f.parcelasIds, parcela.id];
-      // Auto-soma as parcelas selecionadas
       const totalSelecionado = contratoRecebimento?.parcelas
         .filter((p) => novosIds.includes(p.id))
         .reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0) ?? 0;
-      return {
-        ...f,
-        parcelasIds: novosIds,
-        valor: novosIds.length > 0 ? totalSelecionado.toFixed(2).replace(".", ",") : f.valor,
-      };
+      // Só auto-preenche se o consultor não editou manualmente
+      const novoValor = f.valorManual ? f.valor : (novosIds.length > 0 ? totalSelecionado.toFixed(2).replace(".", ",") : f.valor);
+      return { ...f, parcelasIds: novosIds, valor: novoValor };
     });
+  }
+
+  function recalcularValorParcelas() {
+    const total = contratoRecebimento?.parcelas
+      .filter((p) => recebForm.parcelasIds.includes(p.id))
+      .reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0) ?? 0;
+    setRecebForm((f) => ({ ...f, valor: total.toFixed(2).replace(".", ","), valorManual: false }));
   }
 
   async function salvarRecebimento() {
@@ -441,6 +453,42 @@ export default function CarteiraPage() {
     if (!res.ok) { setErroPromRap(data.erro || "Erro ao registrar"); return; }
     setModalPromRap(null);
     carregarPagina(competenciaId, 1, false, busca, sort);
+  }
+
+  async function salvarEdicaoAParte() {
+    if (!editandoAParte) return;
+    setSalvandoEditAParte(true);
+    const res = await fetch("/api/recebimentos", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: editandoAParte.id,
+        valorAParte: parseFloat(editandoAParte.valor.replace(",", ".")) || 0,
+        formaPagamento: editandoAParte.formaPagamento,
+      }),
+    });
+    setSalvandoEditAParte(false);
+    if (!res.ok) return;
+    const updated = await res.json();
+    setModalAParte((prev) => prev ? {
+      ...prev,
+      recebimentos: prev.recebimentos.map((r) =>
+        r.id === updated.id ? { ...r, valorAParte: Number(updated.valorAParte), formaPagamento: updated.formaPagamento } : r
+      ),
+    } : null);
+    setEditandoAParte(null);
+    carregarPagina(competenciaId, 1);
+  }
+
+  async function excluirAParte(id: string) {
+    if (!confirm("Excluir este lançamento a parte?")) return;
+    const res = await fetch(`/api/recebimentos?id=${id}`, { method: "DELETE" });
+    if (!res.ok) return;
+    setModalAParte((prev) => prev ? {
+      ...prev,
+      recebimentos: prev.recebimentos.filter((r) => r.id !== id),
+    } : null);
+    carregarPagina(competenciaId, 1);
   }
 
   const NOVO_FORM_VAZIO = {
@@ -938,15 +986,72 @@ export default function CarteiraPage() {
               <div className="space-y-2">
                 {modalAParte.recebimentos
                   .filter((r) => Number(r.valorAParte ?? 0) > 0)
-                  .map((r, i) => (
-                    <div key={r.id} className="flex items-center justify-between bg-slate-800 rounded-xl px-4 py-3">
-                      <div>
-                        <p className="text-white text-sm font-semibold">{formatarMoeda(Number(r.valorAParte))}</p>
-                        <p className="text-slate-500 text-xs mt-0.5">
-                          {new Date(r.dataRecebimento).toLocaleDateString("pt-BR")} · {r.formaPagamento}
-                        </p>
-                      </div>
-                      <span className="text-xs bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-1 rounded-lg">A Parte</span>
+                  .map((r) => (
+                    <div key={r.id} className="bg-slate-800 rounded-xl px-4 py-3">
+                      {editandoAParte?.id === r.id ? (
+                        <div className="space-y-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] text-slate-400 mb-1 block">Valor (R$)</label>
+                              <input
+                                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                value={editandoAParte.valor}
+                                onChange={(e) => setEditandoAParte((p) => p ? { ...p, valor: e.target.value } : null)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-slate-400 mb-1 block">Forma</label>
+                              <select
+                                className="w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                value={editandoAParte.formaPagamento}
+                                onChange={(e) => setEditandoAParte((p) => p ? { ...p, formaPagamento: e.target.value } : null)}
+                              >
+                                <option value="PIX">PIX</option>
+                                <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                                <option value="BOLETO">Boleto</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={salvarEdicaoAParte} disabled={salvandoEditAParte}
+                              className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-medium py-1.5 rounded-lg border border-emerald-500/20 transition-colors flex items-center justify-center gap-1">
+                              {salvandoEditAParte ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Salvar
+                            </button>
+                            <button onClick={() => setEditandoAParte(null)}
+                              className="flex-1 bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium py-1.5 rounded-lg transition-colors">
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-white text-sm font-semibold">{formatarMoeda(Number(r.valorAParte))}</p>
+                            <p className="text-slate-500 text-xs mt-0.5">
+                              {new Date(r.dataRecebimento).toLocaleDateString("pt-BR")} · {r.formaPagamento}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-1 rounded-lg">A Parte</span>
+                            {isGestorOuAdmin && (
+                              <>
+                                <button
+                                  onClick={() => setEditandoAParte({ id: r.id, valor: String(Number(r.valorAParte)).replace(".", ","), formaPagamento: r.formaPagamento })}
+                                  className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 rounded-lg transition-colors ml-1"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  onClick={() => excluirAParte(r.id)}
+                                  className="p-1.5 text-slate-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))
                 }
@@ -959,7 +1064,7 @@ export default function CarteiraPage() {
               </div>
             </div>
             <div className="px-5 pb-5">
-              <button onClick={() => setModalAParte(null)} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+              <button onClick={() => { setModalAParte(null); setEditandoAParte(null); }} className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
             </div>
@@ -1028,12 +1133,19 @@ export default function CarteiraPage() {
               {/* Campos do formulário */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Valor recebido (R$) *</label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs text-slate-400">Valor recebido (R$) *</label>
+                    {recebForm.valorManual && recebForm.parcelasIds.length > 0 && (
+                      <button type="button" onClick={recalcularValorParcelas} className="text-[10px] text-sky-400 hover:text-sky-300 transition-colors">
+                        ↺ Recalcular parcelas
+                      </button>
+                    )}
+                  </div>
                   <input
                     className={inputCls}
                     placeholder="0,00"
                     value={recebForm.valor}
-                    onChange={(e) => setRecebForm((f) => ({ ...f, valor: e.target.value }))}
+                    onChange={(e) => setRecebForm((f) => ({ ...f, valor: e.target.value, valorManual: true }))}
                   />
                 </div>
                 <div>

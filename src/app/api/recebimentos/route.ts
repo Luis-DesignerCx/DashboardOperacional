@@ -5,6 +5,43 @@ import { prisma } from "@/lib/prisma";
 import { FormaPagamento } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
+    return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const { id, valorAParte, formaPagamento, dataRecebimento } = body;
+  if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
+
+  const data: any = {};
+  if (valorAParte !== undefined) {
+    data.valorAParte = valorAParte != null && Number(valorAParte) > 0
+      ? new Decimal(String(valorAParte).replace(",", "."))
+      : null;
+  }
+  if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
+  if (dataRecebimento) data.dataRecebimento = new Date(dataRecebimento);
+
+  const rec = await prisma.recebimento.update({ where: { id }, data });
+  return NextResponse.json(rec);
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
+    return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
+
+  await prisma.recebimento.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
