@@ -20,7 +20,7 @@ interface Contrato {
   contatos: { tipo: string; status: string; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string }[];
   recebimentos: { id: string; valor: number; valorAParte: number | null; dataRecebimento: string; formaPagamento: string }[];
-  parcelas: { id: string; numero: number; diasAtraso: number; valorTotalAberto: number }[];
+  parcelas: { id: string; numero: number; diasAtraso: number; valorTotalAberto: number; dataVencimento: string }[];
   statusRecuperacao: string | null;
 }
 
@@ -987,8 +987,10 @@ export default function CarteiraPage() {
                 <div>
                   <p className="text-xs text-slate-400 mb-2">Selecione as parcelas pagas <span className="text-slate-400">(o valor é preenchido automaticamente)</span></p>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                    {contratoRecebimento.parcelas.map((p) => {
+                    {[...contratoRecebimento.parcelas].sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime()).map((p) => {
                       const checked = recebForm.parcelasIds.includes(p.id);
+                      const venc = new Date(p.dataVencimento);
+                      const vencLabel = `${String(venc.getUTCDate()).padStart(2,"0")}/${String(venc.getUTCMonth()+1).padStart(2,"0")}/${venc.getUTCFullYear()}`;
                       return (
                         <button
                           key={p.id}
@@ -1006,7 +1008,7 @@ export default function CarteiraPage() {
                             }`}>
                               {checked && <CheckCircle2 size={10} className="text-white" />}
                             </div>
-                            <span>Parcela {p.numero}</span>
+                            <span>{vencLabel}</span>
                             <span className={`text-xs ${p.diasAtraso > 90 ? "text-red-400" : p.diasAtraso > 30 ? "text-amber-400" : "text-sky-400"}`}>
                               {p.diasAtraso}d atraso
                             </span>
@@ -1297,8 +1299,10 @@ export default function CarteiraPage() {
                 <div>
                   <p className="text-xs text-slate-400 mb-2">Parcelas incluídas na promessa <span className="text-slate-400">(valor preenchido automaticamente)</span></p>
                   <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                    {modalPromRap.parcelas.map((p) => {
+                    {[...modalPromRap.parcelas].sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime()).map((p) => {
                       const checked = promRapForm.parcelasIds.includes(p.id);
+                      const venc = new Date(p.dataVencimento);
+                      const vencLabel = `${String(venc.getUTCDate()).padStart(2,"0")}/${String(venc.getUTCMonth()+1).padStart(2,"0")}/${venc.getUTCFullYear()}`;
                       return (
                         <button key={p.id} type="button" onClick={() => toggleParcelaPromRap(p)}
                           className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors ${checked ? "bg-purple-500/10 border-purple-500/40 text-purple-300" : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600"}`}>
@@ -1306,7 +1310,7 @@ export default function CarteiraPage() {
                             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${checked ? "bg-purple-500 border-purple-500" : "border-slate-600"}`}>
                               {checked && <CheckCircle2 size={10} className="text-white" />}
                             </div>
-                            <span>Parcela {p.numero}</span>
+                            <span>{vencLabel}</span>
                             <span className={`text-xs ${p.diasAtraso > 90 ? "text-red-400" : p.diasAtraso > 30 ? "text-amber-400" : "text-sky-400"}`}>{p.diasAtraso}d</span>
                           </div>
                           <span className="font-semibold tabular-nums">{formatarMoeda(Number(p.valorTotalAberto ?? 0))}</span>
