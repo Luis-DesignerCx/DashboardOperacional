@@ -20,13 +20,63 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "Nome do cliente, número do contrato e competência são obrigatórios" }, { status: 400 });
   }
 
-  // Verifica se contrato já existe
+  const dias = parseInt(diasAtraso) || 0;
+  const valor = parseFloat(String(valorAReceber).replace(",", ".")) || 0;
+
+  // ── Contrato já existe: adiciona nova parcela sem alterar a faixa ──────────
   const contratoExistente = await prisma.contrato.findUnique({ where: { numero: numeroContrato } });
   if (contratoExistente) {
-    return NextResponse.json({ erro: "Esse número de contrato já existe no sistema. Use a opção de adicionar existente." }, { status: 409 });
+    // Próximo número de parcela
+    const ultimaParcela = await prisma.parcela.findFirst({
+      where: { contratoId: contratoExistente.id },
+      orderBy: { numero: "desc" },
+      select: { numero: true },
+    });
+    const proximoNumero = (ultimaParcela?.numero ?? 0) + 1;
+
+    // Adiciona parcela e atualiza valor total do contrato em uma transação
+    // maiorDiasAtraso NÃO é alterado — faixa congelada na competência atual
+    await prisma.$transaction([
+      prisma.parcela.create({
+        data: {
+          id: randomUUID(),
+          contratoId: contratoExistente.id,
+          numero: proximoNumero,
+          dataVencimento: new Date(),
+          diasAtraso: dias,
+          valorParcela: new Decimal(valor.toFixed(2)),
+          valorTotalAberto: new Decimal(valor.toFixed(2)),
+        },
+      }),
+      prisma.contrato.update({
+        where: { id: contratoExistente.id },
+        data: {
+          valorTotalAberto: {
+            increment: new Decimal(valor.toFixed(2)),
+          },
+        },
+      }),
+    ]);
+
+    // Vincula à carteira do consultor se ainda não estiver nesta competência
+    const carteiraExistente = await prisma.carteiraParcela.findFirst({
+      where: { contratoId: contratoExistente.id, competenciaId },
+    });
+    if (!carteiraExistente) {
+      await prisma.carteiraParcela.create({
+        data: {
+          id: randomUUID(),
+          contratoId: contratoExistente.id,
+          consultorId: session.user.id,
+          competenciaId,
+        },
+      });
+    }
+
+    return NextResponse.json({ ok: true, contratoId: contratoExistente.id }, { status: 201 });
   }
 
-  // Identifica empresa pelo prefixo do contrato
+  // ── Contrato novo: cria cliente, contrato, parcela e carteira ─────────────
   const empresas = await prisma.empresa.findMany();
   const empresa = empresas.find((e) =>
     e.prefixos.some((p) => numeroContrato.toUpperCase().startsWith(p.toUpperCase()))
@@ -37,10 +87,6 @@ export async function POST(req: NextRequest) {
 
   const clienteId = randomUUID();
   const contratoId = randomUUID();
-  const parcelaId = randomUUID();
-  const carteiraId = randomUUID();
-  const dias = parseInt(diasAtraso) || 0;
-  const valor = parseFloat(String(valorAReceber).replace(",", ".")) || 0;
 
   await prisma.$transaction([
     prisma.cliente.create({
@@ -63,7 +109,7 @@ export async function POST(req: NextRequest) {
     }),
     prisma.parcela.create({
       data: {
-        id: parcelaId,
+        id: randomUUID(),
         contratoId,
         numero: 1,
         dataVencimento: new Date(),
@@ -74,7 +120,7 @@ export async function POST(req: NextRequest) {
     }),
     prisma.carteiraParcela.create({
       data: {
-        id: carteiraId,
+        id: randomUUID(),
         contratoId,
         consultorId: session.user.id,
         competenciaId,
