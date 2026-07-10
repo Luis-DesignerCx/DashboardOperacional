@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 import { Decimal } from "@prisma/client/runtime/library";
-import { identificarEmpresa } from "@/constants/empresas";
+import { FormaPagamento } from "@prisma/client";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
   const {
     nomeCliente, telefones, emails,
     numeroContrato, diasAtraso, valorAReceber, competenciaId,
+    tipo = "inadimplencia", formaPagamento,
   } = body;
 
   if (!nomeCliente || !numeroContrato || !competenciaId) {
@@ -23,8 +24,86 @@ export async function POST(req: NextRequest) {
   const dias = parseInt(diasAtraso) || 0;
   const valor = parseFloat(String(valorAReceber).replace(",", ".")) || 0;
 
-  // ── Contrato já existe: adiciona nova parcela sem alterar a faixa ──────────
   const contratoExistente = await prisma.contrato.findUnique({ where: { numero: numeroContrato } });
+
+  // ── RECEBIMENTO A PARTE ────────────────────────────────────────────────────
+  if (tipo === "a_parte") {
+    if (!formaPagamento) {
+      return NextResponse.json({ erro: "Forma de pagamento obrigatória para lançamento a parte" }, { status: 400 });
+    }
+
+    let contratoId: string;
+
+    if (contratoExistente) {
+      contratoId = contratoExistente.id;
+    } else {
+      // Cria contrato sem dívida (valorTotalAberto = 0)
+      const empresas = await prisma.empresa.findMany();
+      const empresa = empresas.find((e) =>
+        e.prefixos.some((p) => numeroContrato.toUpperCase().startsWith(p.toUpperCase()))
+      );
+      if (!empresa) {
+        return NextResponse.json({ erro: "Não foi possível identificar a empresa pelo número do contrato" }, { status: 400 });
+      }
+
+      const clienteId = randomUUID();
+      contratoId = randomUUID();
+
+      await prisma.$transaction([
+        prisma.cliente.create({
+          data: {
+            id: clienteId,
+            nome: nomeCliente.trim(),
+            telefones: telefones?.trim() || null,
+            emails: emails?.trim() || null,
+          },
+        }),
+        prisma.contrato.create({
+          data: {
+            id: contratoId,
+            numero: numeroContrato.trim(),
+            clienteId,
+            empresaId: empresa.id,
+            maiorDiasAtraso: 0,
+            valorTotalAberto: new Decimal("0"),
+          },
+        }),
+      ]);
+    }
+
+    // Garante que o contrato está na carteira desta competência
+    const carteiraExistente = await prisma.carteiraParcela.findFirst({
+      where: { contratoId, competenciaId },
+    });
+    if (!carteiraExistente) {
+      await prisma.carteiraParcela.create({
+        data: {
+          id: randomUUID(),
+          contratoId,
+          consultorId: session.user.id,
+          competenciaId,
+        },
+      });
+    }
+
+    // Lança diretamente como recebimento a parte
+    await prisma.recebimento.create({
+      data: {
+        id: randomUUID(),
+        contratoId,
+        consultorId: session.user.id,
+        valor: new Decimal("0"),
+        valorAParte: new Decimal(valor.toFixed(2)),
+        dataRecebimento: new Date(),
+        formaPagamento: formaPagamento as FormaPagamento,
+        justificativa: "Lançamento manual a parte",
+      },
+    });
+
+    return NextResponse.json({ ok: true, contratoId }, { status: 201 });
+  }
+
+  // ── INADIMPLÊNCIA ─────────────────────────────────────────────────────────
   if (contratoExistente) {
     // Próximo número de parcela
     const ultimaParcela = await prisma.parcela.findFirst({
@@ -34,8 +113,7 @@ export async function POST(req: NextRequest) {
     });
     const proximoNumero = (ultimaParcela?.numero ?? 0) + 1;
 
-    // Adiciona parcela e atualiza valor total do contrato em uma transação
-    // maiorDiasAtraso NÃO é alterado — faixa congelada na competência atual
+    // Cria parcela e atualiza valor total — faixa (maiorDiasAtraso) congelada
     await prisma.$transaction([
       prisma.parcela.create({
         data: {
@@ -50,15 +128,11 @@ export async function POST(req: NextRequest) {
       }),
       prisma.contrato.update({
         where: { id: contratoExistente.id },
-        data: {
-          valorTotalAberto: {
-            increment: new Decimal(valor.toFixed(2)),
-          },
-        },
+        data: { valorTotalAberto: { increment: new Decimal(valor.toFixed(2)) } },
       }),
     ]);
 
-    // Vincula à carteira do consultor se ainda não estiver nesta competência
+    // Vincula à carteira se ainda não estiver
     const carteiraExistente = await prisma.carteiraParcela.findFirst({
       where: { contratoId: contratoExistente.id, competenciaId },
     });
@@ -76,7 +150,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, contratoId: contratoExistente.id }, { status: 201 });
   }
 
-  // ── Contrato novo: cria cliente, contrato, parcela e carteira ─────────────
+  // Contrato novo — cria tudo
   const empresas = await prisma.empresa.findMany();
   const empresa = empresas.find((e) =>
     e.prefixos.some((p) => numeroContrato.toUpperCase().startsWith(p.toUpperCase()))

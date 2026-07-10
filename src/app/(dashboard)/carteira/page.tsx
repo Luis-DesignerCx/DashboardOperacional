@@ -158,6 +158,8 @@ export default function CarteiraPage() {
   const [novoForm, setNovoForm] = useState({
     nomeCliente: "", telefones: "", emails: "",
     numeroContrato: "", diasAtraso: "", valorAReceber: "",
+    tipo: "inadimplencia" as "inadimplencia" | "a_parte",
+    formaPagamento: "PIX",
   });
   const [salvandoNovo, setSalvandoNovo] = useState(false);
   const [erroNovo, setErroNovo] = useState("");
@@ -441,10 +443,20 @@ export default function CarteiraPage() {
     carregarPagina(competenciaId, 1, false, busca, sort);
   }
 
+  const NOVO_FORM_VAZIO = {
+    nomeCliente: "", telefones: "", emails: "",
+    numeroContrato: "", diasAtraso: "", valorAReceber: "",
+    tipo: "inadimplencia" as "inadimplencia" | "a_parte",
+    formaPagamento: "PIX",
+  };
+
   async function salvarNovoCliente() {
     setErroNovo("");
     if (!novoForm.nomeCliente || !novoForm.numeroContrato) {
       setErroNovo("Nome do cliente e número do contrato são obrigatórios"); return;
+    }
+    if (novoForm.tipo === "a_parte" && !novoForm.formaPagamento) {
+      setErroNovo("Selecione a forma de pagamento"); return;
     }
     setSalvandoNovo(true);
     const res = await fetch("/api/carteira/novo-cliente", {
@@ -456,7 +468,7 @@ export default function CarteiraPage() {
     setSalvandoNovo(false);
     if (!res.ok) { setErroNovo(data.erro || "Erro ao cadastrar"); return; }
     setModal(null);
-    setNovoForm({ nomeCliente: "", telefones: "", emails: "", numeroContrato: "", diasAtraso: "", valorAReceber: "" });
+    setNovoForm(NOVO_FORM_VAZIO);
     carregarPagina(competenciaId, 1);
   }
 
@@ -498,7 +510,7 @@ export default function CarteiraPage() {
             <ArrowLeftRight size={15} /> Outra carteira
           </button>
           <button
-            onClick={() => setModal("novo")}
+            onClick={() => { setNovoForm(NOVO_FORM_VAZIO); setErroNovo(""); setModal("novo"); }}
             className="flex items-center gap-2 bg-gr-500 hover:bg-gr-400 text-white text-sm font-medium px-3 py-2 rounded-xl transition-colors"
           >
             <Plus size={15} /> Novo cadastro
@@ -1365,6 +1377,41 @@ export default function CarteiraPage() {
               </button>
             </div>
             <div className="p-5 space-y-3">
+
+              {/* Tipo do lançamento */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5">Tipo do lançamento *</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNovoForm((f) => ({ ...f, tipo: "inadimplencia" }))}
+                    className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                      novoForm.tipo === "inadimplencia"
+                        ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                        : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300"
+                    }`}
+                  >
+                    Inadimplência
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNovoForm((f) => ({ ...f, tipo: "a_parte" }))}
+                    className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
+                      novoForm.tipo === "a_parte"
+                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                        : "bg-slate-800 border-slate-700 text-slate-400 hover:text-slate-300"
+                    }`}
+                  >
+                    Recebimento a Parte
+                  </button>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1.5">
+                  {novoForm.tipo === "inadimplencia"
+                    ? "O valor será adicionado à dívida total da carteira e entrará em Recebido quando pago."
+                    : "O valor já foi recebido fora do fluxo normal. Será lançado diretamente como a parte."}
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className="block text-xs text-slate-400 mb-1.5">Nome do cliente *</label>
@@ -1386,13 +1433,31 @@ export default function CarteiraPage() {
                   <input className={inputCls} placeholder="Ex: GR-001234" value={novoForm.numeroContrato}
                     onChange={(e) => setNovoForm((f) => ({ ...f, numeroContrato: e.target.value }))} />
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Dias em atraso</label>
-                  <input type="number" className={inputCls} placeholder="0" value={novoForm.diasAtraso}
-                    onChange={(e) => setNovoForm((f) => ({ ...f, diasAtraso: e.target.value }))} />
-                </div>
-                <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Valor inadimplente (R$)</label>
+
+                {novoForm.tipo === "inadimplencia" && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1.5">Dias em atraso</label>
+                    <input type="number" className={inputCls} placeholder="0" value={novoForm.diasAtraso}
+                      onChange={(e) => setNovoForm((f) => ({ ...f, diasAtraso: e.target.value }))} />
+                  </div>
+                )}
+
+                {novoForm.tipo === "a_parte" && (
+                  <div>
+                    <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
+                    <select className={inputCls} value={novoForm.formaPagamento}
+                      onChange={(e) => setNovoForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
+                      <option value="PIX">PIX</option>
+                      <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                      <option value="BOLETO">Boleto</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className={novoForm.tipo === "inadimplencia" ? "" : "col-span-2"}>
+                  <label className="block text-xs text-slate-400 mb-1.5">
+                    {novoForm.tipo === "inadimplencia" ? "Valor inadimplente (R$)" : "Valor recebido (R$)"}
+                  </label>
                   <input className={inputCls} placeholder="0,00" value={novoForm.valorAReceber}
                     onChange={(e) => setNovoForm((f) => ({ ...f, valorAReceber: e.target.value }))} />
                 </div>
@@ -1403,7 +1468,7 @@ export default function CarteiraPage() {
               )}
             </div>
             <div className="flex gap-3 px-5 pb-5">
-              <button onClick={() => setModal(null)}
+              <button onClick={() => { setModal(null); setNovoForm(NOVO_FORM_VAZIO); }}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
