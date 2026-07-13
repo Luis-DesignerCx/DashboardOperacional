@@ -69,8 +69,6 @@ export function DashboardConsultor() {
     </div>
   );
 
-  const proximaFaixa = proximaFaixaComissao(dados.percentualMeta);
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -126,11 +124,11 @@ export function DashboardConsultor() {
           cor="bg-sky-600"
         />
         <CardMetrica
-          titulo="% da Meta"
-          valor={`${(dados.percentualMeta ?? 0).toFixed(1)}%`}
-          sub={proximaFaixa ? `Próxima faixa: ${proximaFaixa}%` : "Meta atingida!"}
+          titulo="Total Recebido"
+          valor={formatarMoeda(dados.valorRecebido + dados.valorAParte)}
+          sub="Inad + A Parte"
           icon={CheckCircle2}
-          cor={dados.percentualMeta >= 100 ? "bg-emerald-500" : dados.percentualMeta >= 70 ? "bg-gr-500" : "bg-slate-600"}
+          cor="bg-emerald-600"
         />
         <CardMetrica
           titulo="Promessas Abertas"
@@ -218,7 +216,3 @@ export function DashboardConsultor() {
   );
 }
 
-function proximaFaixaComissao(percentual: number): number | null {
-  const faixas = [70, 80, 90, 100, 110, 120, 130, 140, 150, 160];
-  return faixas.find((f) => f > percentual) ?? null;
-}
