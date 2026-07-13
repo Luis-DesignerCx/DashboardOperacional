@@ -39,6 +39,23 @@ export async function POST(req: NextRequest) {
     data: { usuarioId: session.user.id, tabela: "contatos", registroId: contato.id, acao: "CREATE" },
   });
 
+  // Ao marcar inadimplência equivocada, abre solicitação de aprovação para o gestor (sem duplicar)
+  if (status === "INADIMPLENCIA_EQUIVOCADA") {
+    const pendente = await prisma.solicitacao.findFirst({
+      where: { contratoId, tipo: "INADIMPLENCIA_EQUIVOCADA", status: "PENDENTE" },
+    });
+    if (!pendente) {
+      await prisma.solicitacao.create({
+        data: {
+          tipo: "INADIMPLENCIA_EQUIVOCADA",
+          motivo: observacao?.trim() || "Consultor identificou inadimplência equivocada",
+          contratoId,
+          solicitanteId: session.user.id,
+        },
+      });
+    }
+  }
+
   return NextResponse.json(contato, { status: 201 });
 }
 

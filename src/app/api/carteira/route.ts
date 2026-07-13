@@ -20,13 +20,13 @@ export async function GET(req: NextRequest) {
 
   const where: any = { competenciaId, ativo: true };
   if (session.user.perfil === "CONSULTOR") where.consultorId = session.user.id;
+
+  where.contrato = { inadimplenciaEquivocada: false };
   if (busca) {
-    where.contrato = {
-      OR: [
-        { cliente: { nome: { contains: busca, mode: "insensitive" } } },
-        { numero: { contains: busca, mode: "insensitive" } },
-      ],
-    };
+    where.contrato.OR = [
+      { cliente: { nome: { contains: busca, mode: "insensitive" } } },
+      { numero: { contains: busca, mode: "insensitive" } },
+    ];
   }
 
   // Ordenação

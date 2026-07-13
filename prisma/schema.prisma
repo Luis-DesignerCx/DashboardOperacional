@@ -245,9 +245,10 @@ model Contrato {
   maiorDiasAtraso       Int?              // calculado: max(parcela.diasAtraso)
   valorTotalAberto      Decimal?          @db.Decimal(15, 2) // soma das parcelas
   valorContrato         Decimal?          @db.Decimal(15, 2) // col 19
-  statusRecuperacao     StatusRecuperacao @default(INADIMPLENTE)
-  ativo                 Boolean           @default(true)
-  criadoEm              DateTime          @default(now())
+  statusRecuperacao         StatusRecuperacao @default(INADIMPLENTE)
+  ativo                     Boolean           @default(true)
+  inadimplenciaEquivocada   Boolean           @default(false)
+  criadoEm                  DateTime          @default(now())
   atualizadoEm          DateTime          @updatedAt
 
   cliente               Cliente           @relation(fields: [clienteId], references: [id])

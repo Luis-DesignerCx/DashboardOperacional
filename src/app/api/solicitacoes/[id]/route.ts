@@ -28,6 +28,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     },
   });
 
+  // Ao aprovar inadimplência equivocada: marca o contrato e remove das métricas
+  if (
+    status === "APROVADA" &&
+    solicitacaoAtual.tipo === "INADIMPLENCIA_EQUIVOCADA" &&
+    solicitacaoAtual.contratoId
+  ) {
+    await prisma.contrato.update({
+      where: { id: solicitacaoAtual.contratoId },
+      data: { inadimplenciaEquivocada: true },
+    });
+  }
+
   // Ao aprovar transferência: move o contrato para a carteira do solicitante
   if (
     status === "APROVADA" &&

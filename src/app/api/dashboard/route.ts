@@ -58,7 +58,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     meta,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
-      where: { consultorId, competenciaId, ativo: true },
+      where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
       select: {
         contrato: {
           select: {
@@ -72,7 +72,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     prisma.recebimento.aggregate({
       where: {
         consultorId,
-        contrato: { carteiras: { some: { consultorId, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId, competenciaId, ativo: true } } },
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
       _sum: { valor: true },
@@ -80,7 +80,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     prisma.recebimento.findMany({
       where: {
         consultorId,
-        contrato: { carteiras: { some: { consultorId, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId, competenciaId, ativo: true } } },
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
       select: { valorAParte: true },
@@ -184,13 +184,13 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     recebidoHojeAgg,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
-      where: { consultorId: { in: consultorIds }, competenciaId, ativo: true },
+      where: { consultorId: { in: consultorIds }, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
       select: { contrato: { select: { valorTotalAberto: true } } },
     }),
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
-        contrato: { carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
         baixaOficial: false,
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
@@ -199,7 +199,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
-        contrato: { carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
         baixaOficial: true,
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
@@ -209,7 +209,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
       by: ["consultorId"],
       where: {
         consultorId: { in: consultorIds },
-        contrato: { carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
       _sum: { valor: true },
@@ -245,7 +245,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
-        contrato: { carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
         dataRecebimento: { gte: inicioHoje, lte: fimHoje },
       },
       _sum: { valor: true },
@@ -286,7 +286,7 @@ async function dashboardExecutivo(competenciaId: string) {
   const [carteiras, recebimentosPorContrato, parcelasCount, empresas] = await Promise.all([
     // Seleção mínima — sem recebimentos
     prisma.carteiraParcela.findMany({
-      where: { competenciaId, ativo: true },
+      where: { competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
       select: {
         contratoId: true,
         contrato: {
