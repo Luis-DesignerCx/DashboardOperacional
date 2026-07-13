@@ -7,24 +7,69 @@ import { Decimal } from "@prisma/client/runtime/library";
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
-    return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
-  }
+  if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+
+  const isGestorAdmin = ["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil);
 
   const body = await req.json();
-  const { id, valorAParte, formaPagamento, dataRecebimento } = body;
+  const { id, valor, valorAParte, formaPagamento, dataRecebimento } = body;
   if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
 
-  const data: any = {};
-  if (valorAParte !== undefined) {
-    data.valorAParte = valorAParte != null && Number(valorAParte) > 0
-      ? new Decimal(String(valorAParte).replace(",", "."))
-      : null;
+  const recAtual = await prisma.recebimento.findUnique({
+    where: { id },
+    include: {
+      contrato: {
+        select: {
+          id: true,
+          valorTotalAberto: true,
+          recebimentos: { select: { id: true, valor: true } },
+        },
+      },
+    },
+  });
+  if (!recAtual) return NextResponse.json({ erro: "Recebimento não encontrado" }, { status: 404 });
+
+  if (!isGestorAdmin) {
+    if (recAtual.consultorId !== session.user.id) {
+      return NextResponse.json({ erro: "Sem permissão para editar este recebimento" }, { status: 403 });
+    }
+    if (valor === undefined) {
+      return NextResponse.json({ erro: "Informe o valor a corrigir" }, { status: 400 });
+    }
   }
-  if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
-  if (dataRecebimento) data.dataRecebimento = new Date(dataRecebimento);
+
+  const data: any = {};
+  if (valor !== undefined) {
+    data.valor = new Decimal(String(valor).replace(",", "."));
+  }
+  if (isGestorAdmin) {
+    if (valorAParte !== undefined) {
+      data.valorAParte = valorAParte != null && Number(valorAParte) > 0
+        ? new Decimal(String(valorAParte).replace(",", "."))
+        : null;
+    }
+    if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
+    if (dataRecebimento) data.dataRecebimento = new Date(dataRecebimento);
+  }
 
   const rec = await prisma.recebimento.update({ where: { id }, data });
+
+  if (valor !== undefined) {
+    const novoValor = parseFloat(String(valor).replace(",", "."));
+    const contrato = recAtual.contrato;
+    const totalRecebido = contrato.recebimentos.reduce((s, r) => {
+      return s + (r.id === id ? novoValor : Number(r.valor));
+    }, 0);
+    const valorAberto = Number(contrato.valorTotalAberto ?? 0);
+    const statusRecuperacao =
+      totalRecebido >= valorAberto
+        ? "RECUPERADO_INTEGRALMENTE"
+        : totalRecebido > 0
+        ? "RECUPERACAO_PARCIAL"
+        : "INADIMPLENTE";
+    await prisma.contrato.update({ where: { id: contrato.id }, data: { statusRecuperacao } });
+  }
+
   return NextResponse.json(rec);
 }
 

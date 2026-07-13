@@ -3,6 +3,24 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions);
+  if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
+    return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const { nome, telefones, emails } = body;
+
+  const data: any = {};
+  if (nome) data.nome = nome.trim();
+  if (telefones !== undefined) data.telefones = telefones?.trim() || null;
+  if (emails !== undefined) data.emails = emails?.trim() || null;
+
+  const cliente = await prisma.cliente.update({ where: { id: params.id }, data });
+  return NextResponse.json(cliente);
+}
+
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });

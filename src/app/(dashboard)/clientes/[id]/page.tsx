@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { formatarMoeda } from "@/lib/utils";
 import {
-  ArrowLeft, Phone, Mail, Building2, FileText,
-  Calendar, Clock, TrendingDown, CheckCircle2, AlertCircle, User,
+  ArrowLeft, Phone, Mail, FileText,
+  Calendar, Clock, CheckCircle2, AlertCircle, User, Pencil, Check, X,
 } from "lucide-react";
 
 interface Contrato {
@@ -19,6 +20,7 @@ interface Contrato {
   statusRecuperacao: string;
   empresa: { nome: string };
   parcelas: {
+    id: string;
     numero: number;
     dataVencimento: string;
     diasAtraso: number;
@@ -28,7 +30,13 @@ interface Contrato {
     meioPagamento: string | null;
     paga: boolean;
   }[];
-  recebimentos: { id: string; valor: number; dataRecebimento: string; formaPagamento: string }[];
+  recebimentos: {
+    id: string;
+    valor: number;
+    dataRecebimento: string;
+    formaPagamento: string;
+    consultorId: string;
+  }[];
   contatos: { id: string; tipo: string; status: string; observacao: string | null; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string; formaPagamento: string }[];
   carteiras: { consultor: { nome: string }; competencia: { descricao: string } }[];
@@ -59,12 +67,31 @@ function labelDias(dias: number) {
   return "181+ dias";
 }
 
+const INPUT = "w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-gr-500";
+const BTN_SAVE = "flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gr-500 text-white text-xs font-medium hover:bg-gr-600 transition-colors disabled:opacity-50";
+const BTN_CANCEL = "flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-300 text-xs hover:bg-slate-700 transition-colors";
+
 export default function ClienteDetalhe() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { data: session } = useSession();
+  const perfil = (session?.user as any)?.perfil as string | undefined;
+  const isGestorOuAdmin = perfil === "GESTOR" || perfil === "ADMINISTRADOR";
+  const meuId = (session?.user as any)?.id as string | undefined;
+
   const [cliente, setCliente] = useState<Cliente | null>(null);
   const [erro, setErro] = useState("");
   const [contratoAberto, setContratoAberto] = useState<string | null>(null);
+
+  const [editandoCliente, setEditandoCliente] = useState(false);
+  const [clienteForm, setClienteForm] = useState({ nome: "", telefones: "", emails: "" });
+  const [editandoContrato, setEditandoContrato] = useState(false);
+  const [contratoForm, setContratoForm] = useState({ maiorDiasAtraso: "", valorTotalAberto: "", statusContrato: "" });
+  const [editandoParcela, setEditandoParcela] = useState<string | null>(null);
+  const [parcelaForm, setParcelaForm] = useState({ valorParcela: "", valorTotalAberto: "", diasAtraso: "", dataVencimento: "" });
+  const [editandoRecebimento, setEditandoRecebimento] = useState<string | null>(null);
+  const [recValor, setRecValor] = useState("");
+  const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
     fetch(`/api/clientes/${id}`)
@@ -76,6 +103,116 @@ export default function ClienteDetalhe() {
       })
       .catch(() => setErro("Erro de conexão"));
   }, [id]);
+
+  async function salvarCliente() {
+    if (!cliente) return;
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/clientes/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(clienteForm),
+      });
+      if (res.ok) {
+        setCliente(prev => prev ? {
+          ...prev,
+          nome: clienteForm.nome.trim() || prev.nome,
+          telefones: clienteForm.telefones.trim() || null,
+          emails: clienteForm.emails.trim() || null,
+        } : null);
+        setEditandoCliente(false);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function salvarContrato(contratoId: string) {
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/contratos/${contratoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(contratoForm),
+      });
+      if (res.ok) {
+        setCliente(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            contratos: prev.contratos.map(c => c.id !== contratoId ? c : {
+              ...c,
+              maiorDiasAtraso: contratoForm.maiorDiasAtraso !== "" ? parseInt(contratoForm.maiorDiasAtraso) : c.maiorDiasAtraso,
+              valorTotalAberto: contratoForm.valorTotalAberto !== "" ? parseFloat(contratoForm.valorTotalAberto.replace(",", ".")) : c.valorTotalAberto,
+              statusContrato: contratoForm.statusContrato || c.statusContrato,
+            }),
+          };
+        });
+        setEditandoContrato(false);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function salvarParcela(parcelaId: string) {
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/parcelas/${parcelaId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parcelaForm),
+      });
+      if (res.ok) {
+        setCliente(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            contratos: prev.contratos.map(c => ({
+              ...c,
+              parcelas: c.parcelas.map(p => p.id !== parcelaId ? p : {
+                ...p,
+                valorParcela: parcelaForm.valorParcela !== "" ? parseFloat(parcelaForm.valorParcela.replace(",", ".")) : p.valorParcela,
+                valorTotalAberto: parcelaForm.valorTotalAberto !== "" ? parseFloat(parcelaForm.valorTotalAberto.replace(",", ".")) : p.valorTotalAberto,
+                diasAtraso: parcelaForm.diasAtraso !== "" ? parseInt(parcelaForm.diasAtraso) : p.diasAtraso,
+                dataVencimento: parcelaForm.dataVencimento ? parcelaForm.dataVencimento + "T00:00:00.000Z" : p.dataVencimento,
+              }),
+            })),
+          };
+        });
+        setEditandoParcela(null);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function salvarRecebimento(recId: string) {
+    setSalvando(true);
+    try {
+      const res = await fetch(`/api/recebimentos`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: recId, valor: recValor }),
+      });
+      if (res.ok) {
+        const valorNum = parseFloat(recValor.replace(",", "."));
+        setCliente(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            contratos: prev.contratos.map(c => ({
+              ...c,
+              recebimentos: c.recebimentos.map(r => r.id !== recId ? r : { ...r, valor: valorNum }),
+            })),
+          };
+        });
+        setEditandoRecebimento(null);
+      }
+    } finally {
+      setSalvando(false);
+    }
+  }
 
   if (erro) return (
     <div className="flex flex-col items-center justify-center h-64 gap-3">
@@ -110,22 +247,71 @@ export default function ClienteDetalhe() {
           <ArrowLeft size={18} />
         </button>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-white">{cliente.nome}</h1>
-          <div className="flex flex-wrap items-center gap-4 mt-1.5">
-            {telefones.length > 0 && (
-              <span className="flex items-center gap-1.5 text-slate-400 text-sm">
-                <Phone size={13} />
-                {telefones[0]}
-                {telefones.length > 1 && <span className="text-slate-400">+{telefones.length - 1}</span>}
-              </span>
-            )}
-            {emails.length > 0 && (
-              <span className="flex items-center gap-1.5 text-slate-400 text-sm">
-                <Mail size={13} />
-                {emails[0]}
-              </span>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-white">{cliente.nome}</h1>
+            {isGestorOuAdmin && !editandoCliente && (
+              <button
+                onClick={() => {
+                  setClienteForm({
+                    nome: cliente.nome,
+                    telefones: cliente.telefones ?? "",
+                    emails: cliente.emails ?? "",
+                  });
+                  setEditandoCliente(true);
+                }}
+                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+              >
+                <Pencil size={14} />
+              </button>
             )}
           </div>
+          {!editandoCliente && (
+            <div className="flex flex-wrap items-center gap-4 mt-1.5">
+              {telefones.length > 0 && (
+                <span className="flex items-center gap-1.5 text-slate-400 text-sm">
+                  <Phone size={13} />
+                  {telefones[0]}
+                  {telefones.length > 1 && <span className="text-slate-400">+{telefones.length - 1}</span>}
+                </span>
+              )}
+              {emails.length > 0 && (
+                <span className="flex items-center gap-1.5 text-slate-400 text-sm">
+                  <Mail size={13} />
+                  {emails[0]}
+                </span>
+              )}
+            </div>
+          )}
+          {editandoCliente && (
+            <div className="mt-3 space-y-2 max-w-md">
+              <input
+                className={INPUT}
+                placeholder="Nome do cliente"
+                value={clienteForm.nome}
+                onChange={e => setClienteForm(f => ({ ...f, nome: e.target.value }))}
+              />
+              <input
+                className={INPUT}
+                placeholder="Telefones (separados por vírgula)"
+                value={clienteForm.telefones}
+                onChange={e => setClienteForm(f => ({ ...f, telefones: e.target.value }))}
+              />
+              <input
+                className={INPUT}
+                placeholder="E-mails (separados por vírgula)"
+                value={clienteForm.emails}
+                onChange={e => setClienteForm(f => ({ ...f, emails: e.target.value }))}
+              />
+              <div className="flex gap-2">
+                <button className={BTN_SAVE} onClick={salvarCliente} disabled={salvando}>
+                  <Check size={12} /> Salvar
+                </button>
+                <button className={BTN_CANCEL} onClick={() => setEditandoCliente(false)}>
+                  <X size={12} /> Cancelar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -151,7 +337,7 @@ export default function ClienteDetalhe() {
         </div>
       </div>
 
-      {/* Seletor de contrato (se tiver mais de 1) */}
+      {/* Seletor de contrato */}
       {cliente.contratos.length > 1 && (
         <div className="flex flex-wrap gap-2">
           {cliente.contratos.map((c) => (
@@ -174,24 +360,76 @@ export default function ClienteDetalhe() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Dados do contrato */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <FileText size={15} className="text-gr-400" />
-              Contrato {contrato.numero}
-            </h2>
-
-            <div className="grid grid-cols-2 gap-3">
-              <Info label="Empresa" value={contrato.empresa.nome} />
-              <Info label="Status" value={contrato.statusContrato ?? "—"} />
-              <Info label="Valor Contrato" value={formatarMoeda(Number(contrato.valorContrato ?? 0))} />
-              <Info label="Total em Aberto" value={formatarMoeda(Number(contrato.valorTotalAberto ?? 0))} />
-              <Info label="Parcelas Vencidas" value={String(contrato.totalParcelasVencidas ?? "—")} />
-              <div>
-                <p className="text-slate-500 text-xs mb-1">Faixa de Atraso</p>
-                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeDias(contrato.maiorDiasAtraso ?? 0)}`}>
-                  {contrato.maiorDiasAtraso ?? 0}d — {labelDias(contrato.maiorDiasAtraso ?? 0)}
-                </span>
-              </div>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <FileText size={15} className="text-gr-400" />
+                Contrato {contrato.numero}
+              </h2>
+              {isGestorOuAdmin && !editandoContrato && (
+                <button
+                  onClick={() => {
+                    setContratoForm({
+                      maiorDiasAtraso: String(contrato.maiorDiasAtraso ?? ""),
+                      valorTotalAberto: String(contrato.valorTotalAberto ?? ""),
+                      statusContrato: contrato.statusContrato ?? "",
+                    });
+                    setEditandoContrato(true);
+                  }}
+                  className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                >
+                  <Pencil size={13} />
+                </button>
+              )}
             </div>
+
+            {editandoContrato ? (
+              <div className="space-y-2">
+                <label className="text-slate-500 text-xs block">Maior Dias de Atraso</label>
+                <input
+                  className={INPUT}
+                  type="number"
+                  placeholder="Ex: 90"
+                  value={contratoForm.maiorDiasAtraso}
+                  onChange={e => setContratoForm(f => ({ ...f, maiorDiasAtraso: e.target.value }))}
+                />
+                <label className="text-slate-500 text-xs block">Valor Total em Aberto (R$)</label>
+                <input
+                  className={INPUT}
+                  placeholder="Ex: 1500.00"
+                  value={contratoForm.valorTotalAberto}
+                  onChange={e => setContratoForm(f => ({ ...f, valorTotalAberto: e.target.value }))}
+                />
+                <label className="text-slate-500 text-xs block">Status do Contrato</label>
+                <input
+                  className={INPUT}
+                  placeholder="Ex: ATIVO"
+                  value={contratoForm.statusContrato}
+                  onChange={e => setContratoForm(f => ({ ...f, statusContrato: e.target.value }))}
+                />
+                <div className="flex gap-2 pt-1">
+                  <button className={BTN_SAVE} onClick={() => salvarContrato(contrato.id)} disabled={salvando}>
+                    <Check size={12} /> Salvar
+                  </button>
+                  <button className={BTN_CANCEL} onClick={() => setEditandoContrato(false)}>
+                    <X size={12} /> Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Info label="Empresa" value={contrato.empresa.nome} />
+                <Info label="Status" value={contrato.statusContrato ?? "—"} />
+                <Info label="Valor Contrato" value={formatarMoeda(Number(contrato.valorContrato ?? 0))} />
+                <Info label="Total em Aberto" value={formatarMoeda(Number(contrato.valorTotalAberto ?? 0))} />
+                <Info label="Parcelas Vencidas" value={String(contrato.totalParcelasVencidas ?? "—")} />
+                <div>
+                  <p className="text-slate-500 text-xs mb-1">Faixa de Atraso</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeDias(contrato.maiorDiasAtraso ?? 0)}`}>
+                    {contrato.maiorDiasAtraso ?? 0}d — {labelDias(contrato.maiorDiasAtraso ?? 0)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {contrato.carteiras[0] && (
               <div className="pt-3 border-t border-slate-800">
@@ -211,23 +449,95 @@ export default function ClienteDetalhe() {
               <Calendar size={15} className="text-gr-400" />
               Parcelas ({contrato.parcelas.length})
             </h2>
-            <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+            <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
               {contrato.parcelas.map((p) => (
-                <div key={p.numero} className="flex items-center justify-between py-1.5 border-b border-slate-800/50 last:border-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-400 text-xs w-5 text-right">{p.numero}</span>
-                    <span className="text-slate-400 text-xs">
-                      {new Date(p.dataVencimento).toLocaleDateString("pt-BR")}
-                    </span>
-                    {p.diasAtraso > 0 && (
-                      <span className={`text-xs px-1.5 py-0.5 rounded-full ${badgeDias(p.diasAtraso)}`}>
-                        {p.diasAtraso}d
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-white text-xs font-medium tabular-nums">
-                    {formatarMoeda(Number(p.valorTotalAberto))}
-                  </span>
+                <div key={p.id}>
+                  {editandoParcela === p.id ? (
+                    <div className="py-2 border-b border-slate-800/50 space-y-2">
+                      <div className="grid grid-cols-2 gap-1.5">
+                        <div>
+                          <label className="text-slate-500 text-xs block mb-1">Valor parcela</label>
+                          <input
+                            className={INPUT}
+                            placeholder="0.00"
+                            value={parcelaForm.valorParcela}
+                            onChange={e => setParcelaForm(f => ({ ...f, valorParcela: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 text-xs block mb-1">Valor em aberto</label>
+                          <input
+                            className={INPUT}
+                            placeholder="0.00"
+                            value={parcelaForm.valorTotalAberto}
+                            onChange={e => setParcelaForm(f => ({ ...f, valorTotalAberto: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 text-xs block mb-1">Dias atraso</label>
+                          <input
+                            className={INPUT}
+                            type="number"
+                            placeholder="0"
+                            value={parcelaForm.diasAtraso}
+                            onChange={e => setParcelaForm(f => ({ ...f, diasAtraso: e.target.value }))}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-slate-500 text-xs block mb-1">Vencimento</label>
+                          <input
+                            className={INPUT}
+                            type="date"
+                            value={parcelaForm.dataVencimento}
+                            onChange={e => setParcelaForm(f => ({ ...f, dataVencimento: e.target.value }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button className={BTN_SAVE} onClick={() => salvarParcela(p.id)} disabled={salvando}>
+                          <Check size={12} /> Salvar
+                        </button>
+                        <button className={BTN_CANCEL} onClick={() => setEditandoParcela(null)}>
+                          <X size={12} /> Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between py-1.5 border-b border-slate-800/50 last:border-0 group">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 text-xs w-5 text-right">{p.numero}</span>
+                        <span className="text-slate-400 text-xs">
+                          {new Date(p.dataVencimento).toLocaleDateString("pt-BR")}
+                        </span>
+                        {p.diasAtraso > 0 && (
+                          <span className={`text-xs px-1.5 py-0.5 rounded-full ${badgeDias(p.diasAtraso)}`}>
+                            {p.diasAtraso}d
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-white text-xs font-medium tabular-nums">
+                          {formatarMoeda(Number(p.valorTotalAberto))}
+                        </span>
+                        {isGestorOuAdmin && (
+                          <button
+                            onClick={() => {
+                              setParcelaForm({
+                                valorParcela: String(p.valorParcela ?? ""),
+                                valorTotalAberto: String(p.valorTotalAberto ?? ""),
+                                diasAtraso: String(p.diasAtraso ?? ""),
+                                dataVencimento: p.dataVencimento ? p.dataVencimento.substring(0, 10) : "",
+                              });
+                              setEditandoParcela(p.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-white transition-all"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -240,15 +550,53 @@ export default function ClienteDetalhe() {
                 <CheckCircle2 size={15} className="text-emerald-400" />
                 Recebimentos ({contrato.recebimentos.length})
               </h2>
-              <div className="space-y-2">
-                {contrato.recebimentos.slice(0, 5).map((r) => (
-                  <div key={r.id} className="flex justify-between items-center py-1.5 border-b border-slate-800/50 last:border-0">
-                    <div>
-                      <p className="text-white text-sm font-medium">{formatarMoeda(Number(r.valor))}</p>
-                      <p className="text-slate-500 text-xs">{r.formaPagamento.replace(/_/g, " ")} · {new Date(r.dataRecebimento).toLocaleDateString("pt-BR")}</p>
+              <div className="space-y-1">
+                {contrato.recebimentos.map((r) => {
+                  const podeEditar = isGestorOuAdmin || r.consultorId === meuId;
+                  return (
+                    <div key={r.id}>
+                      {editandoRecebimento === r.id ? (
+                        <div className="py-2 border-b border-slate-800/50 space-y-2">
+                          <label className="text-slate-500 text-xs block">Valor recebido (R$)</label>
+                          <input
+                            className={INPUT}
+                            placeholder="Ex: 150,00"
+                            value={recValor}
+                            onChange={e => setRecValor(e.target.value)}
+                          />
+                          <div className="flex gap-2">
+                            <button className={BTN_SAVE} onClick={() => salvarRecebimento(r.id)} disabled={salvando}>
+                              <Check size={12} /> Salvar
+                            </button>
+                            <button className={BTN_CANCEL} onClick={() => setEditandoRecebimento(null)}>
+                              <X size={12} /> Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between items-center py-1.5 border-b border-slate-800/50 last:border-0 group">
+                          <div>
+                            <p className="text-white text-sm font-medium">{formatarMoeda(Number(r.valor))}</p>
+                            <p className="text-slate-500 text-xs">
+                              {r.formaPagamento.replace(/_/g, " ")} · {new Date(r.dataRecebimento).toLocaleDateString("pt-BR")}
+                            </p>
+                          </div>
+                          {podeEditar && (
+                            <button
+                              onClick={() => {
+                                setRecValor(String(Number(r.valor).toFixed(2)).replace(".", ","));
+                                setEditandoRecebimento(r.id);
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-all"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
