@@ -126,6 +126,7 @@ export default function CarteiraPage() {
   const [busca, setBusca] = useState("");
   const [sort, setSort] = useState("diasAtraso");
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
+  const [statusFiltro, setStatusFiltro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [modal, setModal] = useState<"buscar" | "novo" | "recebimento" | "externo" | null>(null);
   // Modal atendimento (histórico + novo contato)
@@ -521,11 +522,17 @@ export default function CarteiraPage() {
   }
 
   const empresas = Array.from(new Set(carteira.map((i) => i.contrato.empresa.nome))).sort();
+  const statusPresentes = Array.from(
+    new Set(carteira.map((i) => i.contrato.contatos[0]?.status).filter(Boolean) as string[])
+  ).sort((a, b) => (STATUS_LABEL[a] ?? a).localeCompare(STATUS_LABEL[b] ?? b));
 
-  // Filtro de empresa client-side (sort/busca são server-side)
-  const filtrados = empresaFiltro
-    ? carteira.filter((item) => item.contrato.empresa.nome === empresaFiltro)
-    : carteira;
+  // Filtros client-side (sort/busca são server-side)
+  const filtrados = carteira.filter((item) => {
+    const empresaOk = !empresaFiltro || item.contrato.empresa.nome === empresaFiltro;
+    const ultimoStatus = item.contrato.contatos[0]?.status;
+    const statusOk = !statusFiltro || ultimoStatus === statusFiltro;
+    return empresaOk && statusOk;
+  });
 
   // Agrupar por faixa de inadimplência
   const porFaixa = filtrados.reduce<Record<string, ItemCarteira[]>>((acc, item) => {
@@ -573,9 +580,9 @@ export default function CarteiraPage() {
         </div>
       </div>
 
-      {/* Busca + Ordenação */}
-      <div className="flex gap-3">
-        <div className="relative flex-1">
+      {/* Busca + Filtros */}
+      <div className="flex gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-52">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
@@ -585,6 +592,16 @@ export default function CarteiraPage() {
             className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
           />
         </div>
+        <select
+          value={statusFiltro ?? ""}
+          onChange={(e) => setStatusFiltro(e.target.value || null)}
+          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+        >
+          <option value="">Status do atendimento</option>
+          {statusPresentes.map((s) => (
+            <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
+          ))}
+        </select>
         <div className="flex items-center gap-2">
           <ArrowUpDown size={14} className="text-slate-500 flex-shrink-0" />
           <select
