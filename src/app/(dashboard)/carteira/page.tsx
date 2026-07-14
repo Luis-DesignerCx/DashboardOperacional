@@ -855,16 +855,20 @@ export default function CarteiraPage() {
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <div className="flex flex-col items-end gap-0.5 min-w-[110px]">
-                              <span className="text-white font-bold text-base tabular-nums tracking-tight">
+                          {/* LADO DIREITO — largura fixa, sempre alinhado */}
+                          <div className="flex items-center gap-4 flex-shrink-0">
+
+                            {/* Bloco de valores — largura fixa 148px, sempre no mesmo eixo */}
+                            <div className="flex flex-col items-end w-[148px]">
+                              <span className="text-white font-bold text-base tabular-nums">
                                 {formatarMoeda(c.valorTotalAberto ?? 0)}
                               </span>
-                              {totalRecebido > 0 && (
-                                <span className="text-[11px] font-medium tabular-nums text-emerald-400 tracking-tight">
-                                  <span className="text-emerald-600/70 mr-0.5 text-[10px]">↳</span>
-                                  {formatarMoeda(totalRecebido)} rec.
+                              {totalRecebido > 0 ? (
+                                <span className="text-xs font-medium tabular-nums text-emerald-400 mt-0.5">
+                                  ↳ {formatarMoeda(totalRecebido)} rec.
                                 </span>
+                              ) : (
+                                <span className="h-[18px]" /> /* mantém altura quando não há rec. */
                               )}
                               {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
                                 <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full mt-0.5">
@@ -872,63 +876,78 @@ export default function CarteiraPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="flex gap-1 items-center">
-                              {/* Situação (visível quando INADIMPLENTE e não adimplente) */}
-                              {c.situacao === "INADIMPLENTE" && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
-                                <div className="relative">
-                                  <button
-                                    onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
-                                    title="Atualizar situação"
-                                    className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors opacity-0 group-hover:opacity-100"
-                                  >
-                                    <ArrowLeftRight size={13} />
-                                  </button>
-                                  {situacaoPopover === c.id && (
-                                    <div className="absolute right-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
-                                      {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
-                                        <button
-                                          key={val}
-                                          onClick={() => handleSituacao(c, val)}
-                                          disabled={salvandoSituacao === c.id}
-                                          className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
-                                        >
-                                          {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
-                                          {label}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+
+                            {/* Botões — 5 slots fixos, invisible preserva espaço */}
+                            <div className="flex items-center gap-0.5">
+
+                              {/* Slot 1: Situação */}
+                              <div className="relative">
+                                <button
+                                  onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
+                                  title="Atualizar situação"
+                                  className={`p-1.5 rounded-lg transition-colors ${
+                                    c.situacao === "INADIMPLENTE" && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE"
+                                      ? "text-slate-500 hover:text-amber-400 hover:bg-amber-500/10"
+                                      : "invisible pointer-events-none"
+                                  }`}
+                                >
+                                  <ArrowLeftRight size={14} />
+                                </button>
+                                {situacaoPopover === c.id && (
+                                  <div className="absolute right-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
+                                    {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
+                                      <button
+                                        key={val}
+                                        onClick={() => handleSituacao(c, val)}
+                                        disabled={salvandoSituacao === c.id}
+                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
+                                      >
+                                        {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
+                                        {label}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Slot 2: Atendimento */}
                               <button
                                 onClick={() => abrirAtendimento(c)}
                                 title="Registrar atendimento"
                                 className="p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors"
                               >
-                                <Phone size={15} />
+                                <Phone size={14} />
                               </button>
+
+                              {/* Slot 3: Promessa */}
                               <button
                                 onClick={() => abrirPromessaRapida(c)}
                                 title="Registrar promessa"
                                 className="p-1.5 rounded-lg text-slate-500 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
                               >
-                                <Calendar size={15} />
+                                <Calendar size={14} />
                               </button>
-                              {c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
-                                <button
-                                  onClick={() => abrirRecebimento(c)}
-                                  title="Registrar recebimento"
-                                  className="p-1.5 rounded-lg text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-colors"
-                                >
-                                  <DollarSign size={15} />
-                                </button>
-                              )}
+
+                              {/* Slot 4: Recebimento — invisible quando adimplente */}
+                              <button
+                                onClick={() => abrirRecebimento(c)}
+                                title="Registrar recebimento"
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                  c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE"
+                                    ? "text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                                    : "invisible pointer-events-none"
+                                }`}
+                              >
+                                <DollarSign size={14} />
+                              </button>
+
+                              {/* Slot 5: Ficha do cliente */}
                               <Link
                                 href={`/clientes/${c.cliente.id}`}
                                 className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors"
                                 title="Ver ficha do cliente"
                               >
-                                <ChevronRight size={15} />
+                                <ChevronRight size={14} />
                               </Link>
                             </div>
                           </div>
