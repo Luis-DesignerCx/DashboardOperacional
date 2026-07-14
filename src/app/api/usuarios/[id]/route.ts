@@ -4,6 +4,17 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
+async function getEquipeIdsGestor(gestorId: string, equipeIdPrimaria: string | null): Promise<string[]> {
+  const adicionais = await prisma.equipeConsultor.findMany({
+    where: { consultorId: gestorId },
+    select: { equipeId: true },
+  });
+  return [
+    ...(equipeIdPrimaria ? [equipeIdPrimaria] : []),
+    ...adicionais.map((f) => f.equipeId),
+  ].filter((v, i, a) => a.indexOf(v) === i);
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
@@ -13,27 +24,32 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
   }
 
-  // Gestor só pode editar consultores da própria equipe
+  // Gestor só pode editar consultores de qualquer uma das suas frentes
   if (perfil === "GESTOR") {
     const alvo = await prisma.usuario.findUnique({ where: { id: params.id }, select: { perfil: true, equipeId: true } });
-    if (!alvo || alvo.perfil !== "CONSULTOR" || alvo.equipeId !== session.user.equipeId) {
+    const minhasFrentes = await getEquipeIdsGestor(session.user.id, session.user.equipeId ?? null);
+    if (!alvo || alvo.perfil !== "CONSULTOR" || !minhasFrentes.includes(alvo.equipeId ?? "")) {
       return NextResponse.json({ erro: "Sem permissão para editar este usuário" }, { status: 403 });
     }
   }
 
   const body = await req.json();
-  const { nome, email, senha, equipeId, ativo, emFerias } = body;
+  const { nome, email, senha, frentesIds, ativo, emFerias } = body;
 
   const data: Record<string, any> = {};
   if (nome !== undefined) data.nome = nome;
   if (email !== undefined) data.email = email;
-  if (equipeId !== undefined) data.equipeId = equipeId || null;
   if (ativo !== undefined) data.ativo = ativo;
   if (emFerias !== undefined) data.emFerias = emFerias;
   if (senha) {
     if (senha.length < 6) return NextResponse.json({ erro: "Senha deve ter pelo menos 6 caracteres" }, { status: 400 });
     data.senhaHash = await bcrypt.hash(senha, 10);
-    data.deveAlterarSenha = true; // redefinição pelo admin/gestor → força troca no próximo login
+    data.deveAlterarSenha = true;
+  }
+
+  // Atualiza frentes quando enviadas
+  if (Array.isArray(frentesIds)) {
+    data.equipeId = frentesIds[0] ?? null;
   }
 
   if (email) {
@@ -50,6 +66,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       equipe: { select: { id: true, nome: true, tipo: true } },
     },
   });
+
+  // Sincroniza EquipeConsultor para frentes adicionais (índice 1+)
+  if (Array.isArray(frentesIds)) {
+    await prisma.equipeConsultor.deleteMany({ where: { consultorId: params.id } });
+    const adicionais = frentesIds.slice(1);
+    if (adicionais.length > 0) {
+      await prisma.equipeConsultor.createMany({
+        data: adicionais.map((equipeId) => ({ equipeId, consultorId: params.id })),
+        skipDuplicates: true,
+      });
+    }
+  }
 
   return NextResponse.json(usuario);
 }
@@ -68,7 +96,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   if (perfil === "GESTOR") {
     const alvo = await prisma.usuario.findUnique({ where: { id: params.id }, select: { perfil: true, equipeId: true } });
-    if (!alvo || alvo.perfil !== "CONSULTOR" || alvo.equipeId !== session.user.equipeId) {
+    const minhasFrentes = await getEquipeIdsGestor(session.user.id, session.user.equipeId ?? null);
+    if (!alvo || alvo.perfil !== "CONSULTOR" || !minhasFrentes.includes(alvo.equipeId ?? "")) {
       return NextResponse.json({ erro: "Sem permissão para excluir este usuário" }, { status: 403 });
     }
   }

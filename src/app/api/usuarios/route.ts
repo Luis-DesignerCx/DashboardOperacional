@@ -14,11 +14,20 @@ export async function GET() {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
   }
 
-  // Gestor vê apenas consultores da própria equipe
   const where: any = { deletadoEm: null };
+
   if (session.user.perfil === "GESTOR") {
     where.perfil = "CONSULTOR";
-    if (session.user.equipeId) where.equipeId = session.user.equipeId;
+    // Coleta todas as frentes do gestor (primária + adicionais via EquipeConsultor)
+    const adicionais = await prisma.equipeConsultor.findMany({
+      where: { consultorId: session.user.id },
+      select: { equipeId: true },
+    });
+    const equipeIds = [
+      ...(session.user.equipeId ? [session.user.equipeId] : []),
+      ...adicionais.map((f) => f.equipeId),
+    ].filter((v, i, a) => a.indexOf(v) === i);
+    if (equipeIds.length > 0) where.equipeId = { in: equipeIds };
   }
 
   const usuarios = await prisma.usuario.findMany({
@@ -51,9 +60,8 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { nome, email, equipeId, perfilCriado: perfilBody } = body;
+  const { nome, email, frentesIds, perfilCriado: perfilBody } = body;
 
-  // Admin cria qualquer perfil; Gestor cria somente Consultores
   const perfisValidos: Perfil[] = ["ADMINISTRADOR", "GESTOR", "CONSULTOR"];
   let perfilCriado: Perfil;
   if (perfil === "ADMINISTRADOR") {
@@ -71,8 +79,17 @@ export async function POST(req: NextRequest) {
 
   const senhaHash = await bcrypt.hash(SENHA_PADRAO, 10);
 
-  // Gestor sempre atribui à própria equipe
-  const equipeIdFinal = perfil === "GESTOR" ? (session.user.equipeId ?? null) : (equipeId || null);
+  // Gestor sempre usa suas próprias frentes como ponto de partida; Admin usa o que foi enviado
+  let equipeIdFinal: string | null;
+  let frentesAdicionaisIds: string[];
+  if (perfil === "GESTOR") {
+    equipeIdFinal = session.user.equipeId ?? null;
+    frentesAdicionaisIds = [];
+  } else {
+    const ids: string[] = Array.isArray(frentesIds) ? frentesIds : [];
+    equipeIdFinal = ids[0] ?? null;
+    frentesAdicionaisIds = ids.slice(1);
+  }
 
   const usuario = await prisma.usuario.create({
     data: {
@@ -89,6 +106,13 @@ export async function POST(req: NextRequest) {
       equipe: { select: { id: true, nome: true, tipo: true } },
     },
   });
+
+  if (frentesAdicionaisIds.length > 0) {
+    await prisma.equipeConsultor.createMany({
+      data: frentesAdicionaisIds.map((equipeId) => ({ equipeId, consultorId: usuario.id })),
+      skipDuplicates: true,
+    });
+  }
 
   return NextResponse.json(usuario, { status: 201 });
 }

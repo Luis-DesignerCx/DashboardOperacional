@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
   Users, Plus, Pencil, Trash2, Eye, EyeOff, X, Check,
-  Palmtree, ShieldCheck, UserCog, User, KeyRound, Layers,
+  Palmtree, ShieldCheck, UserCog, User, KeyRound,
 } from "lucide-react";
 
 interface Equipe { id: string; nome: string; tipo: string }
@@ -41,18 +41,19 @@ const FRENTE_LABEL: Record<string, string> = {
   CR_PDD_91_180: "91+", CR_PDD_181: "91+",
 };
 const FRENTE_COR: Record<string, string> = {
-  FLASH:         "bg-sky-500/15 text-sky-400",
-  CRA_1_30:      "bg-emerald-500/15 text-emerald-400",
-  CR_31_90:      "bg-amber-500/15 text-amber-400",
-  CR_PDD_91_180: "bg-orange-500/15 text-orange-400",
-  CR_PDD_181:    "bg-orange-500/15 text-orange-400",
+  FLASH:         "bg-sky-500/15 text-sky-400 border border-sky-500/20",
+  CRA_1_30:      "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
+  CR_31_90:      "bg-amber-500/15 text-amber-400 border border-amber-500/20",
+  CR_PDD_91_180: "bg-orange-500/15 text-orange-400 border border-orange-500/20",
+  CR_PDD_181:    "bg-orange-500/15 text-orange-400 border border-orange-500/20",
 };
 
 function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; frentesAdicionais: { equipe: Equipe }[] }) {
-  if (!equipe) return <span className="text-slate-400">—</span>;
-  // Junta principal + adicionais e remove duplicatas pelo id
-  const todas = [equipe, ...frentesAdicionais.map((f) => f.equipe)]
-    .filter((e, i, arr) => arr.findIndex((x) => x.id === e.id) === i);
+  const todas = [
+    ...(equipe ? [equipe] : []),
+    ...frentesAdicionais.map((f) => f.equipe),
+  ].filter((e, i, arr) => arr.findIndex((x) => x.id === e.id) === i);
+  if (!todas.length) return <span className="text-slate-400">—</span>;
   return (
     <div className="flex flex-wrap gap-1">
       {todas.map((e) => (
@@ -72,17 +73,15 @@ export default function UsuariosPage() {
 
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [equipes, setEquipes] = useState<Equipe[]>([]);
-  const [modal, setModal] = useState<"criar" | "editar" | "senha" | "frentes" | null>(null);
+  const [modal, setModal] = useState<"criar" | "editar" | "senha" | null>(null);
   const [editando, setEditando] = useState<Usuario | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
 
-  const [form, setForm] = useState({ nome: "", email: "", equipeId: "", perfilCriado: "CONSULTOR" });
+  const [form, setForm] = useState({ nome: "", email: "", frentesIds: [] as string[], perfilCriado: "CONSULTOR" });
   const [novaSenha, setNovaSenha] = useState("");
-  const [frentesAdic, setFrentesAdic] = useState<{id: string; equipe: {id: string; nome: string; tipo: string}}[]>([]);
-  const [adicionandoFrente, setAdicionandoFrente] = useState(false);
 
   useEffect(() => {
     carregar();
@@ -95,12 +94,16 @@ export default function UsuariosPage() {
   }
 
   function abrirCriar() {
-    setForm({ nome: "", email: "", equipeId: "", perfilCriado: "CONSULTOR" });
+    setForm({ nome: "", email: "", frentesIds: [], perfilCriado: "CONSULTOR" });
     setErro(""); setModal("criar");
   }
 
   function abrirEditar(u: Usuario) {
-    setForm({ nome: u.nome, email: u.email, equipeId: u.equipe?.id ?? "", perfilCriado: u.perfil });
+    const ids = [
+      ...(u.equipe ? [u.equipe.id] : []),
+      ...u.frentesAdicionais.map((f) => f.equipe.id),
+    ].filter((v, i, a) => a.indexOf(v) === i);
+    setForm({ nome: u.nome, email: u.email, frentesIds: ids, perfilCriado: u.perfil });
     setEditando(u); setErro(""); setModal("editar");
   }
 
@@ -108,39 +111,23 @@ export default function UsuariosPage() {
     setEditando(u); setNovaSenha(""); setErro(""); setMostrarSenha(false); setModal("senha");
   }
 
-  async function abrirFrentes(u: Usuario) {
-    setEditando(u); setErro("");
-    const data = await fetch(`/api/usuarios/${u.id}/frentes`).then(r => r.json()).catch(() => []);
-    setFrentesAdic(Array.isArray(data) ? data : []);
-    setModal("frentes");
-  }
-
-  async function adicionarFrente(equipeId: string) {
-    if (!editando) return;
-    setAdicionandoFrente(true);
-    const res = await fetch(`/api/usuarios/${editando.id}/frentes`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ equipeId }),
-    });
-    setAdicionandoFrente(false);
-    if (res.ok) {
-      const data = await fetch(`/api/usuarios/${editando.id}/frentes`).then(r => r.json()).catch(() => []);
-      setFrentesAdic(Array.isArray(data) ? data : []);
-    }
-  }
-
-  async function removerFrente(equipeId: string) {
-    if (!editando) return;
-    await fetch(`/api/usuarios/${editando.id}/frentes`, {
-      method: "DELETE", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ equipeId }),
-    });
-    setFrentesAdic(prev => prev.filter(f => f.equipe.id !== equipeId));
+  function toggleFrenteId(equipeId: string) {
+    setForm((f) => ({
+      ...f,
+      frentesIds: f.frentesIds.includes(equipeId)
+        ? f.frentesIds.filter((x) => x !== equipeId)
+        : [...f.frentesIds, equipeId],
+    }));
   }
 
   async function salvar() {
     setErro(""); setCarregando(true);
-    const body: any = { nome: form.nome, email: form.email, equipeId: form.equipeId || null, perfilCriado: form.perfilCriado };
+    const body: any = {
+      nome: form.nome,
+      email: form.email,
+      frentesIds: form.frentesIds,
+      perfilCriado: form.perfilCriado,
+    };
 
     const url = modal === "criar" ? "/api/usuarios" : `/api/usuarios/${editando!.id}`;
     const method = modal === "criar" ? "POST" : "PATCH";
@@ -189,9 +176,8 @@ export default function UsuariosPage() {
     carregar();
   }
 
-  const labelBotao = meuPerfil === "ADMINISTRADOR"
-    ? (PERFIL_LABEL[form.perfilCriado] ?? "Usuário")
-    : "Consultor";
+  // Frentes disponíveis para seleção (sem duplicatas de tipo CR_PDD_181)
+  const frentesDisponiveis = equipes.filter((e) => e.tipo !== "CR_PDD_181");
 
   return (
     <div className="space-y-6">
@@ -220,7 +206,7 @@ export default function UsuariosPage() {
               <th className="text-left text-xs text-slate-500 font-medium px-5 py-3">Nome</th>
               <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">E-mail</th>
               <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">Perfil</th>
-              <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">Frente</th>
+              <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">Frentes</th>
               <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">Status</th>
               <th className="px-4 py-3" />
             </tr>
@@ -268,12 +254,6 @@ export default function UsuariosPage() {
                         className={`p-1.5 rounded-lg transition-colors ${u.ativo ? "text-slate-500 hover:text-emerald-400 hover:bg-emerald-500/10" : "text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20"}`}>
                         <Check size={14} />
                       </button>
-                      {u.perfil === "CONSULTOR" && (meuPerfil === "ADMINISTRADOR" || meuPerfil === "GESTOR") && (
-                        <button onClick={() => abrirFrentes(u)} title="Gerenciar frentes adicionais"
-                          className="p-1.5 rounded-lg text-slate-500 hover:text-sky-400 hover:bg-sky-500/10 transition-colors">
-                          <Layers size={14} />
-                        </button>
-                      )}
                       <button onClick={() => abrirSenha(u)} title="Redefinir senha"
                         className="p-1.5 rounded-lg text-slate-500 hover:text-orange-400 hover:bg-orange-500/10 transition-colors">
                         <KeyRound size={14} />
@@ -337,15 +317,32 @@ export default function UsuariosPage() {
               )}
               {(meuPerfil === "ADMINISTRADOR" || meuPerfil === "GESTOR") && (
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">
-                    Frente de cobrança
-                    {meuPerfil === "GESTOR" && <span className="ml-1 text-slate-400">(pode alterar antes de subir nova base)</span>}
-                  </label>
-                  <select className={inputCls} value={form.equipeId}
-                    onChange={(e) => setForm((f) => ({ ...f, equipeId: e.target.value }))}>
-                    <option value="">Sem frente atribuída</option>
-                    {equipes.filter((e) => e.tipo !== "CR_PDD_181").map((e) => <option key={e.id} value={e.id}>{FRENTE_LABEL[e.tipo] ?? e.nome}</option>)}
-                  </select>
+                  <label className="block text-xs text-slate-400 mb-1.5">Frentes de cobrança</label>
+                  <div className="space-y-1.5 bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
+                    {frentesDisponiveis.length === 0 && (
+                      <p className="text-slate-500 text-xs text-center py-1">Nenhuma frente cadastrada</p>
+                    )}
+                    {frentesDisponiveis.map((e) => {
+                      const selecionada = form.frentesIds.includes(e.id);
+                      return (
+                        <label key={e.id} className="flex items-center gap-3 cursor-pointer py-1 px-1 rounded-lg hover:bg-slate-700/40 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={selecionada}
+                            onChange={() => toggleFrenteId(e.id)}
+                            className="w-4 h-4 accent-gr-500 flex-shrink-0"
+                          />
+                          <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${FRENTE_COR[e.tipo] ?? "bg-slate-700 text-slate-300"}`}>
+                            {FRENTE_LABEL[e.tipo] ?? e.nome}
+                          </span>
+                          <span className="text-slate-300 text-sm">{e.nome}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {form.frentesIds.length === 0 && (
+                    <p className="text-slate-500 text-xs mt-1">Nenhuma frente selecionada — usuário sem frente atribuída</p>
+                  )}
                 </div>
               )}
               {erro && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{erro}</p>}
@@ -402,81 +399,6 @@ export default function UsuariosPage() {
                   {carregando ? "Salvando..." : "Redefinir"}
                 </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal frentes adicionais */}
-      {modal === "frentes" && editando && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
-              <div>
-                <h2 className="text-white font-semibold">Frentes de cobrança</h2>
-                <p className="text-slate-500 text-xs mt-0.5">{editando.nome} · Frente primária: {editando.equipe ? (FRENTE_LABEL[editando.equipe.tipo] ?? editando.equipe.nome) : "Nenhuma"}</p>
-              </div>
-              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <p className="text-xs text-slate-400">Frentes adicionais permitem que o consultor receba contratos de múltiplas frentes na distribuição da carteira.</p>
-
-              {/* Frentes já vinculadas */}
-              <div className="space-y-2">
-                {frentesAdic.length === 0 ? (
-                  <p className="text-slate-400 text-sm text-center py-3">Nenhuma frente adicional vinculada</p>
-                ) : (
-                  frentesAdic.map((f) => (
-                    <div key={f.id} className="flex items-center justify-between bg-slate-800 rounded-xl px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        <Layers size={13} className="text-sky-400" />
-                        <span className="text-white text-sm">{FRENTE_LABEL[f.equipe.tipo] ?? f.equipe.nome}</span>
-                      </div>
-                      <button
-                        onClick={() => removerFrente(f.equipe.id)}
-                        className="p-1 text-slate-500 hover:text-red-400 rounded transition-colors"
-                      >
-                        <X size={13} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Adicionar frente */}
-              <div>
-                <label className="block text-xs text-slate-400 mb-1.5">Adicionar frente</label>
-                <div className="flex gap-2">
-                  <select
-                    id="addFrente"
-                    className={inputCls + " flex-1"}
-                    defaultValue=""
-                  >
-                    <option value="" disabled>Selecione uma frente...</option>
-                    {equipes
-                      .filter((e) => e.id !== editando.equipe?.id && !frentesAdic.find(f => f.equipe.id === e.id))
-                      .map((e) => <option key={e.id} value={e.id}>{FRENTE_LABEL[e.tipo] ?? e.nome}</option>)}
-                  </select>
-                  <button
-                    disabled={adicionandoFrente}
-                    onClick={() => {
-                      const sel = document.getElementById("addFrente") as HTMLSelectElement;
-                      if (sel.value) adicionarFrente(sel.value);
-                    }}
-                    className="bg-gr-500 hover:bg-gr-400 disabled:bg-gr-500/30 text-white text-sm font-medium px-3 py-2.5 rounded-lg transition-colors flex-shrink-0"
-                  >
-                    <Plus size={15} />
-                  </button>
-                </div>
-              </div>
-            </div>
-            <div className="px-5 pb-5">
-              <button onClick={() => { setModal(null); carregar(); }}
-                className="w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
-                Fechar
-              </button>
             </div>
           </div>
         </div>
