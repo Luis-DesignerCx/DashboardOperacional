@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     nomeCliente, telefones, emails,
     numeroContrato, competenciaId,
     tipo = "inadimplencia", formaPagamento,
-    parcelas, valorAReceber,
+    parcelas, dataRecebimento,
   } = body;
 
   if (!nomeCliente || !numeroContrato || !competenciaId) {
@@ -35,7 +35,16 @@ export async function POST(req: NextRequest) {
     if (!formaPagamento) {
       return NextResponse.json({ erro: "Forma de pagamento obrigatória para lançamento a parte" }, { status: 400 });
     }
-    const valor = parseFloat(String(valorAReceber ?? "0").replace(",", ".")) || 0;
+    if (!dataRecebimento) {
+      return NextResponse.json({ erro: "Data do recebimento obrigatória" }, { status: 400 });
+    }
+
+    const parcelasAParte: ParcelaInput[] = Array.isArray(parcelas) && parcelas.length > 0 ? parcelas : [];
+    if (parcelasAParte.length === 0) {
+      return NextResponse.json({ erro: "Informe ao menos uma parcela recebida a parte" }, { status: 400 });
+    }
+
+    const valorTotal = parcelasAParte.reduce((s, p) => s + (parseFloat(String(p.valor).replace(",", ".")) || 0), 0);
 
     let contratoId: string;
 
@@ -84,14 +93,37 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Cria as parcelas marcadas como pagas (já recebidas)
+    const ultimaParcela = await prisma.parcela.findFirst({
+      where: { contratoId },
+      orderBy: { numero: "desc" },
+      select: { numero: true },
+    });
+    let proximoNumero = (ultimaParcela?.numero ?? 0) + 1;
+    for (const p of parcelasAParte) {
+      const valor = parseFloat(String(p.valor).replace(",", ".")) || 0;
+      await prisma.parcela.create({
+        data: {
+          id: randomUUID(),
+          contratoId,
+          numero: proximoNumero++,
+          dataVencimento: new Date(p.dataVencimento + "T00:00:00.000Z"),
+          diasAtraso: 0,
+          valorParcela: new Decimal(valor.toFixed(2)),
+          valorTotalAberto: new Decimal("0"),
+          paga: true,
+        },
+      });
+    }
+
     await prisma.recebimento.create({
       data: {
         id: randomUUID(),
         contratoId,
         consultorId: session.user.id,
         valor: new Decimal("0"),
-        valorAParte: new Decimal(valor.toFixed(2)),
-        dataRecebimento: new Date(),
+        valorAParte: new Decimal(valorTotal.toFixed(2)),
+        dataRecebimento: new Date(dataRecebimento),
         formaPagamento: formaPagamento as FormaPagamento,
         justificativa: "Lançamento manual a parte",
       },
