@@ -11,7 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const isGestorAdmin = ["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil);
   const body = await req.json();
-  const { maiorDiasAtraso, valorTotalAberto, statusContrato, situacao, justificativa } = body;
+  const { maiorDiasAtraso, valorTotalAberto, statusContrato, situacao, justificativa, parcelasIds, todasParcelas } = body;
 
   // Consultores só podem atualizar situacao (e apenas de contratos na sua carteira)
   if (!isGestorAdmin) {
@@ -86,6 +86,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           contratoId: params.id,
           solicitanteId: session.user.id,
           motivo: justificativa || "Consultor contestou a inadimplência via carteira",
+          dados: Array.isArray(parcelasIds) && parcelasIds.length > 0
+            ? { parcelasIds, todasParcelas: !!todasParcelas }
+            : undefined,
         },
       });
     }

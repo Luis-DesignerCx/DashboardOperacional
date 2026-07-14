@@ -99,6 +99,7 @@ export default function ClienteDetalhe() {
   // Modal Inadimplência equivocada
   const [inadEquivContratoId, setInadEquivContratoId] = useState<string | null>(null);
   const [inadEquivJustificativa, setInadEquivJustificativa] = useState("");
+  const [inadEquivParcelasIds, setInadEquivParcelasIds] = useState<string[]>([]);
   const [salvandoInadEquiv, setSalvandoInadEquiv] = useState(false);
   const [erroInadEquiv, setErroInadEquiv] = useState("");
 
@@ -116,12 +117,21 @@ export default function ClienteDetalhe() {
   async function submeterInadEquivocada() {
     if (!inadEquivContratoId) return;
     if (!inadEquivJustificativa.trim()) { setErroInadEquiv("Informe o motivo da contestação"); return; }
+    if (!inadEquivParcelasIds.length) { setErroInadEquiv("Selecione ao menos uma parcela equivocada"); return; }
+    const contratoDaSelecao = cliente?.contratos.find(c => c.id === inadEquivContratoId);
+    const totalNaoPagas = contratoDaSelecao?.parcelas.filter(p => !p.paga).length ?? 0;
+    const todasParcelas = inadEquivParcelasIds.length === totalNaoPagas;
     setSalvandoInadEquiv(true);
     setErroInadEquiv("");
     const res = await fetch(`/api/contratos/${inadEquivContratoId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ situacao: "INADIMPLENCIA_EQUIVOCADA", justificativa: inadEquivJustificativa.trim() }),
+      body: JSON.stringify({
+        situacao: "INADIMPLENCIA_EQUIVOCADA",
+        justificativa: inadEquivJustificativa.trim(),
+        parcelasIds: inadEquivParcelasIds,
+        todasParcelas,
+      }),
     });
     setSalvandoInadEquiv(false);
     if (!res.ok) {
@@ -525,7 +535,13 @@ export default function ClienteDetalhe() {
                 && contrato.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE"
                 && contrato.situacao !== "INADIMPLENCIA_EQUIVOCADA" && (
                 <button
-                  onClick={() => { setInadEquivContratoId(contrato.id); setInadEquivJustificativa(""); setErroInadEquiv(""); }}
+                  onClick={() => {
+                    const naoPageIds = contrato.parcelas.filter(p => !p.paga).map(p => p.id);
+                    setInadEquivContratoId(contrato.id);
+                    setInadEquivParcelasIds(naoPageIds);
+                    setInadEquivJustificativa("");
+                    setErroInadEquiv("");
+                  }}
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-orange-400 bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 transition-colors"
                   title="Contestar inadimplência"
                 >
@@ -546,13 +562,56 @@ export default function ClienteDetalhe() {
               <div className="mb-4 bg-orange-500/5 border border-orange-500/20 rounded-xl p-4 space-y-3">
                 <div>
                   <p className="text-xs font-medium text-orange-400 mb-1">Contestar inadimplência</p>
-                  <p className="text-xs text-slate-400">Explique ao gestor por que esta inadimplência é equivocada. Após aprovação, o contrato sairá da sua carteira e da inadimplência geral.</p>
+                  <p className="text-xs text-slate-400">Selecione as parcelas equivocadas e explique ao gestor o motivo. Após aprovação, essas parcelas sairão da inadimplência.</p>
                 </div>
+
+                {/* Seleção de parcelas */}
+                {(() => {
+                  const naoPageas = contrato.parcelas.filter(p => !p.paga);
+                  const todasSelecionadas = inadEquivParcelasIds.length === naoPageas.length && naoPageas.length > 0;
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[11px] font-medium text-slate-400">Parcelas equivocadas</p>
+                        <button
+                          type="button"
+                          onClick={() => setInadEquivParcelasIds(
+                            todasSelecionadas ? [] : naoPageas.map(p => p.id)
+                          )}
+                          className="text-[10px] text-orange-400 hover:text-orange-300 transition-colors"
+                        >
+                          {todasSelecionadas ? "Desmarcar todas" : "Selecionar todas"}
+                        </button>
+                      </div>
+                      <div className="space-y-0.5 max-h-36 overflow-y-auto rounded-lg bg-slate-800/50 border border-slate-700/50 p-2">
+                        {naoPageas.map((p) => {
+                          const selecionada = inadEquivParcelasIds.includes(p.id);
+                          return (
+                            <label key={p.id} className="flex items-center gap-2 cursor-pointer py-0.5 hover:bg-slate-700/30 rounded px-1 transition-colors">
+                              <input
+                                type="checkbox"
+                                checked={selecionada}
+                                onChange={() => setInadEquivParcelasIds(prev =>
+                                  selecionada ? prev.filter(x => x !== p.id) : [...prev, p.id]
+                                )}
+                                className="w-3.5 h-3.5 accent-orange-500 flex-shrink-0"
+                              />
+                              <span className="text-xs text-slate-300">
+                                Parcela {p.numero} · venc. {new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })} · <span className="text-white font-medium">{formatarMoeda(Number(p.valorTotalAberto))}</span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <textarea
-                  rows={3}
+                  rows={2}
                   autoFocus
                   className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 placeholder:text-slate-500 resize-none"
-                  placeholder="Ex: Cliente realizou o pagamento diretamente na construtora em 10/07/2026..."
+                  placeholder="Ex: O cliente solicitou cancelamento em xx/xx/xxxx..."
                   value={inadEquivJustificativa}
                   onChange={(e) => setInadEquivJustificativa(e.target.value)}
                 />

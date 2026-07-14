@@ -13,7 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const solicitacaoAtual = await prisma.solicitacao.findUnique({
     where: { id: params.id },
-    select: { tipo: true, contratoId: true, solicitanteId: true, status: true },
+    select: { tipo: true, contratoId: true, solicitanteId: true, status: true, dados: true },
   });
 
   if (!solicitacaoAtual) return NextResponse.json({ erro: "Não encontrada" }, { status: 404 });
@@ -28,20 +28,48 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     },
   });
 
-  // Ao aprovar inadimplência equivocada: marca contrato, reseta situação e remove da carteira ativa
+  // Ao aprovar inadimplência equivocada
   if (
     status === "APROVADA" &&
     solicitacaoAtual.tipo === "INADIMPLENCIA_EQUIVOCADA" &&
     solicitacaoAtual.contratoId
   ) {
-    await prisma.contrato.update({
-      where: { id: solicitacaoAtual.contratoId },
-      data: { inadimplenciaEquivocada: true, situacao: "INADIMPLENTE" },
-    });
-    await prisma.carteiraParcela.updateMany({
-      where: { contratoId: solicitacaoAtual.contratoId, ativo: true },
-      data: { ativo: false },
-    });
+    const dados = solicitacaoAtual.dados as { parcelasIds?: string[]; todasParcelas?: boolean } | null;
+    const parcialIds = dados?.parcelasIds;
+    const isTodas = !dados || dados.todasParcelas || !parcialIds?.length;
+
+    if (isTodas) {
+      // Remoção total: sai da carteira e da inadimplência geral
+      await prisma.contrato.update({
+        where: { id: solicitacaoAtual.contratoId },
+        data: { inadimplenciaEquivocada: true, situacao: "INADIMPLENTE" },
+      });
+      await prisma.carteiraParcela.updateMany({
+        where: { contratoId: solicitacaoAtual.contratoId, ativo: true },
+        data: { ativo: false },
+      });
+    } else {
+      // Remoção parcial: apenas as parcelas selecionadas saem da inadimplência
+      const parcelasEquiv = await prisma.parcela.findMany({
+        where: { id: { in: parcialIds } },
+        select: { valorTotalAberto: true },
+      });
+      const valorEquivocado = parcelasEquiv.reduce((s, p) => s + Number(p.valorTotalAberto), 0);
+      const contratoAtual = await prisma.contrato.findUnique({
+        where: { id: solicitacaoAtual.contratoId },
+        select: { valorTotalAberto: true },
+      });
+      const novoValorAberto = Math.max(0, Number(contratoAtual?.valorTotalAberto ?? 0) - valorEquivocado);
+      await prisma.parcela.updateMany({
+        where: { id: { in: parcialIds } },
+        data: { paga: true },
+      });
+      await prisma.contrato.update({
+        where: { id: solicitacaoAtual.contratoId },
+        data: { valorTotalAberto: novoValorAberto, situacao: "INADIMPLENTE" },
+      });
+      // CarteiraParcela permanece ativo — contrato fica na carteira com valor reduzido
+    }
   }
 
   // Ao rejeitar inadimplência equivocada: reseta situação de volta para INADIMPLENTE
