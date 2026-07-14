@@ -91,5 +91,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
+  // Quando consultor muda de INADIMPLENCIA_EQUIVOCADA para outra situação, cancela solicitação pendente
+  if (situacao && situacao !== "INADIMPLENCIA_EQUIVOCADA") {
+    await prisma.solicitacao.updateMany({
+      where: { contratoId: params.id, tipo: "INADIMPLENCIA_EQUIVOCADA", status: "PENDENTE" },
+      data: { status: "REJEITADA", resposta: "Cancelada pelo consultor" },
+    });
+  }
+
   return NextResponse.json(contrato);
 }

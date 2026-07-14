@@ -785,12 +785,29 @@ export default function CarteiraPage() {
                                 </div>
                               )}
                               {SITUACAO_COR_EXTRA[c.situacao] && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
-                                <span
-                                  title="Contestação de inadimplência pendente — aguardando gestor"
-                                  className={`text-[10px] border px-1.5 py-0.5 rounded font-medium ${SITUACAO_COR_EXTRA[c.situacao]}`}
-                                >
-                                  {SITUACAO_LABEL_EXTRA[c.situacao]}
-                                </span>
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
+                                    className={`text-[10px] border px-1.5 py-0.5 rounded font-medium transition-colors hover:opacity-80 ${SITUACAO_COR_EXTRA[c.situacao]}`}
+                                  >
+                                    {SITUACAO_LABEL_EXTRA[c.situacao]}
+                                  </button>
+                                  {situacaoPopover === c.id && (
+                                    <div className="absolute left-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
+                                      {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
+                                        <button
+                                          key={val}
+                                          onClick={() => atualizarSituacao(c.id, val)}
+                                          disabled={salvandoSituacao === c.id}
+                                          className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
+                                        >
+                                          {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
+                                          {label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
