@@ -758,64 +758,16 @@ export default function CarteiraPage() {
                                   <CheckCircle2 size={9} /> Recuperado
                                 </span>
                               )}
-                              {totalAParte > 0 && (
-                                <button
-                                  onClick={() => setModalAParte(c)}
-                                  className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-medium hover:bg-sky-500/20 transition-colors"
-                                >
-                                  A Parte · {formatarMoeda(totalAParte)}
-                                </button>
-                              )}
-                              {/* Badge de situação — clicável se selecionável, somente leitura se automático. Oculto para adimplentes. */}
+                              {/* Badge de situação — somente leitura */}
                               {c.situacao !== "INADIMPLENTE" && SITUACAO_COR[c.situacao] && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
-                                <div className="relative">
-                                  <button
-                                    onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
-                                    className={`text-[10px] border px-1.5 py-0.5 rounded font-medium transition-colors hover:opacity-80 ${SITUACAO_COR[c.situacao]}`}
-                                  >
-                                    {SITUACAO_LABEL[c.situacao] ?? c.situacao}
-                                  </button>
-                                  {situacaoPopover === c.id && (
-                                    <div className="absolute left-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
-                                      {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
-                                        <button
-                                          key={val}
-                                          onClick={() => handleSituacao(c, val)}
-                                          disabled={salvandoSituacao === c.id}
-                                          className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
-                                        >
-                                          {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
-                                          {label}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
+                                <span className={`text-[10px] border px-1.5 py-0.5 rounded font-medium ${SITUACAO_COR[c.situacao]}`}>
+                                  {SITUACAO_LABEL[c.situacao] ?? c.situacao}
+                                </span>
                               )}
                               {SITUACAO_COR_EXTRA[c.situacao] && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
-                                <div className="relative">
-                                  <button
-                                    onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
-                                    className={`text-[10px] border px-1.5 py-0.5 rounded font-medium transition-colors hover:opacity-80 ${SITUACAO_COR_EXTRA[c.situacao]}`}
-                                  >
-                                    {SITUACAO_LABEL_EXTRA[c.situacao]}
-                                  </button>
-                                  {situacaoPopover === c.id && (
-                                    <div className="absolute left-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
-                                      {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
-                                        <button
-                                          key={val}
-                                          onClick={() => handleSituacao(c, val)}
-                                          disabled={salvandoSituacao === c.id}
-                                          className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
-                                        >
-                                          {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
-                                          {label}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
+                                <span className={`text-[10px] border px-1.5 py-0.5 rounded font-medium ${SITUACAO_COR_EXTRA[c.situacao]}`}>
+                                  {SITUACAO_LABEL_EXTRA[c.situacao]}
+                                </span>
                               )}
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -853,7 +805,16 @@ export default function CarteiraPage() {
                                   ↳ {formatarMoeda(totalRecebido)} rec.
                                 </span>
                               ) : (
-                                <span className="h-[18px]" /> /* mantém altura quando não há rec. */
+                                <span className="h-[18px]" />
+                              )}
+                              {totalAParte > 0 && (
+                                <button
+                                  onClick={() => setModalAParte(c)}
+                                  title="Ver detalhes A Parte"
+                                  className="text-xs font-medium tabular-nums text-sky-400 mt-0.5 hover:text-sky-300 transition-colors text-right"
+                                >
+                                  ↳ {formatarMoeda(totalAParte)} rec. a parte
+                                </button>
                               )}
                               {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
                                 <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full mt-0.5">
@@ -865,37 +826,7 @@ export default function CarteiraPage() {
                             {/* Botões — 5 slots fixos, invisible preserva espaço */}
                             <div className="flex items-center gap-0.5">
 
-                              {/* Slot 1: Situação */}
-                              <div className="relative">
-                                <button
-                                  onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
-                                  title="Atualizar situação"
-                                  className={`p-1.5 rounded-lg transition-colors ${
-                                    c.situacao === "INADIMPLENTE" && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE"
-                                      ? "text-slate-500 hover:text-amber-400 hover:bg-amber-500/10"
-                                      : "invisible pointer-events-none"
-                                  }`}
-                                >
-                                  <ArrowLeftRight size={14} />
-                                </button>
-                                {situacaoPopover === c.id && (
-                                  <div className="absolute right-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
-                                    {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
-                                      <button
-                                        key={val}
-                                        onClick={() => handleSituacao(c, val)}
-                                        disabled={salvandoSituacao === c.id}
-                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
-                                      >
-                                        {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
-                                        {label}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Slot 2: Atendimento */}
+                              {/* Slot 1: Atendimento */}
                               <button
                                 onClick={() => abrirAtendimento(c)}
                                 title="Registrar atendimento"
