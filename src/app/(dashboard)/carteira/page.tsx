@@ -1197,18 +1197,6 @@ export default function CarteiraPage() {
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs text-slate-400 mb-1.5">
-                    Valor a parte (R$)
-                    <span className="ml-1 text-slate-400 font-normal">— antecipação ou valor fora da inadimplência</span>
-                  </label>
-                  <input
-                    className={inputCls}
-                    placeholder="0,00 — opcional"
-                    value={recebForm.valorAParte}
-                    onChange={(e) => setRecebForm((f) => ({ ...f, valorAParte: e.target.value }))}
-                  />
-                </div>
-                <div className="col-span-2">
                   <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
                   <select
                     className={inputCls}
