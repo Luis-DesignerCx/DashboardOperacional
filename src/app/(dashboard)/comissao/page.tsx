@@ -622,11 +622,10 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
 interface FrenteOpcao { equipeId: string; label: string }
 
 const FRENTE_CHIP_STYLE: Record<string, string> = {
-  "eq-flash":   "bg-sky-500/15 text-sky-300 border-sky-500/30",
-  "eq-1-30":    "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  "eq-31-90":   "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  "eq-91-180":  "bg-orange-500/15 text-orange-300 border-orange-500/30",
-  "eq-181plus": "bg-rose-500/15 text-rose-300 border-rose-500/30",
+  "eq-flash":  "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  "eq-1-30":   "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  "eq-31-90":  "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "eq-91-180": "bg-orange-500/15 text-orange-300 border-orange-500/30",
 };
 
 export default function ComissaoPage() {

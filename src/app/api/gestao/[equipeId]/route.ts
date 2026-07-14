@@ -8,8 +8,7 @@ function getDiasFilter(tipo: string): { gte?: number; lte?: number } | undefined
     case "FLASH":         return { lte: 0 };
     case "CRA_1_30":      return { gte: 1,  lte: 30  };
     case "CR_31_90":      return { gte: 31, lte: 90  };
-    case "CR_PDD_91_180":
-    case "CR_PDD_181":    return { gte: 91 }; // 91+ engloba tudo acima de 90
+    case "CR_PDD_91_180": return { gte: 91 };
     default:              return undefined;
   }
 }

@@ -18,7 +18,7 @@ const LABEL_STATUS: Record<string, { label: string; cor: string; icon: React.Ele
 
 const FRENTE_LABEL: Record<string, string> = {
   FLASH: "Flash", CRA_1_30: "1 a 30", CR_31_90: "31 a 90",
-  CR_PDD_91_180: "PDD 91+", CR_PDD_181: "PDD 91+",
+  CR_PDD_91_180: "CR PDD - 91+",
 };
 
 interface Equipe { nome: string; tipo: string }

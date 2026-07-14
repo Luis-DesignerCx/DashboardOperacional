@@ -21,7 +21,6 @@ enum TipoEquipe {
   CRA_1_30
   CR_31_90
   CR_PDD_91_180
-  CR_PDD_181
 }
 
 enum TipoContato {

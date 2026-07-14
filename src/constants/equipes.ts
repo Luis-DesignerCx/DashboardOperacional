@@ -5,32 +5,25 @@ export const CONFIG_EQUIPES: Record<
   { label: string; diasAtraso: [number, number]; diasSemContato: number; metaTipo: string }
 > = {
   FLASH: {
-    label: "CRA / Apoio – Flash",
+    label: "CRA - Flash",
     diasAtraso: [0, 0],
     diasSemContato: 2,
     metaTipo: "FINANCEIRA",
   },
   CRA_1_30: {
-    label: "CRA / Apoio 1 a 30",
+    label: "CRA - 1 a 30",
     diasAtraso: [1, 30],
     diasSemContato: 3,
     metaTipo: "FINANCEIRA",
   },
   CR_31_90: {
-    label: "CR 31 a 90",
+    label: "CR - 31 a 90",
     diasAtraso: [31, 90],
     diasSemContato: 5,
     metaTipo: "FINANCEIRA",
   },
   CR_PDD_91_180: {
-    label: "CR PDD 91+",
-    diasAtraso: [91, 9999],
-    diasSemContato: 7,
-    metaTipo: "QUANTIDADE_CLIENTES",
-  },
-  // Mantido apenas para compatibilidade com o enum do Prisma — não usado na UI
-  CR_PDD_181: {
-    label: "CR PDD 91+",
+    label: "CR PDD - 91+",
     diasAtraso: [91, 9999],
     diasSemContato: 7,
     metaTipo: "QUANTIDADE_CLIENTES",

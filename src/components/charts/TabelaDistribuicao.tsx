@@ -6,11 +6,10 @@ import { Building2, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const FRENTE_STYLE: Record<string, { dot: string; bar: string; badge: string }> = {
-  "eq-flash":   { dot: "bg-sky-400",     bar: "bg-sky-500",     badge: "bg-sky-500/15 text-sky-300 border border-sky-500/25" },
-  "eq-1-30":    { dot: "bg-emerald-400", bar: "bg-emerald-500", badge: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" },
-  "eq-31-90":   { dot: "bg-amber-400",   bar: "bg-amber-500",   badge: "bg-amber-500/15 text-amber-300 border border-amber-500/25" },
-  "eq-91-180":  { dot: "bg-orange-400",  bar: "bg-orange-500",  badge: "bg-orange-500/15 text-orange-300 border border-orange-500/25" },
-  "eq-181plus": { dot: "bg-rose-400",    bar: "bg-rose-500",    badge: "bg-rose-500/15 text-rose-300 border border-rose-500/25" },
+  "eq-flash":  { dot: "bg-sky-400",     bar: "bg-sky-500",     badge: "bg-sky-500/15 text-sky-300 border border-sky-500/25" },
+  "eq-1-30":   { dot: "bg-emerald-400", bar: "bg-emerald-500", badge: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" },
+  "eq-31-90":  { dot: "bg-amber-400",   bar: "bg-amber-500",   badge: "bg-amber-500/15 text-amber-300 border border-amber-500/25" },
+  "eq-91-180": { dot: "bg-orange-400",  bar: "bg-orange-500",  badge: "bg-orange-500/15 text-orange-300 border border-orange-500/25" },
 };
 
 interface ConsultorDist {
@@ -73,37 +72,7 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
     );
   }
 
-  // Para gestor: unifica eq-91-180 e eq-181plus em "91+"
-  const frentesProcessadas = (() => {
-    if (!unificar91Plus) return frentes;
-    const merged: FrenteDist[] = [];
-    let unificada: FrenteDist | null = null;
-    for (const f of frentes) {
-      if (f.equipeId === "eq-91-180" || f.equipeId === "eq-181plus") {
-        if (!unificada) {
-          unificada = { equipeId: "eq-91-180", label: "CR PDD — 91+ dias", consultores: [], total: { saldoAberto: 0, recebido: 0, contratos: 0 } };
-        }
-        // Mescla consultores (pode haver duplicatas entre as duas frentes para André/Pedro)
-        for (const c of f.consultores) {
-          const existing = unificada.consultores.find((x) => x.consultorId === c.consultorId);
-          if (existing) {
-            existing.saldoAberto += c.saldoAberto;
-            existing.recebido += c.recebido;
-            existing.contratos += c.contratos;
-          } else {
-            unificada.consultores.push({ ...c });
-          }
-        }
-        unificada.total.saldoAberto += f.total.saldoAberto;
-        unificada.total.recebido += f.total.recebido;
-        unificada.total.contratos += f.total.contratos;
-      } else {
-        merged.push(f);
-      }
-    }
-    if (unificada) merged.push(unificada);
-    return merged;
-  })();
+  const frentesProcessadas = frentes;
 
   const frentesComDados = frentesProcessadas.filter((f) => f.consultores.length > 0);
 

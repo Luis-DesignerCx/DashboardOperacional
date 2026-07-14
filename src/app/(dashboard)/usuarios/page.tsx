@@ -38,14 +38,13 @@ const PERFIL_ICON: Record<string, React.ElementType> = {
 };
 const FRENTE_LABEL: Record<string, string> = {
   FLASH: "Flash", CRA_1_30: "1-30", CR_31_90: "31-90",
-  CR_PDD_91_180: "91+", CR_PDD_181: "91+",
+  CR_PDD_91_180: "91+",
 };
 const FRENTE_COR: Record<string, string> = {
   FLASH:         "bg-sky-500/15 text-sky-400 border border-sky-500/20",
   CRA_1_30:      "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20",
   CR_31_90:      "bg-amber-500/15 text-amber-400 border border-amber-500/20",
   CR_PDD_91_180: "bg-orange-500/15 text-orange-400 border border-orange-500/20",
-  CR_PDD_181:    "bg-orange-500/15 text-orange-400 border border-orange-500/20",
 };
 
 function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; frentesAdicionais: { equipe: Equipe }[] }) {
@@ -176,8 +175,7 @@ export default function UsuariosPage() {
     carregar();
   }
 
-  // Frentes disponíveis para seleção (sem duplicatas de tipo CR_PDD_181)
-  const frentesDisponiveis = equipes.filter((e) => e.tipo !== "CR_PDD_181");
+  const frentesDisponiveis = equipes;
 
   return (
     <div className="space-y-6">

@@ -50,8 +50,8 @@ const DEFAULT_THRESHOLDS: Record<string, number> = {
 };
 
 const TIPO_EQUIPE_LABEL: Record<string, string> = {
-  FLASH: "Flash", CRA_1_30: "1-30 dias", CR_31_90: "31-90 dias",
-  CR_PDD_91_180: "PDD 91+", CR_PDD_181: "PDD 91+",
+  FLASH: "CRA - Flash", CRA_1_30: "CRA - 1 a 30", CR_31_90: "CR - 31 a 90",
+  CR_PDD_91_180: "CR PDD - 91+",
 };
 
 const FORM_VAZIO = {
@@ -86,8 +86,7 @@ export default function MetasPage() {
   useEffect(() => {
     recarregar();
     fetch("/api/equipes").then((r) => r.json()).then((d) => {
-      const lista = (Array.isArray(d) ? d : []).filter((e: any) => e.tipo !== "CR_PDD_181");
-      setEquipes(lista);
+      setEquipes(Array.isArray(d) ? d : []);
       if (lista.length > 0) setForm((f) => ({ ...f, equipeId: lista[0].id }));
     });
     fetch("/api/competencias").then((r) => r.json()).then((d) => {

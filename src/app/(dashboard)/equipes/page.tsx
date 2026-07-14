@@ -5,13 +5,12 @@ import { Plus, X, Eye, EyeOff, Trash2, Palmtree, RefreshCw } from "lucide-react"
 
 // ─── Mapeamentos ──────────────────────────────────────────────────────────────
 
-// Nomes exibidos na interface (sobrescreve o nome vindo do banco)
+// Nomes exibidos na interface
 const NOME_FRENTE: Record<string, string> = {
-  FLASH:         "Flash",
-  CRA_1_30:      "1 a 30",
-  CR_31_90:      "31 a 90",
-  CR_PDD_91_180: "PDD 91+",
-  CR_PDD_181:    "PDD 91+",
+  FLASH:         "CRA - Flash",
+  CRA_1_30:      "CRA - 1 a 30",
+  CR_31_90:      "CR - 31 a 90",
+  CR_PDD_91_180: "CR PDD - 91+",
 };
 
 // Badge de faixa exibido no card
@@ -19,8 +18,7 @@ const LABEL_FRENTE: Record<string, string> = {
   FLASH:         "Flash",
   CRA_1_30:      "1 a 30",
   CR_31_90:      "31 a 90",
-  CR_PDD_91_180: "PDD 91+",
-  CR_PDD_181:    "PDD 91+",
+  CR_PDD_91_180: "91+",
 };
 
 const COR_FRENTE: Record<string, string> = {
@@ -28,7 +26,6 @@ const COR_FRENTE: Record<string, string> = {
   CRA_1_30:      "bg-sky-500/10 text-sky-400 border border-sky-500/20",
   CR_31_90:      "bg-amber-500/10 text-amber-400 border border-amber-500/20",
   CR_PDD_91_180: "bg-orange-500/10 text-orange-400 border border-orange-500/20",
-  CR_PDD_181:    "bg-orange-500/10 text-orange-400 border border-orange-500/20",
 };
 
 // Frentes que pertencem a cada departamento
