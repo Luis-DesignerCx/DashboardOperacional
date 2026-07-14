@@ -11,7 +11,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const isGestorAdmin = ["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil);
   const body = await req.json();
-  const { maiorDiasAtraso, valorTotalAberto, statusContrato, situacao } = body;
+  const { maiorDiasAtraso, valorTotalAberto, statusContrato, situacao, justificativa } = body;
 
   // Consultores só podem atualizar situacao (e apenas de contratos na sua carteira)
   if (!isGestorAdmin) {
@@ -20,6 +20,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { contratoId: params.id, consultorId: session.user.id, ativo: true },
     });
     if (!naCarteira) return NextResponse.json({ erro: "Contrato não está na sua carteira" }, { status: 403 });
+  }
+
+  // Bloqueia mudança de situação para contratos já recuperados integralmente
+  if (situacao) {
+    const atual = await prisma.contrato.findUnique({
+      where: { id: params.id },
+      select: { statusRecuperacao: true },
+    });
+    if (atual?.statusRecuperacao === "RECUPERADO_INTEGRALMENTE") {
+      return NextResponse.json({ erro: "Contrato já adimplente — situação não pode ser alterada" }, { status: 422 });
+    }
   }
 
   const data: any = {};
@@ -46,16 +57,39 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       if (contratoAtual) {
         const totalRecebido = contratoAtual.recebimentos.reduce((s, r) => s + Number(r.valor), 0);
         const novoAberto = parseFloat(String(valorTotalAberto).replace(",", "."));
-        data.statusRecuperacao =
+        const novoStatus =
           totalRecebido >= novoAberto
             ? "RECUPERADO_INTEGRALMENTE"
             : totalRecebido > 0
             ? "RECUPERACAO_PARCIAL"
             : "INADIMPLENTE";
+        data.statusRecuperacao = novoStatus;
+        // Zera situação ao recuperar integralmente
+        if (novoStatus === "RECUPERADO_INTEGRALMENTE") {
+          data.situacao = "INADIMPLENTE" as SituacaoContrato;
+        }
       }
     }
   }
 
   const contrato = await prisma.contrato.update({ where: { id: params.id }, data });
+
+  // Quando situação é INADIMPLENCIA_EQUIVOCADA, cria Solicitação para o gestor (se não houver pendente)
+  if (situacao === "INADIMPLENCIA_EQUIVOCADA") {
+    const jaExiste = await prisma.solicitacao.findFirst({
+      where: { contratoId: params.id, tipo: "INADIMPLENCIA_EQUIVOCADA", status: "PENDENTE" },
+    });
+    if (!jaExiste) {
+      await prisma.solicitacao.create({
+        data: {
+          tipo: "INADIMPLENCIA_EQUIVOCADA",
+          contratoId: params.id,
+          solicitanteId: session.user.id,
+          motivo: justificativa || "Consultor contestou a inadimplência via carteira",
+        },
+      });
+    }
+  }
+
   return NextResponse.json(contrato);
 }

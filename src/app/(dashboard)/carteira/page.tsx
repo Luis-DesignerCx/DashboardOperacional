@@ -758,8 +758,8 @@ export default function CarteiraPage() {
                                   A Parte · {formatarMoeda(totalAParte)}
                                 </button>
                               )}
-                              {/* Badge de situação — clicável se selecionável, somente leitura se automático */}
-                              {c.situacao !== "INADIMPLENTE" && SITUACAO_COR[c.situacao] && (
+                              {/* Badge de situação — clicável se selecionável, somente leitura se automático. Oculto para adimplentes. */}
+                              {c.situacao !== "INADIMPLENTE" && SITUACAO_COR[c.situacao] && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
                                 <div className="relative">
                                   <button
                                     onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
@@ -784,9 +784,9 @@ export default function CarteiraPage() {
                                   )}
                                 </div>
                               )}
-                              {SITUACAO_COR_EXTRA[c.situacao] && (
+                              {SITUACAO_COR_EXTRA[c.situacao] && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
                                 <span
-                                  title="Contestação de inadimplência pendente"
+                                  title="Contestação de inadimplência pendente — aguardando gestor"
                                   className={`text-[10px] border px-1.5 py-0.5 rounded font-medium ${SITUACAO_COR_EXTRA[c.situacao]}`}
                                 >
                                   {SITUACAO_LABEL_EXTRA[c.situacao]}
@@ -833,8 +833,8 @@ export default function CarteiraPage() {
                               )}
                             </div>
                             <div className="flex gap-1 items-center">
-                              {/* Situação (visível quando INADIMPLENTE — padrão sem badge) */}
-                              {c.situacao === "INADIMPLENTE" && (
+                              {/* Situação (visível quando INADIMPLENTE e não adimplente) */}
+                              {c.situacao === "INADIMPLENTE" && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
                                 <div className="relative">
                                   <button
                                     onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}

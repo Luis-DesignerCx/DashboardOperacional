@@ -28,7 +28,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     },
   });
 
-  // Ao aprovar inadimplência equivocada: marca o contrato e remove das métricas
+  // Ao aprovar inadimplência equivocada: marca contrato, reseta situação e remove da carteira ativa
   if (
     status === "APROVADA" &&
     solicitacaoAtual.tipo === "INADIMPLENCIA_EQUIVOCADA" &&
@@ -36,7 +36,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   ) {
     await prisma.contrato.update({
       where: { id: solicitacaoAtual.contratoId },
-      data: { inadimplenciaEquivocada: true },
+      data: { inadimplenciaEquivocada: true, situacao: "INADIMPLENTE" },
+    });
+    await prisma.carteiraParcela.updateMany({
+      where: { contratoId: solicitacaoAtual.contratoId, ativo: true },
+      data: { ativo: false },
+    });
+  }
+
+  // Ao rejeitar inadimplência equivocada: reseta situação de volta para INADIMPLENTE
+  if (
+    status === "REJEITADA" &&
+    solicitacaoAtual.tipo === "INADIMPLENCIA_EQUIVOCADA" &&
+    solicitacaoAtual.contratoId
+  ) {
+    await prisma.contrato.update({
+      where: { id: solicitacaoAtual.contratoId },
+      data: { situacao: "INADIMPLENTE" },
     });
   }
 
