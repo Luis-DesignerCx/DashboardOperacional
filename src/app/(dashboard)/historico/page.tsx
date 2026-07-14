@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Download, FileSpreadsheet, CheckCircle, Clock, Lock, AlertCircle, XCircle } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 
@@ -28,10 +29,14 @@ interface CompetenciaHistorico {
 }
 
 export default function HistoricoPage() {
+  const { data: session } = useSession();
+  const isGestorOuAdmin = ["GESTOR", "ADMINISTRADOR"].includes((session?.user as any)?.perfil ?? "");
+
   const [dados, setDados] = useState<CompetenciaHistorico[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [exportando, setExportando] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState<string | null>(null);
+  const [fechando, setFechando] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/historico")
@@ -48,6 +53,19 @@ export default function HistoricoPage() {
       setDados(await res.json());
     } finally {
       setCancelando(null);
+    }
+  }
+
+  async function fecharCompetencia(competenciaId: string, descricao: string) {
+    if (!confirm(`Fechar a competência "${descricao}"?\n\nApós fechada, não será possível importar novos dados para ela. Essa ação não pode ser desfeita.`)) return;
+    setFechando(competenciaId);
+    try {
+      const res = await fetch(`/api/competencias/${competenciaId}`, { method: "PATCH" });
+      if (!res.ok) { const d = await res.json(); alert(d.erro || "Erro ao fechar competência"); return; }
+      const fresh = await fetch("/api/historico");
+      setDados(await fresh.json());
+    } finally {
+      setFechando(null);
     }
   }
 
@@ -165,6 +183,16 @@ export default function HistoricoPage() {
                         >
                           <XCircle size={14} />
                           {cancelando === comp.ultimaImportacao.id ? "Cancelando..." : "Cancelar"}
+                        </button>
+                      )}
+                      {isGestorOuAdmin && !comp.fechada && (
+                        <button
+                          onClick={() => fecharCompetencia(comp.id, comp.descricao)}
+                          disabled={fechando === comp.id}
+                          className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 disabled:opacity-50 transition-colors"
+                        >
+                          <Lock size={14} />
+                          {fechando === comp.id ? "Fechando..." : "Fechar ciclo"}
                         </button>
                       )}
                       <button
