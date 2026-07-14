@@ -655,7 +655,6 @@ export default function CarteiraPage() {
           <option value="INADIMPLENTE">Inadimplente</option>
           <option value="EM_NEGOCIACAO">Em negociação</option>
           <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
-          <option value="INADIMPLENCIA_EQUIVOCADA">Inadimplência equivocada</option>
         </select>
         <div className="flex items-center gap-2">
           <ArrowUpDown size={14} className="text-slate-500 flex-shrink-0" />
