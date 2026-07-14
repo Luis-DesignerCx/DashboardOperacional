@@ -157,7 +157,7 @@ export function DashboardConsultor() {
             />
           </div>
           <div className="flex justify-between mt-2 text-xs text-slate-500">
-            <span>{formatarMoeda(dados.valorRecebido)} recebido</span>
+            <span>{formatarMoeda(dados.valorRecebido + dados.valorAParte)} recebido</span>
             <span>{formatarMoeda(dados.metaAlvo)} meta</span>
           </div>
         </div>
