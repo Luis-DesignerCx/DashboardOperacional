@@ -855,18 +855,21 @@ export default function CarteiraPage() {
                               </div>
                             )}
                           </div>
-                          <div className="flex items-center gap-4 flex-shrink-0">
-                            <div className="text-right leading-tight">
-                              <p className="text-white font-bold text-sm tabular-nums">
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <div className="flex flex-col items-end gap-0.5 min-w-[110px]">
+                              <span className="text-white font-bold text-base tabular-nums tracking-tight">
                                 {formatarMoeda(c.valorTotalAberto ?? 0)}
-                              </p>
+                              </span>
                               {totalRecebido > 0 && (
-                                <p className="text-xs font-semibold tabular-nums text-emerald-400 mt-0.5">
-                                  Rec. {formatarMoeda(totalRecebido)}
-                                </p>
+                                <span className="text-[11px] font-medium tabular-nums text-emerald-400 tracking-tight">
+                                  <span className="text-emerald-600/70 mr-0.5 text-[10px]">↳</span>
+                                  {formatarMoeda(totalRecebido)} rec.
+                                </span>
                               )}
                               {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
-                                <p className="text-xs font-bold text-emerald-400 mt-0.5">Adimplente</p>
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full mt-0.5">
+                                  <CheckCircle2 size={8} /> Adimplente
+                                </span>
                               )}
                             </div>
                             <div className="flex gap-1 items-center">
