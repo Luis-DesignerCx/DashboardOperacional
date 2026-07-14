@@ -749,16 +749,18 @@ export default function CarteiraPage() {
                           </div>
                           <div className="flex items-center gap-4 flex-shrink-0">
                             <div className="text-right">
-                              {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" || saldoAberto === 0 ? (
+                              {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" ? (
                                 <span className="text-xs font-medium text-emerald-400">Quitado</span>
                               ) : (
                                 <>
                                   <p className="text-white font-semibold text-sm tabular-nums">
                                     {formatarMoeda(saldoAberto)}
                                   </p>
-                                  <p className={`text-xs font-medium tabular-nums ${diasAtrasoColor(c.maiorDiasAtraso)}`}>
-                                    {c.maiorDiasAtraso ?? 0}d em atraso
-                                  </p>
+                                  {saldoAberto > 0 && (
+                                    <p className={`text-xs font-medium tabular-nums ${diasAtrasoColor(c.maiorDiasAtraso)}`}>
+                                      {c.maiorDiasAtraso ?? 0}d em atraso
+                                    </p>
+                                  )}
                                 </>
                               )}
                             </div>
