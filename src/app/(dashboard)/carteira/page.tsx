@@ -91,17 +91,25 @@ const STATUS_COM_AGENDA = ["LIGAR_DEPOIS", "AGUARDANDO_RETORNO"];
 // Status que exigem observação obrigatória
 const STATUS_OBS_OBRIG = ["OUTROS"];
 
+// Situações selecionáveis manualmente pelo consultor no popover do card
 const SITUACAO_COR: Record<string, string> = {
   INADIMPLENTE: "",
   EM_NEGOCIACAO: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   PROMESSA_PAGAMENTO: "bg-purple-500/10 text-purple-400 border-purple-500/20",
-  INADIMPLENCIA_EQUIVOCADA: "bg-orange-500/10 text-orange-400 border-orange-500/20",
 };
 
 const SITUACAO_LABEL: Record<string, string> = {
   INADIMPLENTE: "Inadimplente",
   EM_NEGOCIACAO: "Em negociação",
   PROMESSA_PAGAMENTO: "Promessa de pgto.",
+};
+
+// Badges somente de leitura (definidos por fluxos automáticos, não pelo popover)
+const SITUACAO_COR_EXTRA: Record<string, string> = {
+  INADIMPLENCIA_EQUIVOCADA: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+};
+
+const SITUACAO_LABEL_EXTRA: Record<string, string> = {
   INADIMPLENCIA_EQUIVOCADA: "Inad. equivocada",
 };
 
@@ -750,7 +758,7 @@ export default function CarteiraPage() {
                                   A Parte · {formatarMoeda(totalAParte)}
                                 </button>
                               )}
-                              {/* Badge de situação — clicável para atualizar */}
+                              {/* Badge de situação — clicável se selecionável, somente leitura se automático */}
                               {c.situacao !== "INADIMPLENTE" && SITUACAO_COR[c.situacao] && (
                                 <div className="relative">
                                   <button
@@ -775,6 +783,14 @@ export default function CarteiraPage() {
                                     </div>
                                   )}
                                 </div>
+                              )}
+                              {SITUACAO_COR_EXTRA[c.situacao] && (
+                                <span
+                                  title="Contestação de inadimplência pendente"
+                                  className={`text-[10px] border px-1.5 py-0.5 rounded font-medium ${SITUACAO_COR_EXTRA[c.situacao]}`}
+                                >
+                                  {SITUACAO_LABEL_EXTRA[c.situacao]}
+                                </span>
                               )}
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
