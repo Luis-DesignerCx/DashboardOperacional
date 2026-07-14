@@ -155,6 +155,22 @@ export default function ClienteDetalhe() {
     }
   }
 
+  async function excluirParcela(parcelaId: string) {
+    if (!confirm("Excluir esta parcela? O valor será removido do total em aberto do contrato.")) return;
+    const res = await fetch(`/api/parcelas/${parcelaId}`, { method: "DELETE" });
+    if (!res.ok) return;
+    setCliente(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        contratos: prev.contratos.map(c => ({
+          ...c,
+          parcelas: c.parcelas.filter(p => p.id !== parcelaId),
+        })),
+      };
+    });
+  }
+
   async function salvarParcela(parcelaId: string) {
     setSalvando(true);
     try {
@@ -537,20 +553,28 @@ export default function ClienteDetalhe() {
                           {formatarMoeda(Number(p.valorTotalAberto))}
                         </span>
                         {isGestorOuAdmin && (
-                          <button
-                            onClick={() => {
-                              setParcelaForm({
-                                valorParcela: String(p.valorParcela ?? ""),
-                                valorTotalAberto: String(p.valorTotalAberto ?? ""),
-                                diasAtraso: String(p.diasAtraso ?? ""),
-                                dataVencimento: p.dataVencimento ? p.dataVencimento.substring(0, 10) : "",
-                              });
-                              setEditandoParcela(p.id);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1 rounded text-slate-500 hover:text-white transition-all"
-                          >
-                            <Pencil size={11} />
-                          </button>
+                          <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 transition-all">
+                            <button
+                              onClick={() => {
+                                setParcelaForm({
+                                  valorParcela: String(p.valorParcela ?? ""),
+                                  valorTotalAberto: String(p.valorTotalAberto ?? ""),
+                                  diasAtraso: String(p.diasAtraso ?? ""),
+                                  dataVencimento: p.dataVencimento ? p.dataVencimento.substring(0, 10) : "",
+                                });
+                                setEditandoParcela(p.id);
+                              }}
+                              className="p-1 rounded text-slate-500 hover:text-white transition-colors"
+                            >
+                              <Pencil size={11} />
+                            </button>
+                            <button
+                              onClick={() => excluirParcela(p.id)}
+                              className="p-1 rounded text-slate-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 size={11} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>
