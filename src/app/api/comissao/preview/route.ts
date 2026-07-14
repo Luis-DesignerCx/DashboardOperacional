@@ -55,6 +55,20 @@ export async function GET(req: NextRequest) {
 
   const resultados = await Promise.all(
     consultores.map(async (consultor) => {
+      // Saldo da carteira individual do consultor (para metas com percentualAlvo)
+      const saldoAgg = await prisma.parcela.aggregate({
+        where: {
+          paga: false,
+          equivocada: false,
+          contrato: {
+            inadimplenciaEquivocada: false,
+            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } },
+          },
+        },
+        _sum: { valorTotalAberto: true },
+      });
+      const saldoConsultor = Number(saldoAgg._sum.valorTotalAberto ?? 0);
+
       const recebimentos = await prisma.recebimento.findMany({
         where: {
           consultorId: consultor.id,
@@ -68,15 +82,26 @@ export async function GET(req: NextRequest) {
         0
       );
 
-      const metasComNota = metas.map((m) => ({
-        id: m.id,
-        nome: m.nome,
-        tipo: m.tipo,
-        peso: Number(m.peso),
-        valorAlvo: m.valorAlvo ? Number(m.valorAlvo) : null,
-        thresholdsMonitoria: (m.thresholdsMonitoria as Record<string, number>) ?? null,
-        notaMonitoria: ((m.resultadosConsultores as Record<string, number>) ?? {})[consultor.id] ?? 0,
-      }));
+      // Filtra metas: aplica apenas metas globais da equipe OU específicas deste consultor
+      const metasConsultor = metas.filter(
+        (m) => m.consultorId === null || m.consultorId === consultor.id
+      );
+
+      const metasComNota = metasConsultor.map((m) => {
+        // Se a meta usa percentual, recalcula o alvo sobre a carteira individual
+        const valorAlvo = m.percentualAlvo && saldoConsultor > 0
+          ? (Number(m.percentualAlvo) / 100) * saldoConsultor
+          : m.valorAlvo ? Number(m.valorAlvo) : null;
+        return {
+          id: m.id,
+          nome: m.nome,
+          tipo: m.tipo,
+          peso: Number(m.peso),
+          valorAlvo,
+          thresholdsMonitoria: (m.thresholdsMonitoria as Record<string, number>) ?? null,
+          notaMonitoria: ((m.resultadosConsultores as Record<string, number>) ?? {})[consultor.id] ?? 0,
+        };
+      });
 
       const { totalComissao, breakdown } = calcularComissaoMetas(comissaoBase, metasComNota, totalRecebido);
 
