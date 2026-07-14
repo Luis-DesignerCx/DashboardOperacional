@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatarMoeda, formatarData } from "@/lib/utils";
-import { Bell, AlertTriangle, Clock, CheckCircle2, Plus, Search, X, Loader2, Phone, CalendarDays, Trash2, Pencil } from "lucide-react";
+import { Bell, AlertTriangle, Clock, CheckCircle2, Plus, Search, X, Loader2, Phone, CalendarDays, Trash2, Pencil, ChevronDown } from "lucide-react";
 
 const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
 
@@ -224,43 +224,53 @@ export default function PendenciasPage() {
       </div>
 
       {/* Promessas vencidas */}
-      <Section titulo="Promessas Vencidas" count={promessasVencidas.length} icon={AlertTriangle} cor="text-red-400" vazio="Nenhuma promessa vencida">
+      <Section
+        titulo="Promessas Vencidas" count={promessasVencidas.length}
+        icon={AlertTriangle} cor="text-red-400" badgeCor="bg-red-500/15 text-red-400 border-red-500/25"
+        vazio="Nenhuma promessa vencida" defaultAberta={promessasVencidas.length > 0}
+      >
         {promessasVencidas.map((p) => (
           <CardPromessa key={p.id} promessa={p} variante="vencida"
-            onEditar={() => abrirEditar(p)}
-            onExcluir={() => setConfirmandoExclusao(p.id)}
-          />
+            onEditar={() => abrirEditar(p)} onExcluir={() => setConfirmandoExclusao(p.id)} />
         ))}
       </Section>
 
       {/* Promessas de hoje */}
-      <Section titulo="Vencem Hoje" count={promessasHoje.length} icon={Clock} cor="text-amber-400" vazio="Nenhuma promessa para hoje">
+      <Section
+        titulo="Vencem Hoje" count={promessasHoje.length}
+        icon={Clock} cor="text-amber-400" badgeCor="bg-amber-500/15 text-amber-400 border-amber-500/25"
+        vazio="Nenhuma promessa para hoje" defaultAberta={promessasHoje.length > 0}
+      >
         {promessasHoje.map((p) => (
           <CardPromessa key={p.id} promessa={p} variante="hoje"
-            onEditar={() => abrirEditar(p)}
-            onExcluir={() => setConfirmandoExclusao(p.id)}
-          />
+            onEditar={() => abrirEditar(p)} onExcluir={() => setConfirmandoExclusao(p.id)} />
         ))}
       </Section>
 
       {/* Promessas futuras */}
-      <Section titulo="Próximas Promessas" count={promessasFuturas.length} icon={CalendarDays} cor="text-sky-400" vazio="Nenhuma promessa futura cadastrada">
+      <Section
+        titulo="Próximas Promessas" count={promessasFuturas.length}
+        icon={CalendarDays} cor="text-sky-400" badgeCor="bg-sky-500/15 text-sky-400 border-sky-500/25"
+        vazio="Nenhuma promessa futura cadastrada" defaultAberta={false}
+      >
         {promessasFuturas.map((p) => (
           <CardPromessa key={p.id} promessa={p} variante="futura"
-            onEditar={() => abrirEditar(p)}
-            onExcluir={() => setConfirmandoExclusao(p.id)}
-          />
+            onEditar={() => abrirEditar(p)} onExcluir={() => setConfirmandoExclusao(p.id)} />
         ))}
       </Section>
 
       {/* Retornos agendados */}
-      <Section titulo="Retornos Agendados Hoje" count={agendadosHoje.length} icon={Phone} cor="text-emerald-400" vazio="Nenhum retorno agendado para hoje">
+      <Section
+        titulo="Retornos Agendados Hoje" count={agendadosHoje.length}
+        icon={Phone} cor="text-emerald-400" badgeCor="bg-emerald-500/15 text-emerald-400 border-emerald-500/25"
+        vazio="Nenhum retorno agendado para hoje" defaultAberta={agendadosHoje.length > 0}
+      >
         {agendadosHoje.map((c: any) => {
           const cli = c.contrato?.cliente;
           const tel = cli?.telefones ? cli.telefones.split(",")[0].trim() : null;
           const email = cli?.emails ? cli.emails.split(",")[0].trim() : null;
           return (
-            <div key={c.id} className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
+            <div key={c.id} className="bg-slate-800/50 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <p className="text-white font-medium text-sm truncate">{cli?.nome || "—"}</p>
                 <p className="text-slate-400 text-xs">{c.contrato?.numero} · {c.contrato?.empresa?.nome}</p>
@@ -466,23 +476,41 @@ export default function PendenciasPage() {
   );
 }
 
-function Section({ titulo, count, icon: Icon, cor, vazio, children }: any) {
+function Section({ titulo, count, icon: Icon, cor, badgeCor, vazio, children, defaultAberta }: any) {
+  const [aberta, setAberta] = useState<boolean>(defaultAberta ?? false);
+
   return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <Icon size={18} className={cor} />
-        <h2 className="text-white font-semibold">{titulo}</h2>
+    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      {/* Cabeçalho clicável */}
+      <button
+        onClick={() => setAberta((v) => !v)}
+        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-800/60 transition-colors text-left"
+      >
+        <Icon size={16} className={cor} />
+        <span className="text-white font-semibold text-sm flex-1">{titulo}</span>
         {count > 0 && (
-          <span className="ml-auto text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-full">{count}</span>
+          <span className={`text-xs px-2 py-0.5 rounded-full font-semibold border ${badgeCor}`}>
+            {count}
+          </span>
         )}
-      </div>
-      {count === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center">
-          <CheckCircle2 size={28} className="mx-auto mb-2 text-slate-700" />
-          <p className="text-slate-400 text-sm">{vazio}</p>
+        <ChevronDown
+          size={15}
+          className={`text-slate-500 transition-transform duration-200 ${aberta ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {/* Conteúdo expansível */}
+      {aberta && (
+        <div className="px-4 pb-4 pt-1 space-y-2 border-t border-slate-800">
+          {count === 0 ? (
+            <div className="py-6 text-center">
+              <CheckCircle2 size={24} className="mx-auto mb-2 text-slate-700" />
+              <p className="text-slate-500 text-sm">{vazio}</p>
+            </div>
+          ) : (
+            children
+          )}
         </div>
-      ) : (
-        <div className="space-y-2">{children}</div>
       )}
     </div>
   );
