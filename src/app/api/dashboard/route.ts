@@ -56,6 +56,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     promessasAbertasAgg,
     agendadosHoje,
     metasResult,
+    saldoParcelasAgg,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
@@ -115,6 +116,18 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       },
       select: { valorAlvo: true, percentualAlvo: true, consultorId: true, tipo: true },
     }),
+    // Mesma query usada na comissão para garantir base de cálculo idêntica
+    prisma.parcela.aggregate({
+      where: {
+        paga: false,
+        equivocada: false,
+        contrato: {
+          inadimplenciaEquivocada: false,
+          carteiras: { some: { consultorId, competenciaId, ativo: true } },
+        },
+      },
+      _sum: { valorTotalAberto: true },
+    }),
   ]);
 
   // Para a barra de progresso usa a meta FINANCEIRA:
@@ -129,10 +142,12 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   const valorRecebido = Number(recebimentoAgg._sum.valor ?? 0);
   const valorAParte = recebimentosAParte.reduce((s: number, r: any) => s + Number(r.valorAParte ?? 0), 0);
 
-  // Se a meta usa percentualAlvo, calcula o alvo sobre a carteira individual do consultor
+  // Usa a mesma base de cálculo da comissão: soma de parcelas não pagas/não equivocadas
+  const saldoConsultor = Number(saldoParcelasAgg._sum.valorTotalAberto ?? 0);
+
   const metaAlvo = meta
-    ? meta.percentualAlvo && valorCarteira > 0
-      ? (Number(meta.percentualAlvo) / 100) * valorCarteira
+    ? meta.percentualAlvo && saldoConsultor > 0
+      ? (Number(meta.percentualAlvo) / 100) * saldoConsultor
       : meta.valorAlvo ? Number(meta.valorAlvo) : null
     : null;
 
