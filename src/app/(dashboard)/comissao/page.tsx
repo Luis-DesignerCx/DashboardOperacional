@@ -494,7 +494,8 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
         const item = Array.isArray(d) ? d.find((x: any) => x.id === consultorId) : null;
         setPreview(item ?? null);
         setCarregando(false);
-      });
+      })
+      .catch(() => setCarregando(false));
   }, [competenciaId, consultorId]);
 
   return (
