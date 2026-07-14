@@ -796,24 +796,22 @@ export default function CarteiraPage() {
                           <div className="flex items-center gap-4 flex-shrink-0">
 
                             {/* Bloco de valores — largura fixa 148px, sempre no mesmo eixo */}
-                            <div className="flex flex-col items-end w-[148px]">
+                            <div className="flex flex-col items-end w-[160px] gap-0.5">
                               <span className="text-white font-bold text-base tabular-nums">
                                 {formatarMoeda(c.valorTotalAberto ?? 0)}
                               </span>
-                              {totalRecebido > 0 ? (
-                                <span className="text-xs font-medium tabular-nums text-emerald-400 mt-0.5">
-                                  ↳ {formatarMoeda(totalRecebido)} rec.
+                              {totalRecebido > 0 && (
+                                <span className="text-xs font-medium tabular-nums text-emerald-400">
+                                  ↳ {formatarMoeda(totalRecebido)}
                                 </span>
-                              ) : (
-                                <span className="h-[18px]" />
                               )}
                               {totalAParte > 0 && (
                                 <button
                                   onClick={() => setModalAParte(c)}
                                   title="Ver detalhes A Parte"
-                                  className="text-xs font-medium tabular-nums text-sky-400 mt-0.5 hover:text-sky-300 transition-colors text-right"
+                                  className="text-xs font-medium tabular-nums text-sky-400 hover:text-sky-300 transition-colors text-right"
                                 >
-                                  ↳ {formatarMoeda(totalAParte)} rec. a parte
+                                  ↳ {formatarMoeda(totalAParte)} a parte
                                 </button>
                               )}
                               {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
