@@ -209,6 +209,22 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Monta observação com parcelas pagas
+  let observacaoContato = observacao || `Recebimento de ${formatarMoeda(Number(valorDecimal))} informado`;
+  if (Array.isArray(parcelasIds) && parcelasIds.length > 0) {
+    const parcelasPagas = await prisma.parcela.findMany({
+      where: { id: { in: parcelasIds } },
+      select: { numero: true, dataVencimento: true },
+      orderBy: { numero: "asc" },
+    });
+    if (parcelasPagas.length > 0) {
+      const info = parcelasPagas
+        .map((p) => `Parcela ${p.numero} (venc. ${new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })})`)
+        .join(", ");
+      observacaoContato += ` — ${info}`;
+    }
+  }
+
   // Registra contato automático
   await prisma.contato.create({
     data: {
@@ -216,7 +232,7 @@ export async function POST(req: NextRequest) {
       consultorId: session.user.id,
       tipo: "LIGACAO",
       status: "RECEBIDO",
-      observacao: observacao || `Recebimento de ${formatarMoeda(Number(valorDecimal))} informado`,
+      observacao: observacaoContato,
     },
   });
 

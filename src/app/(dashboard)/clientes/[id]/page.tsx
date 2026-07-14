@@ -37,6 +37,7 @@ interface Contrato {
     dataRecebimento: string;
     formaPagamento: string;
     consultorId: string;
+    parcelasIds: string[];
   }[];
   contatos: { id: string; tipo: string; status: string; observacao: string | null; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string; formaPagamento: string }[];
@@ -645,6 +646,20 @@ export default function ClienteDetalhe() {
                             <p className="text-slate-500 text-xs">
                               {r.formaPagamento.replace(/_/g, " ")} · {new Date(r.dataRecebimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                             </p>
+                            {/* Parcelas pagas */}
+                            {Array.isArray(r.parcelasIds) && r.parcelasIds.length > 0 && (() => {
+                              const pagas = contrato.parcelas.filter((p) => r.parcelasIds.includes(p.id));
+                              if (!pagas.length) return null;
+                              return (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {pagas.map((p) => (
+                                    <span key={p.id} className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/8 text-emerald-400/80 border border-emerald-500/15 px-1.5 py-0.5 rounded">
+                                      Parcela {p.numero} · venc. {new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </div>
                           {podeEditar && (
                             <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-all">
