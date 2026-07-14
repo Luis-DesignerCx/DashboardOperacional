@@ -189,8 +189,17 @@ export async function POST(req: NextRequest) {
 
   await prisma.contrato.update({
     where: { id: contratoId },
-    data: { statusRecuperacao },
+    // Recebimento confirmado → reseta situação (promessa/negociação eram expectativa, não pagamento)
+    data: { statusRecuperacao, situacao: "INADIMPLENTE" },
   });
+
+  // Se quitado integralmente, fecha todas as promessas abertas do contrato
+  if (statusRecuperacao === "RECUPERADO_INTEGRALMENTE") {
+    await prisma.promessa.updateMany({
+      where: { contratoId, status: "ABERTA" },
+      data: { status: "PAGA" },
+    });
+  }
 
   // Marca parcelas específicas como pagas
   if (Array.isArray(parcelasIds) && parcelasIds.length > 0) {

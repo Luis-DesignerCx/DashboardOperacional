@@ -856,17 +856,17 @@ export default function CarteiraPage() {
                             )}
                           </div>
                           <div className="flex items-center gap-4 flex-shrink-0">
-                            <div className="text-right">
-                              <p className="text-white font-semibold text-sm tabular-nums">
+                            <div className="text-right leading-tight">
+                              <p className="text-white font-bold text-sm tabular-nums">
                                 {formatarMoeda(c.valorTotalAberto ?? 0)}
                               </p>
                               {totalRecebido > 0 && (
-                                <p className="text-[11px] font-medium tabular-nums text-emerald-400">
+                                <p className="text-xs font-semibold tabular-nums text-emerald-400 mt-0.5">
                                   Rec. {formatarMoeda(totalRecebido)}
                                 </p>
                               )}
                               {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
-                                <p className="text-[11px] font-medium text-emerald-400">Adimplente</p>
+                                <p className="text-xs font-bold text-emerald-400 mt-0.5">Adimplente</p>
                               )}
                             </div>
                             <div className="flex gap-1 items-center">
