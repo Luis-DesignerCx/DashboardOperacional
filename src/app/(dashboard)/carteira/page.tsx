@@ -165,9 +165,11 @@ export default function CarteiraPage() {
   // Estado modal novo cliente
   const [novoForm, setNovoForm] = useState({
     nomeCliente: "", telefones: "", emails: "",
-    numeroContrato: "", diasAtraso: "", valorAReceber: "",
+    numeroContrato: "",
+    valorAReceber: "",
     tipo: "inadimplencia" as "inadimplencia" | "a_parte",
     formaPagamento: "PIX",
+    parcelas: [{ dataVencimento: "", valor: "" }],
   });
   const [salvandoNovo, setSalvandoNovo] = useState(false);
   const [erroNovo, setErroNovo] = useState("");
@@ -494,9 +496,11 @@ export default function CarteiraPage() {
 
   const NOVO_FORM_VAZIO = {
     nomeCliente: "", telefones: "", emails: "",
-    numeroContrato: "", diasAtraso: "", valorAReceber: "",
+    numeroContrato: "",
+    valorAReceber: "",
     tipo: "inadimplencia" as "inadimplencia" | "a_parte",
     formaPagamento: "PIX",
+    parcelas: [{ dataVencimento: "", valor: "" }],
   };
 
   async function salvarNovoCliente() {
@@ -507,11 +511,20 @@ export default function CarteiraPage() {
     if (novoForm.tipo === "a_parte" && !novoForm.formaPagamento) {
       setErroNovo("Selecione a forma de pagamento"); return;
     }
+    if (novoForm.tipo === "inadimplencia") {
+      const parcelasValidas = novoForm.parcelas.filter((p) => p.dataVencimento && p.valor);
+      if (parcelasValidas.length === 0) {
+        setErroNovo("Informe ao menos uma parcela com data de vencimento e valor"); return;
+      }
+    }
     setSalvandoNovo(true);
+    const payload = novoForm.tipo === "inadimplencia"
+      ? { nomeCliente: novoForm.nomeCliente, telefones: novoForm.telefones, emails: novoForm.emails, numeroContrato: novoForm.numeroContrato, tipo: novoForm.tipo, competenciaId, parcelas: novoForm.parcelas.filter((p) => p.dataVencimento && p.valor) }
+      : { nomeCliente: novoForm.nomeCliente, telefones: novoForm.telefones, emails: novoForm.emails, numeroContrato: novoForm.numeroContrato, tipo: novoForm.tipo, formaPagamento: novoForm.formaPagamento, valorAReceber: novoForm.valorAReceber, competenciaId };
     const res = await fetch("/api/carteira/novo-cliente", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...novoForm, competenciaId }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     setSalvandoNovo(false);
@@ -1574,32 +1587,74 @@ export default function CarteiraPage() {
                 </div>
 
                 {novoForm.tipo === "inadimplencia" && (
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1.5">Dias em atraso</label>
-                    <input type="number" className={inputCls} placeholder="0" value={novoForm.diasAtraso}
-                      onChange={(e) => setNovoForm((f) => ({ ...f, diasAtraso: e.target.value }))} />
+                  <div className="col-span-2">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs text-slate-400">Parcelas em atraso *</label>
+                      <button
+                        type="button"
+                        onClick={() => setNovoForm((f) => ({ ...f, parcelas: [...f.parcelas, { dataVencimento: "", valor: "" }] }))}
+                        className="text-xs text-gr-400 hover:text-gr-300 flex items-center gap-1 transition-colors"
+                      >
+                        <Plus size={12} /> Adicionar parcela
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {novoForm.parcelas.map((p, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <input
+                            type="date"
+                            className={inputCls + " flex-1"}
+                            value={p.dataVencimento}
+                            onChange={(e) => setNovoForm((f) => {
+                              const parcelas = [...f.parcelas];
+                              parcelas[i] = { ...parcelas[i], dataVencimento: e.target.value };
+                              return { ...f, parcelas };
+                            })}
+                          />
+                          <input
+                            className={inputCls + " flex-1"}
+                            placeholder="R$ 0,00"
+                            value={p.valor}
+                            onChange={(e) => setNovoForm((f) => {
+                              const parcelas = [...f.parcelas];
+                              parcelas[i] = { ...parcelas[i], valor: e.target.value };
+                              return { ...f, parcelas };
+                            })}
+                          />
+                          {novoForm.parcelas.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setNovoForm((f) => ({ ...f, parcelas: f.parcelas.filter((_, j) => j !== i) }))}
+                              className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors flex-shrink-0"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1.5">Os dias em atraso serão calculados automaticamente com base no 1º dia útil da competência.</p>
                   </div>
                 )}
 
                 {novoForm.tipo === "a_parte" && (
-                  <div>
-                    <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
-                    <select className={inputCls} value={novoForm.formaPagamento}
-                      onChange={(e) => setNovoForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
-                      <option value="PIX">PIX</option>
-                      <option value="CARTAO_CREDITO">Cartão de Crédito</option>
-                      <option value="BOLETO">Boleto</option>
-                    </select>
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
+                      <select className={inputCls} value={novoForm.formaPagamento}
+                        onChange={(e) => setNovoForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
+                        <option value="PIX">PIX</option>
+                        <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                        <option value="BOLETO">Boleto</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Valor recebido (R$)</label>
+                      <input className={inputCls} placeholder="0,00" value={novoForm.valorAReceber}
+                        onChange={(e) => setNovoForm((f) => ({ ...f, valorAReceber: e.target.value }))} />
+                    </div>
+                  </>
                 )}
-
-                <div className={novoForm.tipo === "inadimplencia" ? "" : "col-span-2"}>
-                  <label className="block text-xs text-slate-400 mb-1.5">
-                    {novoForm.tipo === "inadimplencia" ? "Valor inadimplente (R$)" : "Valor recebido (R$)"}
-                  </label>
-                  <input className={inputCls} placeholder="0,00" value={novoForm.valorAReceber}
-                    onChange={(e) => setNovoForm((f) => ({ ...f, valorAReceber: e.target.value }))} />
-                </div>
               </div>
 
               {erroNovo && (

@@ -20,6 +20,15 @@ export function diasUteisNoMes(mes: number, ano: number): number {
   return contarDiasUteis(inicio, fim);
 }
 
+// Retorna o primeiro dia útil (seg-sex) de um mês (mes 1-12, ano YYYY) como Date UTC
+export function primeiroDiaUtilDoMes(mes: number, ano: number): Date {
+  const d = new Date(Date.UTC(ano, mes - 1, 1));
+  while (d.getUTCDay() === 0 || d.getUTCDay() === 6) {
+    d.setUTCDate(d.getUTCDate() + 1);
+  }
+  return d;
+}
+
 // Calcula o fator de férias para um consultor: (diasUteis - diasFeriasNoMes) / diasUteis
 // dataInicio e dataFim são as datas das férias (podem se estender além do mês)
 export function fatorFerias(mes: number, ano: number, dataInicio: Date, dataFim: Date): number {

@@ -5,6 +5,12 @@ import { prisma } from "@/lib/prisma";
 import { randomUUID } from "crypto";
 import { Decimal } from "@prisma/client/runtime/library";
 import { FormaPagamento } from "@prisma/client";
+import { primeiroDiaUtilDoMes } from "@/utils/dias-uteis";
+
+interface ParcelaInput {
+  dataVencimento: string; // YYYY-MM-DD
+  valor: string;
+}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -13,16 +19,14 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const {
     nomeCliente, telefones, emails,
-    numeroContrato, diasAtraso, valorAReceber, competenciaId,
+    numeroContrato, competenciaId,
     tipo = "inadimplencia", formaPagamento,
+    parcelas, valorAReceber,
   } = body;
 
   if (!nomeCliente || !numeroContrato || !competenciaId) {
     return NextResponse.json({ erro: "Nome do cliente, número do contrato e competência são obrigatórios" }, { status: 400 });
   }
-
-  const dias = parseInt(diasAtraso) || 0;
-  const valor = parseFloat(String(valorAReceber).replace(",", ".")) || 0;
 
   const contratoExistente = await prisma.contrato.findUnique({ where: { numero: numeroContrato } });
 
@@ -31,13 +35,13 @@ export async function POST(req: NextRequest) {
     if (!formaPagamento) {
       return NextResponse.json({ erro: "Forma de pagamento obrigatória para lançamento a parte" }, { status: 400 });
     }
+    const valor = parseFloat(String(valorAReceber ?? "0").replace(",", ".")) || 0;
 
     let contratoId: string;
 
     if (contratoExistente) {
       contratoId = contratoExistente.id;
     } else {
-      // Cria contrato sem dívida (valorTotalAberto = 0)
       const empresas = await prisma.empresa.findMany();
       const empresa = empresas.find((e) =>
         e.prefixos.some((p) => numeroContrato.toUpperCase().startsWith(p.toUpperCase()))
@@ -71,22 +75,15 @@ export async function POST(req: NextRequest) {
       ]);
     }
 
-    // Garante que o contrato está na carteira desta competência
     const carteiraExistente = await prisma.carteiraParcela.findFirst({
       where: { contratoId, competenciaId },
     });
     if (!carteiraExistente) {
       await prisma.carteiraParcela.create({
-        data: {
-          id: randomUUID(),
-          contratoId,
-          consultorId: session.user.id,
-          competenciaId,
-        },
+        data: { id: randomUUID(), contratoId, consultorId: session.user.id, competenciaId },
       });
     }
 
-    // Lança diretamente como recebimento a parte
     await prisma.recebimento.create({
       data: {
         id: randomUUID(),
@@ -104,46 +101,74 @@ export async function POST(req: NextRequest) {
   }
 
   // ── INADIMPLÊNCIA ─────────────────────────────────────────────────────────
+  const parcelasInput: ParcelaInput[] = Array.isArray(parcelas) && parcelas.length > 0
+    ? parcelas
+    : [];
+
+  if (parcelasInput.length === 0) {
+    return NextResponse.json({ erro: "Informe ao menos uma parcela em atraso" }, { status: 400 });
+  }
+
+  // Busca competência para obter mes/ano e calcular 1º dia útil
+  const competencia = await prisma.competencia.findUnique({
+    where: { id: competenciaId },
+    select: { mes: true, ano: true },
+  });
+  if (!competencia) {
+    return NextResponse.json({ erro: "Competência não encontrada" }, { status: 400 });
+  }
+
+  const refDate = primeiroDiaUtilDoMes(competencia.mes, competencia.ano);
+
+  // Calcula diasAtraso de cada parcela e valor total
+  const parcelasProcessadas = parcelasInput.map((p, i) => {
+    const venc = new Date(p.dataVencimento + "T00:00:00.000Z");
+    const diffMs = refDate.getTime() - venc.getTime();
+    const dias = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
+    const valor = parseFloat(String(p.valor).replace(",", ".")) || 0;
+    return { numero: i + 1, dataVencimento: venc, diasAtraso: dias, valor };
+  });
+
+  const maiorDiasAtraso = Math.max(...parcelasProcessadas.map((p) => p.diasAtraso));
+  const valorTotal = parcelasProcessadas.reduce((s, p) => s + p.valor, 0);
+
   if (contratoExistente) {
-    // Próximo número de parcela
     const ultimaParcela = await prisma.parcela.findFirst({
       where: { contratoId: contratoExistente.id },
       orderBy: { numero: "desc" },
       select: { numero: true },
     });
-    const proximoNumero = (ultimaParcela?.numero ?? 0) + 1;
+    let proximoNumero = (ultimaParcela?.numero ?? 0) + 1;
 
-    // Cria parcela e atualiza valor total — faixa (maiorDiasAtraso) congelada
     await prisma.$transaction([
-      prisma.parcela.create({
-        data: {
-          id: randomUUID(),
-          contratoId: contratoExistente.id,
-          numero: proximoNumero,
-          dataVencimento: new Date(),
-          diasAtraso: dias,
-          valorParcela: new Decimal(valor.toFixed(2)),
-          valorTotalAberto: new Decimal(valor.toFixed(2)),
-        },
-      }),
+      ...parcelasProcessadas.map((p) =>
+        prisma.parcela.create({
+          data: {
+            id: randomUUID(),
+            contratoId: contratoExistente.id,
+            numero: proximoNumero++,
+            dataVencimento: p.dataVencimento,
+            diasAtraso: p.diasAtraso,
+            valorParcela: new Decimal(p.valor.toFixed(2)),
+            valorTotalAberto: new Decimal(p.valor.toFixed(2)),
+          },
+        })
+      ),
       prisma.contrato.update({
         where: { id: contratoExistente.id },
-        data: { valorTotalAberto: { increment: new Decimal(valor.toFixed(2)) } },
+        data: {
+          valorTotalAberto: { increment: new Decimal(valorTotal.toFixed(2)) },
+          maiorDiasAtraso: Math.max(contratoExistente.maiorDiasAtraso ?? 0, maiorDiasAtraso),
+        },
       }),
     ]);
 
-    // Vincula à carteira se ainda não estiver
     const carteiraExistente = await prisma.carteiraParcela.findFirst({
       where: { contratoId: contratoExistente.id, competenciaId },
     });
     if (!carteiraExistente) {
       await prisma.carteiraParcela.create({
-        data: {
-          id: randomUUID(),
-          contratoId: contratoExistente.id,
-          consultorId: session.user.id,
-          competenciaId,
-        },
+        data: { id: randomUUID(), contratoId: contratoExistente.id, consultorId: session.user.id, competenciaId },
       });
     }
 
@@ -177,28 +202,25 @@ export async function POST(req: NextRequest) {
         numero: numeroContrato.trim(),
         clienteId,
         empresaId: empresa.id,
-        maiorDiasAtraso: dias,
-        valorTotalAberto: new Decimal(valor.toFixed(2)),
+        maiorDiasAtraso,
+        valorTotalAberto: new Decimal(valorTotal.toFixed(2)),
       },
     }),
-    prisma.parcela.create({
-      data: {
-        id: randomUUID(),
-        contratoId,
-        numero: 1,
-        dataVencimento: new Date(),
-        diasAtraso: dias,
-        valorParcela: new Decimal(valor.toFixed(2)),
-        valorTotalAberto: new Decimal(valor.toFixed(2)),
-      },
-    }),
+    ...parcelasProcessadas.map((p, i) =>
+      prisma.parcela.create({
+        data: {
+          id: randomUUID(),
+          contratoId,
+          numero: i + 1,
+          dataVencimento: p.dataVencimento,
+          diasAtraso: p.diasAtraso,
+          valorParcela: new Decimal(p.valor.toFixed(2)),
+          valorTotalAberto: new Decimal(p.valor.toFixed(2)),
+        },
+      })
+    ),
     prisma.carteiraParcela.create({
-      data: {
-        id: randomUUID(),
-        contratoId,
-        consultorId: session.user.id,
-        competenciaId,
-      },
+      data: { id: randomUUID(), contratoId, consultorId: session.user.id, competenciaId },
     }),
   ]);
 
