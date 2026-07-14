@@ -83,15 +83,17 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
 
-  // Busca o contrato antes de deletar para recalcular statusRecuperacao
   const rec = await prisma.recebimento.findUnique({
     where: { id },
     select: {
       contratoId: true,
+      valor: true,
+      consultorId: true,
       contrato: {
         select: {
           valorTotalAberto: true,
           recebimentos: { select: { id: true, valor: true } },
+          parcelas: { select: { id: true, paga: true } },
         },
       },
     },
@@ -112,9 +114,30 @@ export async function DELETE(req: NextRequest) {
       ? "RECUPERACAO_PARCIAL"
       : "INADIMPLENTE";
 
+  // Reverte parcelas pagas para não-pagas se o contrato não está mais quitado
+  const parcelasPagas = rec.contrato.parcelas.filter((p) => p.paga);
+  if (parcelasPagas.length > 0 && statusRecuperacao !== "RECUPERADO_INTEGRALMENTE") {
+    await prisma.parcela.updateMany({
+      where: { id: { in: parcelasPagas.map((p) => p.id) } },
+      data: { paga: false },
+    });
+  }
+
   await prisma.contrato.update({
     where: { id: rec.contratoId },
     data: { statusRecuperacao },
+  });
+
+  // Registra auditoria no histórico de contatos
+  const nomeUsuario = (session.user as any).name ?? (session.user as any).nome ?? "Usuário";
+  await prisma.contato.create({
+    data: {
+      contratoId: rec.contratoId,
+      consultorId: session.user.id,
+      tipo: "LIGACAO",
+      status: "OUTROS",
+      observacao: `Recebimento de ${formatarMoeda(Number(rec.valor))} excluído por ${nomeUsuario}`,
+    },
   });
 
   return NextResponse.json({ ok: true, statusRecuperacao });
