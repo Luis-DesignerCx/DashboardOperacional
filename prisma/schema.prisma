@@ -290,6 +290,7 @@ model Parcela {
   valorParcela     Decimal   @db.Decimal(15, 2)
   valorTotalAberto Decimal   @db.Decimal(15, 2)
   paga             Boolean   @default(false)
+  equivocada       Boolean   @default(false)
   criadoEm         DateTime  @default(now())
   atualizadoEm     DateTime  @updatedAt
 

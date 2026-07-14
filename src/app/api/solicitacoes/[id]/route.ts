@@ -62,7 +62,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       const novoValorAberto = Math.max(0, Number(contratoAtual?.valorTotalAberto ?? 0) - valorEquivocado);
       await prisma.parcela.updateMany({
         where: { id: { in: parcialIds } },
-        data: { paga: true },
+        data: { equivocada: true, valorTotalAberto: 0 },
       });
       await prisma.contrato.update({
         where: { id: solicitacaoAtual.contratoId },

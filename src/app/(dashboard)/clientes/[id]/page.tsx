@@ -30,6 +30,7 @@ interface Contrato {
     origem: string | null;
     meioPagamento: string | null;
     paga: boolean;
+    equivocada: boolean;
   }[];
   recebimentos: {
     id: string;
@@ -536,7 +537,7 @@ export default function ClienteDetalhe() {
                 && contrato.situacao !== "INADIMPLENCIA_EQUIVOCADA" && (
                 <button
                   onClick={() => {
-                    const naoPageIds = contrato.parcelas.filter(p => !p.paga).map(p => p.id);
+                    const naoPageIds = contrato.parcelas.filter(p => !p.paga && !p.equivocada).map(p => p.id);
                     setInadEquivContratoId(contrato.id);
                     setInadEquivParcelasIds(naoPageIds);
                     setInadEquivJustificativa("");
@@ -567,7 +568,7 @@ export default function ClienteDetalhe() {
 
                 {/* Seleção de parcelas */}
                 {(() => {
-                  const naoPageas = contrato.parcelas.filter(p => !p.paga);
+                  const naoPageas = contrato.parcelas.filter(p => !p.paga && !p.equivocada);
                   const todasSelecionadas = inadEquivParcelasIds.length === naoPageas.length && naoPageas.length > 0;
                   return (
                     <div className="space-y-1.5">
@@ -710,14 +711,19 @@ export default function ClienteDetalhe() {
                         <span className="text-slate-400 text-xs">
                           {new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                         </span>
-                        {p.diasAtraso > 0 && (
+                        {p.equivocada && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/20 font-medium">
+                            Inad. Equivocada
+                          </span>
+                        )}
+                        {!p.equivocada && p.diasAtraso > 0 && (
                           <span className={`text-xs px-1.5 py-0.5 rounded-full ${badgeDias(p.diasAtraso)}`}>
                             {p.diasAtraso}d
                           </span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-white text-xs font-medium tabular-nums">
+                        <span className={`text-xs font-medium tabular-nums ${p.equivocada ? "text-slate-500 line-through" : "text-white"}`}>
                           {formatarMoeda(Number(p.valorTotalAberto))}
                         </span>
                         {isGestorOuAdmin && (
