@@ -147,7 +147,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     promessasVencidas: promessasVencidasAgg._count,
     valorPromessasVencidas: Number(promessasVencidasAgg._sum.valorPrometido ?? 0),
     agendadosHoje,
-    percentualMeta: (metaAlvo && metaAlvo > 0) ? Math.round((valorRecebido / metaAlvo) * 10000) / 100 : 0,
+    percentualMeta: (metaAlvo && metaAlvo > 0) ? Math.round(((valorRecebido + valorAParte) / metaAlvo) * 10000) / 100 : 0,
     metaAlvo,
   };
 }
