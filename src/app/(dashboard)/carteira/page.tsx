@@ -802,7 +802,7 @@ export default function CarteiraPage() {
                           <div className="flex items-center gap-4 flex-shrink-0">
                             <div className="text-right">
                               {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" ? (
-                                <span className="text-xs font-medium text-emerald-400">Quitado</span>
+                                <span className="text-xs font-medium text-emerald-400">Adimplente</span>
                               ) : (
                                 <>
                                   <p className="text-white font-semibold text-sm tabular-nums">
