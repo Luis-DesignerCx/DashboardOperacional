@@ -86,7 +86,9 @@ export default function MetasPage() {
   useEffect(() => {
     recarregar();
     fetch("/api/equipes").then((r) => r.json()).then((d) => {
-      setEquipes(Array.isArray(d) ? d : []);
+      const ORDEM: Record<string, number> = { FLASH: 1, CRA_1_30: 2, CR_31_90: 3, CR_PDD_91_180: 4 };
+      const lista = (Array.isArray(d) ? d : []).sort((a: any, b: any) => (ORDEM[a.tipo] ?? 9) - (ORDEM[b.tipo] ?? 9));
+      setEquipes(lista);
       if (lista.length > 0) setForm((f) => ({ ...f, equipeId: lista[0].id }));
     });
     fetch("/api/competencias").then((r) => r.json()).then((d) => {

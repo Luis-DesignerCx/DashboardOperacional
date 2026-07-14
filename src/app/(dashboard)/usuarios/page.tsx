@@ -84,7 +84,10 @@ export default function UsuariosPage() {
 
   useEffect(() => {
     carregar();
-    fetch("/api/equipes").then((r) => r.json()).then(setEquipes);
+    fetch("/api/equipes").then((r) => r.json()).then((d) => {
+      const ORDEM: Record<string, number> = { FLASH: 1, CRA_1_30: 2, CR_31_90: 3, CR_PDD_91_180: 4 };
+      setEquipes((Array.isArray(d) ? d : []).sort((a: any, b: any) => (ORDEM[a.tipo] ?? 9) - (ORDEM[b.tipo] ?? 9)));
+    });
   }, []);
 
   async function carregar() {
