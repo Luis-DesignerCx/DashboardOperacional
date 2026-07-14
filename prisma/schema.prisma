@@ -96,7 +96,6 @@ enum SituacaoContrato {
   EM_NEGOCIACAO
   PROMESSA_PAGAMENTO
   INADIMPLENCIA_EQUIVOCADA
-  CANCELAMENTO_SOLICITADO
 }
 
 // ─── EMPRESA ──────────────────────────────────────────────────────────────────

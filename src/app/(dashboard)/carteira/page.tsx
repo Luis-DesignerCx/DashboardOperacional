@@ -96,7 +96,6 @@ const SITUACAO_COR: Record<string, string> = {
   EM_NEGOCIACAO: "bg-amber-500/10 text-amber-400 border-amber-500/20",
   PROMESSA_PAGAMENTO: "bg-purple-500/10 text-purple-400 border-purple-500/20",
   INADIMPLENCIA_EQUIVOCADA: "bg-orange-500/10 text-orange-400 border-orange-500/20",
-  CANCELAMENTO_SOLICITADO: "bg-red-500/10 text-red-400 border-red-500/20",
 };
 
 const SITUACAO_LABEL: Record<string, string> = {
@@ -104,7 +103,6 @@ const SITUACAO_LABEL: Record<string, string> = {
   EM_NEGOCIACAO: "Em negociação",
   PROMESSA_PAGAMENTO: "Promessa de pgto.",
   INADIMPLENCIA_EQUIVOCADA: "Inad. equivocada",
-  CANCELAMENTO_SOLICITADO: "Cancelamento",
 };
 
 function getFaixa(dias: number | null): { label: string; cor: string } {
@@ -653,12 +651,11 @@ export default function CarteiraPage() {
           onChange={(e) => setSituacaoFiltro(e.target.value || null)}
           className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
         >
-          <option value="">Situação do contrato</option>
+          <option value="">Todas as situações</option>
           <option value="INADIMPLENTE">Inadimplente</option>
           <option value="EM_NEGOCIACAO">Em negociação</option>
           <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
           <option value="INADIMPLENCIA_EQUIVOCADA">Inadimplência equivocada</option>
-          <option value="CANCELAMENTO_SOLICITADO">Cancelamento solicitado</option>
         </select>
         <div className="flex items-center gap-2">
           <ArrowUpDown size={14} className="text-slate-500 flex-shrink-0" />
