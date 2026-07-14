@@ -6,12 +6,13 @@ import { useSession } from "next-auth/react";
 import { formatarMoeda } from "@/lib/utils";
 import {
   ArrowLeft, Phone, Mail, FileText,
-  Calendar, Clock, CheckCircle2, AlertCircle, User, Pencil, Check, X, Trash2,
+  Calendar, Clock, CheckCircle2, AlertCircle, User, Pencil, Check, X, Trash2, AlertTriangle, Loader2,
 } from "lucide-react";
 
 interface Contrato {
   id: string;
   numero: string;
+  situacao: string;
   statusContrato: string | null;
   maiorDiasAtraso: number | null;
   valorTotalAberto: number | null;
@@ -95,6 +96,12 @@ export default function ClienteDetalhe() {
   const [recValor, setRecValor] = useState("");
   const [salvando, setSalvando] = useState(false);
 
+  // Modal Inadimplência equivocada
+  const [inadEquivContratoId, setInadEquivContratoId] = useState<string | null>(null);
+  const [inadEquivJustificativa, setInadEquivJustificativa] = useState("");
+  const [salvandoInadEquiv, setSalvandoInadEquiv] = useState(false);
+  const [erroInadEquiv, setErroInadEquiv] = useState("");
+
   useEffect(() => {
     fetch(`/api/clientes/${id}`)
       .then((r) => r.json())
@@ -105,6 +112,33 @@ export default function ClienteDetalhe() {
       })
       .catch(() => setErro("Erro de conexão"));
   }, [id]);
+
+  async function submeterInadEquivocada() {
+    if (!inadEquivContratoId) return;
+    if (!inadEquivJustificativa.trim()) { setErroInadEquiv("Informe o motivo da contestação"); return; }
+    setSalvandoInadEquiv(true);
+    setErroInadEquiv("");
+    const res = await fetch(`/api/contratos/${inadEquivContratoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ situacao: "INADIMPLENCIA_EQUIVOCADA", justificativa: inadEquivJustificativa.trim() }),
+    });
+    setSalvandoInadEquiv(false);
+    if (!res.ok) {
+      const d = await res.json();
+      setErroInadEquiv(d.erro || "Erro ao enviar solicitação");
+      return;
+    }
+    // Atualiza situação localmente
+    setCliente((prev) => prev ? {
+      ...prev,
+      contratos: prev.contratos.map((c) =>
+        c.id === inadEquivContratoId ? { ...c, situacao: "INADIMPLENCIA_EQUIVOCADA" } : c
+      ),
+    } : prev);
+    setInadEquivContratoId(null);
+    setInadEquivJustificativa("");
+  }
 
   async function salvarCliente() {
     if (!cliente) return;
@@ -481,10 +515,70 @@ export default function ClienteDetalhe() {
 
           {/* Parcelas */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
-            <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
-              <Calendar size={15} className="text-gr-400" />
-              Parcelas ({contrato.parcelas.length})
-            </h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <Calendar size={15} className="text-gr-400" />
+                Parcelas ({contrato.parcelas.length})
+              </h2>
+              {/* Botão Inad. equivocada — só para CONSULTOR, contrato não adimplente e ainda não equivocado */}
+              {perfil === "CONSULTOR"
+                && contrato.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE"
+                && contrato.situacao !== "INADIMPLENCIA_EQUIVOCADA" && (
+                <button
+                  onClick={() => { setInadEquivContratoId(contrato.id); setInadEquivJustificativa(""); setErroInadEquiv(""); }}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-orange-400 bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 transition-colors"
+                  title="Contestar inadimplência"
+                >
+                  <AlertTriangle size={11} />
+                  Inad. equivocada
+                </button>
+              )}
+              {/* Badge quando já está equivocada (aguardando aprovação) */}
+              {contrato.situacao === "INADIMPLENCIA_EQUIVOCADA" && (
+                <span className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium text-orange-400 bg-orange-500/10 border border-orange-500/20">
+                  <AlertTriangle size={11} /> Aguardando aprovação
+                </span>
+              )}
+            </div>
+
+            {/* Modal inline de inadimplência equivocada */}
+            {inadEquivContratoId === contrato.id && (
+              <div className="mb-4 bg-orange-500/5 border border-orange-500/20 rounded-xl p-4 space-y-3">
+                <div>
+                  <p className="text-xs font-medium text-orange-400 mb-1">Contestar inadimplência</p>
+                  <p className="text-xs text-slate-400">Explique ao gestor por que esta inadimplência é equivocada. Após aprovação, o contrato sairá da sua carteira e da inadimplência geral.</p>
+                </div>
+                <textarea
+                  rows={3}
+                  autoFocus
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 placeholder:text-slate-500 resize-none"
+                  placeholder="Ex: Cliente realizou o pagamento diretamente na construtora em 10/07/2026..."
+                  value={inadEquivJustificativa}
+                  onChange={(e) => setInadEquivJustificativa(e.target.value)}
+                />
+                {erroInadEquiv && (
+                  <p className="text-red-400 text-xs">{erroInadEquiv}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setInadEquivContratoId(null)}
+                    className="flex-1 py-2 rounded-lg bg-slate-800 text-slate-300 text-xs font-medium hover:bg-slate-700 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={submeterInadEquivocada}
+                    disabled={salvandoInadEquiv}
+                    className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    {salvandoInadEquiv
+                      ? <><Loader2 size={12} className="animate-spin" /> Enviando...</>
+                      : <><AlertTriangle size={12} /> Enviar solicitação</>
+                    }
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
               {contrato.parcelas.filter(p => !(p.paga && Number(p.valorTotalAberto) === 0)).map((p) => (
                 <div key={p.id}>
