@@ -33,6 +33,7 @@ interface Contrato {
   recebimentos: {
     id: string;
     valor: number;
+    valorAParte: number | null;
     dataRecebimento: string;
     formaPagamento: string;
     consultorId: string;
@@ -484,7 +485,7 @@ export default function ClienteDetalhe() {
               Parcelas ({contrato.parcelas.length})
             </h2>
             <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
-              {contrato.parcelas.map((p) => (
+              {contrato.parcelas.filter(p => !(p.paga && Number(p.valorTotalAberto) === 0)).map((p) => (
                 <div key={p.id}>
                   {editandoParcela === p.id ? (
                     <div className="py-2 border-b border-slate-800/50 space-y-2">
@@ -631,7 +632,16 @@ export default function ClienteDetalhe() {
                       ) : (
                         <div className="flex justify-between items-center py-1.5 border-b border-slate-800/50 last:border-0 group">
                           <div>
-                            <p className="text-white text-sm font-medium">{formatarMoeda(Number(r.valor))}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-white text-sm font-medium">
+                                {Number(r.valorAParte ?? 0) > 0
+                                  ? formatarMoeda(Number(r.valorAParte))
+                                  : formatarMoeda(Number(r.valor))}
+                              </p>
+                              {Number(r.valorAParte ?? 0) > 0 && (
+                                <span className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-medium">A Parte</span>
+                              )}
+                            </div>
                             <p className="text-slate-500 text-xs">
                               {r.formaPagamento.replace(/_/g, " ")} · {new Date(r.dataRecebimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                             </p>

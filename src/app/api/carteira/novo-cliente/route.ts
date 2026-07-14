@@ -93,28 +93,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Cria as parcelas marcadas como pagas (já recebidas)
-    const ultimaParcela = await prisma.parcela.findFirst({
-      where: { contratoId },
-      orderBy: { numero: "desc" },
-      select: { numero: true },
-    });
-    let proximoNumero = (ultimaParcela?.numero ?? 0) + 1;
-    for (const p of parcelasAParte) {
-      const valor = parseFloat(String(p.valor).replace(",", ".")) || 0;
-      await prisma.parcela.create({
-        data: {
-          id: randomUUID(),
-          contratoId,
-          numero: proximoNumero++,
-          dataVencimento: new Date(p.dataVencimento + "T00:00:00.000Z"),
-          diasAtraso: 0,
-          valorParcela: new Decimal(valor.toFixed(2)),
-          valorTotalAberto: new Decimal("0"),
-          paga: true,
-        },
-      });
-    }
+    // Detalhes das parcelas ficam na justificativa (não criam registros de parcela)
+    const detalhesParcelas = parcelasAParte
+      .map((p) => {
+        const d = new Date(p.dataVencimento + "T00:00:00.000Z");
+        const data = `${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;
+        const val = parseFloat(String(p.valor).replace(",", ".")) || 0;
+        return `${data} R$ ${val.toFixed(2).replace(".", ",")}`;
+      })
+      .join(", ");
 
     await prisma.recebimento.create({
       data: {
@@ -125,7 +112,7 @@ export async function POST(req: NextRequest) {
         valorAParte: new Decimal(valorTotal.toFixed(2)),
         dataRecebimento: new Date(dataRecebimento),
         formaPagamento: formaPagamento as FormaPagamento,
-        justificativa: "Lançamento manual a parte",
+        justificativa: `Lançamento a parte — parcelas: ${detalhesParcelas}`,
       },
     });
 
