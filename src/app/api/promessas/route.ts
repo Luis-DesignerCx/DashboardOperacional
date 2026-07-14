@@ -131,12 +131,29 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ erro: "ID obrigatório" }, { status: 400 });
 
-  const promessa = await prisma.promessa.findUnique({ where: { id }, select: { consultorId: true, status: true } });
+  const promessa = await prisma.promessa.findUnique({
+    where: { id },
+    select: { consultorId: true, status: true, contratoId: true },
+  });
   if (!promessa) return NextResponse.json({ erro: "Promessa não encontrada" }, { status: 404 });
   if (session.user.perfil === "CONSULTOR" && promessa.consultorId !== session.user.id) {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
   }
 
   await prisma.promessa.delete({ where: { id } });
+
+  // Se não restam promessas abertas para o contrato, volta a situação para INADIMPLENTE
+  if (promessa.contratoId) {
+    const restantes = await prisma.promessa.count({
+      where: { contratoId: promessa.contratoId, status: "ABERTA" },
+    });
+    if (restantes === 0) {
+      await prisma.contrato.update({
+        where: { id: promessa.contratoId },
+        data: { situacao: "INADIMPLENTE" },
+      });
+    }
+  }
+
   return NextResponse.json({ ok: true });
 }

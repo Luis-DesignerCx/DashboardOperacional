@@ -753,9 +753,16 @@ export default function CarteiraPage() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-white font-semibold text-sm">{c.cliente.nome}</p>
+                              {/* Adimplente substitui Recuperado — aparece só quando totalmente recuperado */}
                               {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
                                 <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
-                                  <CheckCircle2 size={9} /> Recuperado
+                                  <CheckCircle2 size={9} /> Adimplente
+                                </span>
+                              )}
+                              {/* Rec. Parcial */}
+                              {c.statusRecuperacao === "RECUPERACAO_PARCIAL" && (
+                                <span className="text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/20 px-1.5 py-0.5 rounded font-medium">
+                                  Rec. Parcial
                                 </span>
                               )}
                               {/* Badge de situação — somente leitura */}
@@ -802,7 +809,7 @@ export default function CarteiraPage() {
                               </span>
                               {totalRecebido > 0 && (
                                 <span className="text-xs font-medium tabular-nums text-emerald-400">
-                                  ↳ {formatarMoeda(totalRecebido)}
+                                  ↳ {formatarMoeda(totalRecebido)}{c.statusRecuperacao === "RECUPERACAO_PARCIAL" ? " parcial" : ""}
                                 </span>
                               )}
                               {totalAParte > 0 && (
@@ -813,11 +820,6 @@ export default function CarteiraPage() {
                                 >
                                   ↳ {formatarMoeda(totalAParte)} a parte
                                 </button>
-                              )}
-                              {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" && (
-                                <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-full mt-0.5">
-                                  <CheckCircle2 size={8} /> Adimplente
-                                </span>
                               )}
                             </div>
 
