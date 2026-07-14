@@ -78,21 +78,22 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
 
   useEffect(() => {
     if (!["CONSULTOR", "GESTOR"].includes(perfil)) return;
-    const fetchPromessas = () => {
-      fetch("/api/promessas?vencendoHoje=true")
-        .then((r) => r.json())
-        .then((data) => {
-          if (!Array.isArray(data)) return;
-          setTotalTarefasHoje(data.length);
-          // Se o usuário já está na página de tarefas, marca como visto imediatamente
-          if (typeof window !== "undefined" && window.location.pathname === "/pendencias") {
-            markSeen(data.length);
-          }
-        })
-        .catch(() => {});
+    const fetchTarefas = () => {
+      Promise.all([
+        fetch("/api/promessas?vencendoHoje=true").then((r) => r.json()).catch(() => []),
+        fetch("/api/contatos?agendadosHoje=true").then((r) => r.json()).catch(() => []),
+      ]).then(([promessas, agendados]) => {
+        const total = (Array.isArray(promessas) ? promessas.length : 0)
+                    + (Array.isArray(agendados)  ? agendados.length  : 0);
+        setTotalTarefasHoje(total);
+        // Se o usuário já está na página de tarefas, marca como visto imediatamente
+        if (typeof window !== "undefined" && window.location.pathname === "/pendencias") {
+          markSeen(total);
+        }
+      });
     };
-    fetchPromessas();
-    const interval = setInterval(fetchPromessas, 60_000);
+    fetchTarefas();
+    const interval = setInterval(fetchTarefas, 60_000);
     return () => clearInterval(interval);
   }, [perfil]);
 
