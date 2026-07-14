@@ -16,13 +16,14 @@ interface Contrato {
   maiorDiasAtraso: number | null;
   valorTotalAberto: number | null;
   statusContrato: string | null;
+  statusRecuperacao: string | null;
+  situacao: string;
   cliente: { id: string; nome: string; telefones: string | null; emails: string | null };
   empresa: { nome: string };
   contatos: { tipo: string; status: string; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string }[];
   recebimentos: { id: string; valor: number; valorAParte: number | null; dataRecebimento: string; formaPagamento: string }[];
   parcelas: { id: string; numero: number; diasAtraso: number; valorTotalAberto: number; dataVencimento: string }[];
-  statusRecuperacao: string | null;
 }
 
 interface ItemCarteira {
@@ -90,6 +91,22 @@ const STATUS_COM_AGENDA = ["LIGAR_DEPOIS", "AGUARDANDO_RETORNO"];
 // Status que exigem observação obrigatória
 const STATUS_OBS_OBRIG = ["OUTROS"];
 
+const SITUACAO_COR: Record<string, string> = {
+  INADIMPLENTE: "",
+  EM_NEGOCIACAO: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  PROMESSA_PAGAMENTO: "bg-purple-500/10 text-purple-400 border-purple-500/20",
+  INADIMPLENCIA_EQUIVOCADA: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  CANCELAMENTO_SOLICITADO: "bg-red-500/10 text-red-400 border-red-500/20",
+};
+
+const SITUACAO_LABEL: Record<string, string> = {
+  INADIMPLENTE: "Inadimplente",
+  EM_NEGOCIACAO: "Em negociação",
+  PROMESSA_PAGAMENTO: "Promessa de pgto.",
+  INADIMPLENCIA_EQUIVOCADA: "Inad. equivocada",
+  CANCELAMENTO_SOLICITADO: "Cancelamento",
+};
+
 function getFaixa(dias: number | null): { label: string; cor: string } {
   if (!dias || dias <= 0) return { label: "FLASH", cor: "text-sky-400" };
   if (dias <= 30) return { label: "CRA — 1 a 30 dias", cor: "text-sky-400" };
@@ -126,7 +143,9 @@ export default function CarteiraPage() {
   const [busca, setBusca] = useState("");
   const [sort, setSort] = useState("diasAtraso");
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
-  const [statusFiltro, setStatusFiltro] = useState<string | null>(null);
+  const [situacaoFiltro, setSituacaoFiltro] = useState<string | null>(null);
+  const [situacaoPopover, setSituacaoPopover] = useState<string | null>(null);
+  const [salvandoSituacao, setSalvandoSituacao] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [modal, setModal] = useState<"buscar" | "novo" | "recebimento" | "externo" | null>(null);
   // Modal atendimento (histórico + novo contato)
@@ -308,6 +327,25 @@ export default function CarteiraPage() {
     setExternoSucesso(true);
   }
 
+  async function atualizarSituacao(contratoId: string, situacao: string) {
+    setSalvandoSituacao(contratoId);
+    await fetch(`/api/contratos/${contratoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ situacao }),
+    });
+    setSalvandoSituacao(null);
+    setSituacaoPopover(null);
+    // Atualiza local sem reload completo
+    setCarteira((prev) =>
+      prev.map((item) =>
+        item.contrato.id === contratoId
+          ? { ...item, contrato: { ...item.contrato, situacao } }
+          : item
+      )
+    );
+  }
+
   function abrirExterno() {
     setModal("externo");
     setExternoQuery("");
@@ -398,23 +436,11 @@ export default function CarteiraPage() {
     if (!modalAtend) return;
     setErroAtend("");
 
-    // Validação REGULARIZADO: só permite se não há parcelas em atraso
-    if (atendForm.status === "REGULARIZADO") {
-      const parcelasEmAtraso = modalAtend.parcelas.filter((p) => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0);
-      if (parcelasEmAtraso.length > 0) {
-        setErroAtend(`Não é possível marcar como Regularizado — há ${parcelasEmAtraso.length} parcela(s) em atraso em aberto`);
-        return;
-      }
-    }
-
     if (atendForm.status === "OUTROS" && !atendForm.observacao.trim()) {
       setErroAtend("Observação obrigatória para status 'Outros'"); return;
     }
     if (STATUS_COM_AGENDA.includes(atendForm.status) && !atendForm.agendadoPara) {
       setErroAtend("Informe a data/hora para agendamento"); return;
-    }
-    if (atendForm.status === "INADIMPLENCIA_EQUIVOCADA" && !atendForm.observacao.trim()) {
-      setErroAtend("Descreva o motivo da inadimplência equivocada"); return;
     }
     setSalvandoAtend(true);
     const res = await fetch("/api/contatos", {
@@ -429,20 +455,6 @@ export default function CarteiraPage() {
       }),
     });
     const data = await res.json();
-
-    // Para inadimplência equivocada: cria solicitação automática para o gestor
-    if (res.ok && atendForm.status === "INADIMPLENCIA_EQUIVOCADA") {
-      await fetch("/api/solicitacoes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo: "INADIMPLENCIA_EQUIVOCADA",
-          contratoId: modalAtend.id,
-          motivo: atendForm.observacao || `Inadimplência equivocada identificada no contrato ${modalAtend.numero}`,
-        }),
-      });
-    }
-
     setSalvandoAtend(false);
     if (!res.ok) { setErroAtend(data.erro || "Erro ao registrar"); return; }
     setModalAtend(null);
@@ -570,16 +582,12 @@ export default function CarteiraPage() {
   }
 
   const empresas = Array.from(new Set(carteira.map((i) => i.contrato.empresa.nome))).sort();
-  const statusPresentes = Array.from(
-    new Set(carteira.map((i) => i.contrato.contatos[0]?.status).filter(Boolean) as string[])
-  ).sort((a, b) => (STATUS_LABEL[a] ?? a).localeCompare(STATUS_LABEL[b] ?? b));
 
   // Filtros client-side (sort/busca são server-side)
   const filtrados = carteira.filter((item) => {
     const empresaOk = !empresaFiltro || item.contrato.empresa.nome === empresaFiltro;
-    const ultimoStatus = item.contrato.contatos[0]?.status;
-    const statusOk = !statusFiltro || ultimoStatus === statusFiltro;
-    return empresaOk && statusOk;
+    const situacaoOk = !situacaoFiltro || item.contrato.situacao === situacaoFiltro;
+    return empresaOk && situacaoOk;
   });
 
   // Agrupar por faixa de inadimplência
@@ -641,14 +649,16 @@ export default function CarteiraPage() {
           />
         </div>
         <select
-          value={statusFiltro ?? ""}
-          onChange={(e) => setStatusFiltro(e.target.value || null)}
+          value={situacaoFiltro ?? ""}
+          onChange={(e) => setSituacaoFiltro(e.target.value || null)}
           className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
         >
-          <option value="">Status do atendimento</option>
-          {statusPresentes.map((s) => (
-            <option key={s} value={s}>{STATUS_LABEL[s] ?? s}</option>
-          ))}
+          <option value="">Situação do contrato</option>
+          <option value="INADIMPLENTE">Inadimplente</option>
+          <option value="EM_NEGOCIACAO">Em negociação</option>
+          <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
+          <option value="INADIMPLENCIA_EQUIVOCADA">Inadimplência equivocada</option>
+          <option value="CANCELAMENTO_SOLICITADO">Cancelamento solicitado</option>
         </select>
         <div className="flex items-center gap-2">
           <ArrowUpDown size={14} className="text-slate-500 flex-shrink-0" />
@@ -736,11 +746,6 @@ export default function CarteiraPage() {
                                   <CheckCircle2 size={9} /> Recuperado
                                 </span>
                               )}
-                              {c.statusRecuperacao === "RECUPERACAO_PARCIAL" && (
-                                <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium">
-                                  Rec. parcial · {formatarMoeda(totalRecebido)}
-                                </span>
-                              )}
                               {totalAParte > 0 && (
                                 <button
                                   onClick={() => setModalAParte(c)}
@@ -749,8 +754,31 @@ export default function CarteiraPage() {
                                   A Parte · {formatarMoeda(totalAParte)}
                                 </button>
                               )}
-                              {temPromessa && c.statusRecuperacao === "INADIMPLENTE" && (
-                                <span className="text-[10px] bg-purple-500/10 text-purple-400 px-1.5 py-0.5 rounded font-medium">promessa aberta</span>
+                              {/* Badge de situação — clicável para atualizar */}
+                              {c.situacao !== "INADIMPLENTE" && SITUACAO_COR[c.situacao] && (
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
+                                    className={`text-[10px] border px-1.5 py-0.5 rounded font-medium transition-colors hover:opacity-80 ${SITUACAO_COR[c.situacao]}`}
+                                  >
+                                    {SITUACAO_LABEL[c.situacao] ?? c.situacao}
+                                  </button>
+                                  {situacaoPopover === c.id && (
+                                    <div className="absolute left-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
+                                      {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
+                                        <button
+                                          key={val}
+                                          onClick={() => atualizarSituacao(c.id, val)}
+                                          disabled={salvandoSituacao === c.id}
+                                          className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
+                                        >
+                                          {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
+                                          {label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
                               )}
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
@@ -759,14 +787,6 @@ export default function CarteiraPage() {
                               <span className="text-xs text-slate-500 flex items-center gap-1">
                                 <Building2 size={11} /> {c.empresa.nome}
                               </span>
-                              {ultimoContato && (
-                                <>
-                                  <span className="text-xs text-slate-400">·</span>
-                                  <span className={`text-xs font-medium ${STATUS_COR[ultimoContato.status] ?? "text-slate-400"}`}>
-                                    {STATUS_LABEL[ultimoContato.status] ?? ultimoContato.status}
-                                  </span>
-                                </>
-                              )}
                             </div>
                             {(c.cliente.telefones || c.cliente.emails) && (
                               <div className="flex items-center gap-3 mt-0.5 flex-wrap">
@@ -800,7 +820,34 @@ export default function CarteiraPage() {
                                 </>
                               )}
                             </div>
-                            <div className="flex gap-1">
+                            <div className="flex gap-1 items-center">
+                              {/* Situação (visível quando INADIMPLENTE — padrão sem badge) */}
+                              {c.situacao === "INADIMPLENTE" && (
+                                <div className="relative">
+                                  <button
+                                    onClick={() => setSituacaoPopover(situacaoPopover === c.id ? null : c.id)}
+                                    title="Atualizar situação"
+                                    className="p-1.5 rounded-lg text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                                  >
+                                    <ArrowLeftRight size={13} />
+                                  </button>
+                                  {situacaoPopover === c.id && (
+                                    <div className="absolute right-0 top-full mt-1 z-20 bg-slate-800 border border-slate-700 rounded-xl shadow-xl py-1 min-w-[180px]">
+                                      {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
+                                        <button
+                                          key={val}
+                                          onClick={() => atualizarSituacao(c.id, val)}
+                                          disabled={salvandoSituacao === c.id}
+                                          className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
+                                        >
+                                          {c.situacao === val && <CheckCircle2 size={10} className="text-gr-400 flex-shrink-0" />}
+                                          {label}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               <button
                                 onClick={() => abrirAtendimento(c)}
                                 title="Registrar atendimento"
@@ -1342,19 +1389,15 @@ export default function CarteiraPage() {
                       <label className="block text-xs text-slate-400 mb-1.5">Status *</label>
                       <select className={inputCls} value={atendForm.status} onChange={(e) => setAtendForm((f) => ({ ...f, status: e.target.value }))}>
                         <option value="ACIONADO">Acionado</option>
-                        <option value="VISUALIZOU_SEM_RESPOSTA">Visualizou, não respondeu</option>
                         <option value="NAO_ATENDE">Não atende</option>
+                        <option value="SEM_RESPOSTA">Sem resposta</option>
+                        <option value="VISUALIZOU_SEM_RESPOSTA">Visualizou, não respondeu</option>
+                        <option value="NAO_RESPONDE_MENSAGENS">Não responde mensagens</option>
                         <option value="CONTATO_INEXISTENTE">Contato inexistente</option>
-                        <option value="EM_NEGOCIACAO">Em negociação</option>
+                        <option value="NAO_QUER_CONTATO">Não quer contato</option>
                         <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
                         <option value="LIGAR_DEPOIS">Ligar depois</option>
-                        <option value="LINK_ENVIADO">Link enviado – aguardando pagamento</option>
-                        <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
-                        <option value="RECEBIDO_PARCIAL">Recebido parcial</option>
-                        <option value="REGULARIZADO">Regularizado</option>
-                        <option value="SOLICITOU_CANCELAMENTO">Solicitou cancelamento / Jurídico</option>
-                        <option value="NAO_QUER_CONTATO">Não quer mais contato</option>
-                        <option value="INADIMPLENCIA_EQUIVOCADA">Inadimplência equivocada</option>
+                        <option value="LINK_ENVIADO">Link enviado</option>
                         <option value="OUTROS">Outros</option>
                       </select>
                     </div>
@@ -1367,59 +1410,9 @@ export default function CarteiraPage() {
                     </div>
                   )}
 
-                  {/* Recebido parcial: mostra parcelas em aberto */}
-                  {atendForm.status === "RECEBIDO_PARCIAL" && modalAtend.parcelas.length > 0 && (
-                    <div className="bg-lime-500/5 border border-lime-500/20 rounded-xl p-3">
-                      <p className="text-lime-400 text-xs font-medium mb-2">Parcelas ainda em aberto</p>
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {modalAtend.parcelas.filter(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0).map((p) => (
-                          <div key={p.id} className="flex justify-between text-xs bg-slate-800/60 rounded-lg px-2.5 py-1.5">
-                            <span className="text-slate-400">Parcela {p.numero} · <span className="text-amber-400">{p.diasAtraso}d atraso</span></span>
-                            <span className="text-slate-200 font-medium tabular-nums">{formatarMoeda(Number(p.valorTotalAberto))}</span>
-                          </div>
-                        ))}
-                        {modalAtend.parcelas.filter(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0).length === 0 && (
-                          <p className="text-slate-500 text-xs">Nenhuma parcela em atraso encontrada.</p>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Inadimplência equivocada: aviso de solicitação automática */}
-                  {atendForm.status === "INADIMPLENCIA_EQUIVOCADA" && (
-                    <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl p-3">
-                      <p className="text-orange-400 text-xs font-medium">Uma solicitação será enviada ao gestor para análise e aprovação.</p>
-                      <p className="text-slate-500 text-xs mt-0.5">Descreva o motivo na observação abaixo.</p>
-                    </div>
-                  )}
-
-                  {/* Promessa de pagamento: aviso de redirecionamento */}
-                  {atendForm.status === "PROMESSA_PAGAMENTO" && (
-                    <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
-                      <p className="text-purple-300 text-xs font-medium">Você será direcionado para o cadastro de promessa.</p>
-                      <p className="text-slate-500 text-xs mt-0.5">O contato será registrado automaticamente ao salvar a promessa.</p>
-                    </div>
-                  )}
-
-                  {/* Link enviado: aviso de redirecionamento */}
-                  {atendForm.status === "LINK_ENVIADO" && (
-                    <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3">
-                      <p className="text-sky-300 text-xs font-medium">Informe o valor e as parcelas cobertas pelo link enviado.</p>
-                      <p className="text-slate-500 text-xs mt-0.5">O contato será registrado automaticamente para hoje.</p>
-                    </div>
-                  )}
-
-                  {/* Regularizado: aviso se há parcelas em atraso */}
-                  {atendForm.status === "REGULARIZADO" && modalAtend.parcelas.some(p => p.diasAtraso > 0 && Number(p.valorTotalAberto) > 0) && (
-                    <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-3">
-                      <p className="text-red-400 text-xs font-medium">Atenção: há parcelas em aberto com atraso.</p>
-                      <p className="text-slate-500 text-xs mt-0.5">Confirme se todas as parcelas foram realmente quitadas antes de marcar como regularizado.</p>
-                    </div>
-                  )}
-
                   <div>
                     <label className="block text-xs text-slate-400 mb-1.5">
-                      Observação {(STATUS_OBS_OBRIG.includes(atendForm.status) || atendForm.status === "INADIMPLENCIA_EQUIVOCADA") ? "*" : ""}
+                      Observação {STATUS_OBS_OBRIG.includes(atendForm.status) ? "*" : ""}
                     </label>
                     <textarea rows={2} className={inputCls + " resize-none"} placeholder="Descreva o atendimento..."
                       value={atendForm.observacao} onChange={(e) => setAtendForm((f) => ({ ...f, observacao: e.target.value }))} />
@@ -1437,19 +1430,10 @@ export default function CarteiraPage() {
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
-              {(atendForm.status === "PROMESSA_PAGAMENTO" || atendForm.status === "LINK_ENVIADO") ? (
-                <button
-                  onClick={() => { const c = modalAtend; const modo = atendForm.status === "LINK_ENVIADO" ? "LINK" : "PROMESSA"; setModalAtend(null); abrirPromessaRapida(c!, modo); }}
-                  className="flex-1 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  <Calendar size={14} /> {atendForm.status === "LINK_ENVIADO" ? "Informar link enviado" : "Registrar promessa"}
-                </button>
-              ) : (
-                <button onClick={salvarAtendimento} disabled={salvandoAtend}
-                  className="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
-                  {salvandoAtend ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Phone size={14} /> Registrar contato</>}
-                </button>
-              )}
+              <button onClick={salvarAtendimento} disabled={salvandoAtend}
+                className="flex-1 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-600/30 text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2">
+                {salvandoAtend ? <><Loader2 size={14} className="animate-spin" /> Registrando...</> : <><Phone size={14} /> Registrar contato</>}
+              </button>
             </div>
           </div>
         </div>

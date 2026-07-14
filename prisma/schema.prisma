@@ -91,6 +91,14 @@ enum StatusRecuperacao {
   RECUPERADO_INTEGRALMENTE
 }
 
+enum SituacaoContrato {
+  INADIMPLENTE
+  EM_NEGOCIACAO
+  PROMESSA_PAGAMENTO
+  INADIMPLENCIA_EQUIVOCADA
+  CANCELAMENTO_SOLICITADO
+}
+
 // ─── EMPRESA ──────────────────────────────────────────────────────────────────
 
 model Empresa {
@@ -248,6 +256,7 @@ model Contrato {
   valorTotalAberto      Decimal?          @db.Decimal(15, 2) // soma das parcelas
   valorContrato         Decimal?          @db.Decimal(15, 2) // col 19
   statusRecuperacao         StatusRecuperacao @default(INADIMPLENTE)
+  situacao                  SituacaoContrato  @default(INADIMPLENTE)
   ativo                     Boolean           @default(true)
   inadimplenciaEquivocada   Boolean           @default(false)
   criadoEm                  DateTime          @default(now())
