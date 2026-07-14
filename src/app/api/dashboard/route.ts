@@ -55,7 +55,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     promessasVencidasAgg,
     promessasAbertasAgg,
     agendadosHoje,
-    meta,
+    metasResult,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
@@ -107,17 +107,33 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         agendadoPara: { gte: inicioHoje, lte: fimHoje },
       },
     }),
-    prisma.meta.findFirst({
-      where: { equipe: { usuarios: { some: { id: consultorId } } }, competenciaId },
-      select: { valorAlvo: true },
+    prisma.meta.findMany({
+      where: {
+        equipe: { usuarios: { some: { id: consultorId } } },
+        competenciaId,
+        OR: [{ consultorId: null }, { consultorId }],
+      },
+      select: { valorAlvo: true, percentualAlvo: true, consultorId: true },
     }),
   ]);
+
+  // Prefere meta específica do consultor; se não houver, usa meta da equipe (consultorId null)
+  const metaEspecifica = metasResult.find((m) => m.consultorId === consultorId) ?? null;
+  const metaGlobal = metasResult.find((m) => m.consultorId === null) ?? null;
+  const meta = metaEspecifica ?? metaGlobal;
 
   const valorCarteira = carteira.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;
   const promessasAbertas = promessasAbertasAgg._count;
   const valorRecebido = Number(recebimentoAgg._sum.valor ?? 0);
   const valorAParte = recebimentosAParte.reduce((s: number, r: any) => s + Number(r.valorAParte ?? 0), 0);
+
+  // Se a meta usa percentualAlvo, calcula o alvo sobre a carteira individual do consultor
+  const metaAlvo = meta
+    ? meta.percentualAlvo && valorCarteira > 0
+      ? (Number(meta.percentualAlvo) / 100) * valorCarteira
+      : meta.valorAlvo ? Number(meta.valorAlvo) : null
+    : null;
 
   return {
     valorCarteira,
@@ -131,8 +147,8 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     promessasVencidas: promessasVencidasAgg._count,
     valorPromessasVencidas: Number(promessasVencidasAgg._sum.valorPrometido ?? 0),
     agendadosHoje,
-    percentualMeta: (meta && meta.valorAlvo && Number(meta.valorAlvo) > 0) ? Math.round((valorRecebido / Number(meta.valorAlvo)) * 10000) / 100 : 0,
-    metaAlvo: (meta && meta.valorAlvo) ? Number(meta.valorAlvo) : null,
+    percentualMeta: (metaAlvo && metaAlvo > 0) ? Math.round((valorRecebido / metaAlvo) * 10000) / 100 : 0,
+    metaAlvo,
   };
 }
 
