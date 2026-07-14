@@ -749,7 +749,7 @@ export default function CarteiraPage() {
                           </div>
                           <div className="flex items-center gap-4 flex-shrink-0">
                             <div className="text-right">
-                              {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" ? (
+                              {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" || saldoAberto === 0 ? (
                                 <span className="text-xs font-medium text-emerald-400">Quitado</span>
                               ) : (
                                 <>
