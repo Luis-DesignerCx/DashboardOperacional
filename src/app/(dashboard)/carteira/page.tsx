@@ -86,8 +86,8 @@ const STATUS_LABEL: Record<string, string> = {
   OUTROS: "Outros",
 };
 
-// Status que exigem campo de agendamento
-const STATUS_COM_AGENDA = ["LIGAR_DEPOIS", "AGUARDANDO_RETORNO"];
+// Status que exigem campo de agendamento (follow-up date)
+const STATUS_COM_AGENDA = ["LIGAR_DEPOIS", "AGUARDANDO_RETORNO", "LINK_ENVIADO"];
 // Status que exigem observação obrigatória
 const STATUS_OBS_OBRIG = ["OUTROS"];
 
@@ -333,6 +333,16 @@ export default function CarteiraPage() {
     setExternoSucesso(true);
   }
 
+  // Intercepta seleção no popover: promessa → abre modal de promessa rápida
+  function handleSituacao(c: Contrato, val: string) {
+    setSituacaoPopover(null);
+    if (val === "PROMESSA_PAGAMENTO") {
+      abrirPromessaRapida(c, "PROMESSA");
+    } else {
+      atualizarSituacao(c.id, val);
+    }
+  }
+
   async function atualizarSituacao(contratoId: string, situacao: string) {
     setSalvandoSituacao(contratoId);
     await fetch(`/api/contratos/${contratoId}`, {
@@ -507,6 +517,19 @@ export default function CarteiraPage() {
     const data = await res.json();
     setSalvandoPromRap(false);
     if (!res.ok) { setErroPromRap(data.erro || "Erro ao registrar"); return; }
+    // Atualiza situação do contrato para refletir o modo no card sem reload
+    if (promRapModo === "PROMESSA") {
+      await fetch(`/api/contratos/${modalPromRap.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ situacao: "PROMESSA_PAGAMENTO" }),
+      });
+      setCarteira((prev) => prev.map((item) =>
+        item.contrato.id === modalPromRap.id
+          ? { ...item, contrato: { ...item.contrato, situacao: "PROMESSA_PAGAMENTO" } }
+          : item
+      ));
+    }
     setModalPromRap(null);
     carregarPagina(competenciaId, 1, false, busca, sort);
   }
@@ -772,7 +795,7 @@ export default function CarteiraPage() {
                                       {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
                                         <button
                                           key={val}
-                                          onClick={() => atualizarSituacao(c.id, val)}
+                                          onClick={() => handleSituacao(c, val)}
                                           disabled={salvandoSituacao === c.id}
                                           className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
                                         >
@@ -797,7 +820,7 @@ export default function CarteiraPage() {
                                       {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
                                         <button
                                           key={val}
-                                          onClick={() => atualizarSituacao(c.id, val)}
+                                          onClick={() => handleSituacao(c, val)}
                                           disabled={salvandoSituacao === c.id}
                                           className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
                                         >
@@ -862,7 +885,7 @@ export default function CarteiraPage() {
                                       {Object.entries(SITUACAO_LABEL).map(([val, label]) => (
                                         <button
                                           key={val}
-                                          onClick={() => atualizarSituacao(c.id, val)}
+                                          onClick={() => handleSituacao(c, val)}
                                           disabled={salvandoSituacao === c.id}
                                           className={`w-full text-left px-3 py-2 text-xs hover:bg-slate-700 transition-colors flex items-center gap-2 ${c.situacao === val ? "text-white font-medium" : "text-slate-400"}`}
                                         >
@@ -1430,7 +1453,9 @@ export default function CarteiraPage() {
                   </div>
                   {STATUS_COM_AGENDA.includes(atendForm.status) && (
                     <div>
-                      <label className="block text-xs text-slate-400 mb-1.5">Data/hora para {atendForm.status === "LIGAR_DEPOIS" ? "ligar" : "retorno"} *</label>
+                      <label className="block text-xs text-slate-400 mb-1.5">
+                        {atendForm.status === "LIGAR_DEPOIS" ? "Data/hora para ligar" : atendForm.status === "LINK_ENVIADO" ? "Data/hora para verificar pagamento" : "Data/hora para retorno"} *
+                      </label>
                       <input type="datetime-local" className={inputCls} value={atendForm.agendadoPara}
                         onChange={(e) => setAtendForm((f) => ({ ...f, agendadoPara: e.target.value }))} />
                     </div>
