@@ -657,7 +657,7 @@ export default function CarteiraPage() {
           <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
         </select>
         <div className="flex items-center gap-2">
-          <ArrowUpDown size={14} className="text-slate-500 flex-shrink-0" />
+          <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Ordenar por</span>
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
