@@ -113,14 +113,15 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         competenciaId,
         OR: [{ consultorId: null }, { consultorId }],
       },
-      select: { valorAlvo: true, percentualAlvo: true, consultorId: true },
+      select: { valorAlvo: true, percentualAlvo: true, consultorId: true, tipo: true },
     }),
   ]);
 
-  // Prefere meta específica do consultor; se não houver, usa meta da equipe (consultorId null)
-  const metaEspecifica = metasResult.find((m) => m.consultorId === consultorId) ?? null;
-  const metaGlobal = metasResult.find((m) => m.consultorId === null) ?? null;
-  const meta = metaEspecifica ?? metaGlobal;
+  // Para a barra de progresso usa a meta FINANCEIRA:
+  // individual tem prioridade sobre a da equipe no mesmo tipo
+  const metaFinancEsp = metasResult.find((m) => m.consultorId === consultorId && m.tipo === "FINANCEIRA") ?? null;
+  const metaFinancGlobal = metasResult.find((m) => m.consultorId === null && m.tipo === "FINANCEIRA") ?? null;
+  const meta = metaFinancEsp ?? metaFinancGlobal;
 
   const valorCarteira = carteira.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;

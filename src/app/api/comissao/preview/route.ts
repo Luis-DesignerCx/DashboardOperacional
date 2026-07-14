@@ -82,11 +82,15 @@ export async function GET(req: NextRequest) {
         0
       );
 
-      // Meta individual substitui a meta da equipe (ex: consultor de férias)
-      const especificas = metas.filter((m) => m.consultorId === consultor.id);
-      const metasConsultor = especificas.length > 0
-        ? especificas
-        : metas.filter((m) => m.consultorId === null);
+      // Por tipo: meta individual substitui a da equipe apenas no mesmo tipo
+      const tiposComEspecifica = new Set(
+        metas.filter((m) => m.consultorId === consultor.id).map((m) => m.tipo)
+      );
+      const metasConsultor = metas.filter(
+        (m) =>
+          m.consultorId === consultor.id ||
+          (m.consultorId === null && !tiposComEspecifica.has(m.tipo))
+      );
 
       const metasComNota = metasConsultor.map((m) => {
         // Se a meta usa percentual, recalcula o alvo sobre a carteira individual
