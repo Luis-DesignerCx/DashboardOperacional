@@ -135,6 +135,7 @@ model Usuario {
   carteiras         CarteiraParcela[]
   frentesAdicionais EquipeConsultor[] @relation("FrentesAdicionais")
   metas             Meta[]            @relation("MetasConsultor")
+  ferias            FeriasConsultor[]
 
   @@index([equipeId])
   @@index([perfil])
@@ -191,6 +192,7 @@ model Competencia {
   metas       Meta[]
   importacoes Importacao[]
   carteiras   CarteiraParcela[]
+  ferias      FeriasConsultor[]
 
   @@unique([mes, ano])
   @@map("competencias")
@@ -468,6 +470,24 @@ model Auditoria {
   usuario       Usuario  @relation(fields: [usuarioId], references: [id])
 
   @@map("auditoria")
+}
+
+// ─── FÉRIAS ───────────────────────────────────────────────────────────────────
+
+model FeriasConsultor {
+  id            String      @id @default(cuid())
+  consultorId   String
+  competenciaId String
+  dataInicio    DateTime
+  dataFim       DateTime
+  criadoEm      DateTime    @default(now())
+
+  consultor     Usuario     @relation(fields: [consultorId], references: [id])
+  competencia   Competencia @relation(fields: [competenciaId], references: [id])
+
+  @@unique([consultorId, competenciaId])
+  @@index([competenciaId])
+  @@map("ferias_consultores")
 }
 
 // ─── CONFIGURAÇÃO ─────────────────────────────────────────────────────────────

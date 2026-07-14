@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 import { identificarEmpresa } from "@/constants/empresas";
 import { obterEquipePorDiasAtraso } from "@/constants/equipes";
 import { distribuirCarteira } from "@/utils/distribuicao-carteira";
+import { fatorFerias } from "@/utils/dias-uteis";
 import { Decimal } from "@prisma/client/runtime/library";
 import { Prisma } from "@prisma/client";
 
@@ -307,9 +308,9 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ── 9. Detecta tipo e distribui apenas contratos SEM carteira ───────────
-    const carteirasExistentes = await prisma.carteiraParcela.count({ where: { competenciaId } });
-    const isFlash = carteirasExistentes > 0;
+    // ── 9. Determina tipo e distribui apenas contratos SEM carteira ─────────
+    const tipoBase = formData.get("tipoBase") as string | null;
+    const isFlash = tipoBase === "FLASH";
 
     const todosContratoIds = [
       ...newContratos.map((c) => c.id),
@@ -323,6 +324,15 @@ export async function POST(req: NextRequest) {
     });
     const jaDistribuidosSet = new Set(jaDistribuidos.map((c) => c.contratoId));
     const semCarteira = todosContratoIds.filter((id) => !jaDistribuidosSet.has(id));
+
+    // Carrega férias desta competência para ajustar distribuição proporcional
+    const feriasCompetencia = await prisma.feriasConsultor.findMany({
+      where: { competenciaId },
+    });
+    const fatoresFerias = new Map<string, number>();
+    for (const f of feriasCompetencia) {
+      fatoresFerias.set(f.consultorId, fatorFerias(competencia.mes, competencia.ano, f.dataInicio, f.dataFim));
+    }
 
     if (semCarteira.length > 0) {
       // Monta mapas contratoId → nome do consultor e → faixa lidos da planilha
@@ -363,7 +373,8 @@ export async function POST(req: NextRequest) {
         semCarteira,
         isFlash,
         nomeConsultorPorContrato,
-        faixaPorContrato
+        faixaPorContrato,
+        fatoresFerias
       );
     }
 
@@ -400,7 +411,8 @@ async function distribuirCarteiraAutomatica(
   paraDistribuir: string[],
   isFlash = false,
   nomeConsultorPorContrato: Map<string, string> = new Map(),
-  faixaPorContrato: Map<string, string> = new Map()
+  faixaPorContrato: Map<string, string> = new Map(),
+  fatoresFerias: Map<string, number> = new Map()
 ) {
   if (!paraDistribuir.length) return;
 
@@ -472,7 +484,8 @@ async function distribuirCarteiraAutomatica(
           clienteId:        c.clienteId,
           valorTotalAberto: Number(c.valorTotalAberto ?? 0),
         })),
-        equipe.usuarios.map((u) => u.id)
+        equipe.usuarios.map((u) => u.id),
+        fatoresFerias
       );
 
       for (const at of atribuicoes) {

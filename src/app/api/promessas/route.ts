@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       status: isLink ? "LINK_ENVIADO" : "PROMESSA_PAGAMENTO",
       observacao: isLink
         ? `Link enviado: R$ ${valorPrometido} — parcelas: ${Array.isArray(parcelasIds) && parcelasIds.length > 0 ? parcelasIds.length : "não especificadas"}`
-        : `Promessa: R$ ${valorPrometido} para ${new Date(dataPrometida).toLocaleDateString("pt-BR")}`,
+        : `Promessa: R$ ${valorPrometido} para ${new Date(dataPrometida).toLocaleDateString("pt-BR", { timeZone: "UTC" })}`,
     },
   });
 

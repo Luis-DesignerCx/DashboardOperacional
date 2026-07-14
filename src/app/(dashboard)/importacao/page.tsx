@@ -1,12 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff } from "lucide-react";
 
 interface Competencia {
   id: string;
   descricao: string;
+  mes: number;
+  ano: number;
   fechada: boolean;
+}
+
+interface Consultor {
+  id: string;
+  nome: string;
+}
+
+interface FeriasEntry {
+  id: string;
+  consultorId: string;
+  dataInicio: string;
+  dataFim: string;
+  consultor: { id: string; nome: string };
 }
 
 const MESES = [
@@ -30,6 +45,14 @@ export default function ImportacaoPage() {
   const [criandoComp, setCriandoComp] = useState(false);
   const [erroComp, setErroComp] = useState("");
 
+  // Férias
+  const [ferias, setFerias] = useState<FeriasEntry[]>([]);
+  const [consultores, setConsultores] = useState<Consultor[]>([]);
+  const [novaFeriasConsultorId, setNovaFeriasConsultorId] = useState("");
+  const [novaFeriasInicio, setNovaFeriasInicio] = useState("");
+  const [novaFeriasFim, setNovaFeriasFim] = useState("");
+  const [salvandoFerias, setSalvandoFerias] = useState(false);
+
   async function recarregarCompetencias() {
     const data = await fetch("/api/competencias").then((r) => r.json());
     setCompetencias(data);
@@ -37,6 +60,25 @@ export default function ImportacaoPage() {
   }
 
   useEffect(() => { recarregarCompetencias(); }, []);
+
+  useEffect(() => {
+    if (!competenciaId) { setFerias([]); return; }
+    fetch(`/api/ferias?competenciaId=${competenciaId}`)
+      .then((r) => r.json())
+      .then(setFerias);
+  }, [competenciaId]);
+
+  useEffect(() => {
+    fetch("/api/usuarios")
+      .then((r) => r.json())
+      .then((data: any[]) =>
+        setConsultores(
+          data
+            .filter((u) => u.perfil === "CONSULTOR" && u.ativo)
+            .map((u) => ({ id: u.id, nome: u.nome }))
+        )
+      );
+  }, []);
 
   async function criarCompetencia() {
     setCriandoComp(true);
@@ -53,22 +95,42 @@ export default function ImportacaoPage() {
       return;
     }
     const nova: Competencia = await res.json();
-    const lista = await recarregarCompetencias();
+    await recarregarCompetencias();
     setCompetenciaId(nova.id);
     setShowNovaComp(false);
     setErroComp("");
   }
 
-  // Detecta tipo assim que seleciona a competência
-  useEffect(() => {
-    if (!competenciaId) { setTipoImport(null); return; }
-    fetch(`/api/historico`)
-      .then((r) => r.json())
-      .then((lista: any[]) => {
-        const comp = lista.find((c: any) => c.id === competenciaId);
-        setTipoImport(comp && comp.totalContratos > 0 ? "FLASH" : "BASE");
+  async function adicionarFerias() {
+    if (!novaFeriasConsultorId || !novaFeriasInicio || !novaFeriasFim || !competenciaId) return;
+    setSalvandoFerias(true);
+    const res = await fetch("/api/ferias", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        consultorId: novaFeriasConsultorId,
+        competenciaId,
+        dataInicio: novaFeriasInicio,
+        dataFim: novaFeriasFim,
+      }),
+    });
+    setSalvandoFerias(false);
+    if (res.ok) {
+      const nova = await res.json();
+      setFerias((prev) => {
+        const filtrado = prev.filter((f) => f.consultorId !== nova.consultorId);
+        return [...filtrado, nova].sort((a, b) => a.consultor.nome.localeCompare(b.consultor.nome));
       });
-  }, [competenciaId]);
+      setNovaFeriasConsultorId("");
+      setNovaFeriasInicio("");
+      setNovaFeriasFim("");
+    }
+  }
+
+  async function removerFerias(id: string) {
+    await fetch(`/api/ferias?id=${id}`, { method: "DELETE" });
+    setFerias((prev) => prev.filter((f) => f.id !== id));
+  }
 
   async function handleImportar() {
     if (!arquivo || !competenciaId) return;
@@ -79,6 +141,7 @@ export default function ImportacaoPage() {
     const form = new FormData();
     form.append("arquivo", arquivo);
     form.append("competenciaId", competenciaId);
+    form.append("tipoBase", tipoImport!);
 
     const res = await fetch("/api/importacao", { method: "POST", body: form });
     const data = await res.json();
@@ -90,6 +153,10 @@ export default function ImportacaoPage() {
       setResultado({ processadas: data.processadas, erros: data.erros, tipoDetectado: data.tipoDetectado });
     }
   }
+
+  const consultoresDisponiveis = consultores.filter(
+    (c) => !ferias.some((f) => f.consultorId === c.id)
+  );
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -114,7 +181,6 @@ export default function ImportacaoPage() {
             </button>
           </div>
 
-          {/* Formulário inline de nova competência */}
           {showNovaComp && (
             <div className="mb-3 p-3 bg-slate-800 border border-slate-700 rounded-xl space-y-3">
               <div className="flex items-center gap-2">
@@ -154,7 +220,7 @@ export default function ImportacaoPage() {
 
           <select
             value={competenciaId}
-            onChange={(e) => setCompetenciaId(e.target.value)}
+            onChange={(e) => { setCompetenciaId(e.target.value); setTipoImport(null); }}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
           >
             <option value="">Selecione a competência</option>
@@ -163,21 +229,112 @@ export default function ImportacaoPage() {
             ))}
           </select>
 
-          {tipoImport && (
-            <div className={`flex items-center gap-2 mt-2 px-3 py-2 rounded-lg text-xs font-medium border ${
-              tipoImport === "FLASH"
-                ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                : "bg-gr-500/10 border-gr-500/20 text-gr-300"
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${tipoImport === "FLASH" ? "bg-emerald-400" : "bg-gr-400"}`} />
-              {tipoImport === "FLASH"
-                ? "Flash Semanal detectado — base mensal já existe para esta competência"
-                : "Base Mensal — primeiro import desta competência"}
+          {/* Tipo de base */}
+          <div className="mt-3">
+            <label className="block text-sm text-slate-400 mb-2">Tipo de base</label>
+            <div className="grid grid-cols-2 gap-2">
+              {(["BASE", "FLASH"] as const).map((tipo) => (
+                <button
+                  key={tipo}
+                  type="button"
+                  onClick={() => setTipoImport(tipo)}
+                  className={`flex flex-col items-start gap-1 px-4 py-3 rounded-xl border text-left transition-colors ${
+                    tipoImport === tipo
+                      ? tipo === "FLASH"
+                        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+                        : "bg-gr-500/15 border-gr-500/50 text-gr-300"
+                      : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                  }`}
+                >
+                  <span className="text-sm font-medium">
+                    {tipo === "BASE" ? "Base Mensal" : "Flash Semanal"}
+                  </span>
+                  <span className="text-xs opacity-70">
+                    {tipo === "BASE"
+                      ? "Primeiro envio desta competência"
+                      : "Envio incremental semanal"}
+                  </span>
+                </button>
+              ))}
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Upload de arquivo */}
+        {/* Férias desta competência */}
+        {competenciaId && (
+          <div className="border border-slate-700 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <UmbrellaOff size={14} className="text-amber-400" />
+              <span className="text-sm font-medium text-slate-300">Férias nesta competência</span>
+              <span className="text-xs text-slate-500">(registre antes de importar)</span>
+            </div>
+
+            {ferias.length > 0 && (
+              <div className="space-y-1.5">
+                {ferias.map((f) => (
+                  <div key={f.id} className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
+                    <div>
+                      <span className="text-sm text-white">{f.consultor.nome}</span>
+                      <span className="text-xs text-slate-400 ml-2">
+                        {new Date(f.dataInicio).toLocaleDateString("pt-BR", { timeZone: "UTC" })} →{" "}
+                        {new Date(f.dataFim).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => removerFerias(f.id)}
+                      className="text-slate-500 hover:text-red-400 transition-colors ml-2"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {consultoresDisponiveis.length > 0 ? (
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <select
+                    value={novaFeriasConsultorId}
+                    onChange={(e) => setNovaFeriasConsultorId(e.target.value)}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
+                  >
+                    <option value="">Selecionar consultor</option>
+                    {consultoresDisponiveis.map((c) => (
+                      <option key={c.id} value={c.id}>{c.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <input
+                  type="date"
+                  value={novaFeriasInicio}
+                  onChange={(e) => setNovaFeriasInicio(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
+                />
+                <input
+                  type="date"
+                  value={novaFeriasFim}
+                  onChange={(e) => setNovaFeriasFim(e.target.value)}
+                  className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
+                />
+                <button
+                  onClick={adicionarFerias}
+                  disabled={!novaFeriasConsultorId || !novaFeriasInicio || !novaFeriasFim || salvandoFerias}
+                  className="flex items-center gap-1 px-3 py-2 bg-amber-500/20 border border-amber-500/30 hover:bg-amber-500/30 disabled:opacity-40 text-amber-300 text-xs rounded-lg transition-colors"
+                >
+                  {salvandoFerias ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
+                  Adicionar
+                </button>
+              </div>
+            ) : (
+              ferias.length === 0 && (
+                <p className="text-xs text-slate-500">Nenhum consultor de férias nesta competência.</p>
+              )
+            )}
+          </div>
+        )}
+
+        {/* Seleção de arquivo */}
         <div>
           <label className="block text-sm text-slate-400 mb-1.5">Planilha de Inadimplência</label>
           <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer hover:border-sky-500 hover:bg-sky-500/5 transition-colors">
@@ -255,7 +412,7 @@ export default function ImportacaoPage() {
 
         <button
           onClick={handleImportar}
-          disabled={!arquivo || !competenciaId || carregando}
+          disabled={!arquivo || !competenciaId || !tipoImport || carregando}
           className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 disabled:bg-sky-500/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
         >
           {carregando ? (

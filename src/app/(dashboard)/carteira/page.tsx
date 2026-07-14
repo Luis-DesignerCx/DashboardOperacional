@@ -735,12 +735,18 @@ export default function CarteiraPage() {
                           </div>
                           <div className="flex items-center gap-4 flex-shrink-0">
                             <div className="text-right">
-                              <p className="text-white font-semibold text-sm tabular-nums">
-                                {formatarMoeda(Number(c.valorTotalAberto ?? 0))}
-                              </p>
-                              <p className={`text-xs font-medium tabular-nums ${diasAtrasoColor(c.maiorDiasAtraso)}`}>
-                                {c.maiorDiasAtraso ?? 0}d em atraso
-                              </p>
+                              {c.statusRecuperacao === "RECUPERADO_INTEGRALMENTE" ? (
+                                <span className="text-xs font-medium text-emerald-400">Quitado</span>
+                              ) : (
+                                <>
+                                  <p className="text-white font-semibold text-sm tabular-nums">
+                                    {formatarMoeda(Math.max(0, Number(c.valorTotalAberto ?? 0) - totalRecebido))}
+                                  </p>
+                                  <p className={`text-xs font-medium tabular-nums ${diasAtrasoColor(c.maiorDiasAtraso)}`}>
+                                    {c.maiorDiasAtraso ?? 0}d em atraso
+                                  </p>
+                                </>
+                              )}
                             </div>
                             <div className="flex gap-1">
                               <button
@@ -1045,7 +1051,7 @@ export default function CarteiraPage() {
                           <div>
                             <p className="text-white text-sm font-semibold">{formatarMoeda(Number(r.valorAParte))}</p>
                             <p className="text-slate-500 text-xs mt-0.5">
-                              {new Date(r.dataRecebimento).toLocaleDateString("pt-BR")} · {r.formaPagamento}
+                              {new Date(r.dataRecebimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })} · {r.formaPagamento}
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
@@ -1272,7 +1278,7 @@ export default function CarteiraPage() {
                           {h.observacao && <p className="text-slate-400 text-xs mt-0.5 truncate">{h.observacao}</p>}
                           {h.agendadoPara && <p className="text-amber-400 text-xs mt-0.5 flex items-center gap-1"><Clock size={10} /> Agendado: {new Date(h.agendadoPara).toLocaleString("pt-BR")}</p>}
                         </div>
-                        <span className="text-slate-400 text-xs flex-shrink-0">{new Date(h.criadoEm).toLocaleDateString("pt-BR")}</span>
+                        <span className="text-slate-400 text-xs flex-shrink-0">{new Date(h.criadoEm).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span>
                       </div>
                     ))}
                   </div>

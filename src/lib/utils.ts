@@ -13,7 +13,7 @@ export function formatarMoeda(valor: number | string): string {
 }
 
 export function formatarData(data: Date | string): string {
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(data));
+  return new Intl.DateTimeFormat("pt-BR", { timeZone: "UTC" }).format(new Date(data));
 }
 
 export function formatarDataHora(data: Date | string): string {

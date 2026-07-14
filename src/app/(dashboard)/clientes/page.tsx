@@ -422,7 +422,7 @@ export default function ClientesPage() {
                         <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{formatarMoeda(Number(p.valorPrometido))}</span>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <span>Vence: <span className={new Date(p.dataPrometida) < new Date() && p.status === "ABERTA" ? "text-red-400" : "text-slate-300"}>{new Date(p.dataPrometida).toLocaleDateString("pt-BR")}</span></span>
+                        <span>Vence: <span className={new Date(p.dataPrometida) < new Date() && p.status === "ABERTA" ? "text-red-400" : "text-slate-300"}>{new Date(p.dataPrometida).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</span></span>
                         <span>· {p.formaPagamento.replace("_", " ")}</span>
                         <span>· {p.consultor.nome.split(" ")[0]}</span>
                       </div>

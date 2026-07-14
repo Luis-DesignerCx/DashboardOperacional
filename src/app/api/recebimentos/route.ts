@@ -83,8 +83,41 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
 
+  // Busca o contrato antes de deletar para recalcular statusRecuperacao
+  const rec = await prisma.recebimento.findUnique({
+    where: { id },
+    select: {
+      contratoId: true,
+      contrato: {
+        select: {
+          valorTotalAberto: true,
+          recebimentos: { select: { id: true, valor: true } },
+        },
+      },
+    },
+  });
+  if (!rec) return NextResponse.json({ erro: "Não encontrado" }, { status: 404 });
+
   await prisma.recebimento.delete({ where: { id } });
-  return NextResponse.json({ ok: true });
+
+  // Recalcula statusRecuperacao excluindo o recebimento removido
+  const totalRecebido = rec.contrato.recebimentos
+    .filter((r) => r.id !== id)
+    .reduce((s, r) => s + Number(r.valor), 0);
+  const valorAberto = Number(rec.contrato.valorTotalAberto ?? 0);
+  const statusRecuperacao =
+    totalRecebido >= valorAberto && valorAberto > 0
+      ? "RECUPERADO_INTEGRALMENTE"
+      : totalRecebido > 0
+      ? "RECUPERACAO_PARCIAL"
+      : "INADIMPLENTE";
+
+  await prisma.contrato.update({
+    where: { id: rec.contratoId },
+    data: { statusRecuperacao },
+  });
+
+  return NextResponse.json({ ok: true, statusRecuperacao });
 }
 
 export async function POST(req: NextRequest) {

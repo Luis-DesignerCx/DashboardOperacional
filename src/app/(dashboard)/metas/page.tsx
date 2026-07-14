@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Target, Plus, X, CheckCircle2, Loader2, Trash2, TrendingUp, Users, ClipboardCheck, Pencil } from "lucide-react";
+import { Target, Plus, X, CheckCircle2, Loader2, Trash2, TrendingUp, Users, ClipboardCheck, Pencil, Percent } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 
 interface Meta {
@@ -57,7 +57,8 @@ const TIPO_EQUIPE_LABEL: Record<string, string> = {
 const FORM_VAZIO = {
   equipeId: "", competenciaId: "", consultorId: "",
   nome: "", tipo: "FINANCEIRA" as "FINANCEIRA" | "QUANTIDADE" | "MONITORIA",
-  valorAlvo: "", quantidadeAlvo: "",
+  modoAlvo: "VALOR" as "VALOR" | "PERCENTUAL",
+  valorAlvo: "", percentualAlvo: "", quantidadeAlvo: "",
   peso: "100",
 };
 
@@ -75,6 +76,7 @@ export default function MetasPage() {
   const [salvando, setSalvando] = useState(false);
   const [excluindo, setExcluindo] = useState<string | null>(null);
   const [erro, setErro] = useState("");
+  const [totalInadimplencia, setTotalInadimplencia] = useState<number | null>(null);
 
   function recarregar() {
     setCarregando(true);
@@ -103,26 +105,41 @@ export default function MetasPage() {
     }
   }, [form.equipeId, equipes]);
 
+  useEffect(() => {
+    if (form.tipo !== "FINANCEIRA" || form.modoAlvo !== "PERCENTUAL") return;
+    if (!form.equipeId || !form.competenciaId) { setTotalInadimplencia(null); return; }
+    const params = new URLSearchParams({ equipeId: form.equipeId, competenciaId: form.competenciaId });
+    if (form.consultorId) params.set("consultorId", form.consultorId);
+    fetch(`/api/metas/totais?${params}`)
+      .then((r) => r.json())
+      .then((d) => setTotalInadimplencia(d.totalInadimplencia ?? null));
+  }, [form.equipeId, form.competenciaId, form.consultorId, form.tipo, form.modoAlvo]);
+
   function abrirModal() {
     setEditandoMeta(null);
     setModalAberto(true);
     setForm({ ...FORM_VAZIO, equipeId: equipes[0]?.id ?? "", competenciaId: competencias[0]?.id ?? "" });
     setThresholds({ ...DEFAULT_THRESHOLDS });
+    setTotalInadimplencia(null);
     setErro("");
   }
 
   function abrirEdicao(m: Meta) {
     setEditandoMeta(m);
     setModalAberto(true);
+    const temPercentual = m.percentualAlvo != null;
     setForm({
       equipeId: "", competenciaId: "", consultorId: "",
       nome: m.nome ?? "",
       tipo: m.tipo as "FINANCEIRA" | "QUANTIDADE" | "MONITORIA",
+      modoAlvo: temPercentual ? "PERCENTUAL" : "VALOR",
       valorAlvo: m.valorAlvo != null ? String(Number(m.valorAlvo)) : "",
+      percentualAlvo: m.percentualAlvo != null ? String(Number(m.percentualAlvo)) : "",
       quantidadeAlvo: m.quantidadeAlvo != null ? String(m.quantidadeAlvo) : "",
       peso: String(Math.round(Number(m.peso ?? 1) * 100)),
     });
     setThresholds(m.thresholdsMonitoria ? { ...m.thresholdsMonitoria } : { ...DEFAULT_THRESHOLDS });
+    setTotalInadimplencia(null);
     setErro("");
   }
 
@@ -149,9 +166,19 @@ export default function MetasPage() {
     }
 
     if (form.tipo === "FINANCEIRA") {
-      const v = parseFloat(form.valorAlvo.replace(",", ".") || "0");
-      if (!v || v <= 0) { setErro("Informe o valor alvo em R$"); return; }
-      payload.valorAlvo = v;
+      if (form.modoAlvo === "PERCENTUAL") {
+        const pct = parseFloat(form.percentualAlvo.replace(",", ".") || "0");
+        if (!pct || pct <= 0) { setErro("Informe o percentual alvo"); return; }
+        payload.percentualAlvo = pct;
+        if (totalInadimplencia != null && totalInadimplencia > 0) {
+          payload.valorAlvo = parseFloat(((pct / 100) * totalInadimplencia).toFixed(2));
+        }
+      } else {
+        const v = parseFloat(form.valorAlvo.replace(",", ".") || "0");
+        if (!v || v <= 0) { setErro("Informe o valor alvo em R$"); return; }
+        payload.valorAlvo = v;
+        payload.percentualAlvo = null;
+      }
     } else if (form.tipo === "MONITORIA") {
       payload.thresholdsMonitoria = thresholds;
     } else if (form.tipo === "QUANTIDADE") {
@@ -189,7 +216,17 @@ export default function MetasPage() {
   }
 
   function renderAlvo(m: Meta) {
-    if (m.tipo === "FINANCEIRA") return m.valorAlvo ? formatarMoeda(Number(m.valorAlvo)) : "—";
+    if (m.tipo === "FINANCEIRA") {
+      if (m.percentualAlvo != null) {
+        return (
+          <span className="flex flex-col items-end gap-0.5">
+            <span>{Number(m.percentualAlvo).toFixed(1)}% da inadimplência</span>
+            {m.valorAlvo && <span className="text-xs text-slate-400 font-normal">{formatarMoeda(Number(m.valorAlvo))}</span>}
+          </span>
+        );
+      }
+      return m.valorAlvo ? formatarMoeda(Number(m.valorAlvo)) : "—";
+    }
     if (m.tipo === "QUANTIDADE") return `${m.quantidadeAlvo ?? 0} clientes`;
     if (m.tipo === "MONITORIA") {
       const notaBase = m.thresholdsMonitoria?.["100"];
@@ -318,7 +355,7 @@ export default function MetasPage() {
                         key={t}
                         type="button"
                         onClick={() => {
-                          setForm((f) => ({ ...f, tipo: t, valorAlvo: "", quantidadeAlvo: "" }));
+                          setForm((f) => ({ ...f, tipo: t, valorAlvo: "", quantidadeAlvo: "", modoAlvo: "VALOR", percentualAlvo: "" }));
                           if (t === "MONITORIA" && !editandoMeta) setThresholds({ ...DEFAULT_THRESHOLDS });
                         }}
                         className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
@@ -382,19 +419,72 @@ export default function MetasPage() {
                 <div>
                   {form.tipo === "FINANCEIRA" && (
                     <>
-                      <label className="block text-xs text-slate-400 mb-1.5">Valor alvo (R$) *</label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
-                        <input
-                          className={inputCls + " pl-9"}
-                          type="number"
-                          min="1"
-                          step="0.01"
-                          placeholder="0,00"
-                          value={form.valorAlvo}
-                          onChange={(e) => setForm((f) => ({ ...f, valorAlvo: e.target.value }))}
-                        />
+                      {/* Toggle R$ / % */}
+                      <div className="flex gap-1 mb-2">
+                        {(["VALOR", "PERCENTUAL"] as const).map((modo) => (
+                          <button
+                            key={modo}
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, modoAlvo: modo }))}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors border ${
+                              form.modoAlvo === modo
+                                ? "bg-sky-500/20 border-sky-500/40 text-sky-300"
+                                : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                            }`}
+                          >
+                            {modo === "VALOR" ? "R$ fixo" : <><Percent size={10} /> % da inadimplência</>}
+                          </button>
+                        ))}
                       </div>
+
+                      {form.modoAlvo === "VALOR" ? (
+                        <>
+                          <label className="block text-xs text-slate-400 mb-1.5">Valor alvo (R$) *</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">R$</span>
+                            <input
+                              className={inputCls + " pl-9"}
+                              type="number"
+                              min="1"
+                              step="0.01"
+                              placeholder="0,00"
+                              value={form.valorAlvo}
+                              onChange={(e) => setForm((f) => ({ ...f, valorAlvo: e.target.value }))}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <label className="block text-xs text-slate-400 mb-1.5">Percentual alvo *</label>
+                          <div className="relative">
+                            <input
+                              className={inputCls + " pr-8"}
+                              type="number"
+                              min="0.1"
+                              max="100"
+                              step="0.1"
+                              placeholder="Ex: 15"
+                              value={form.percentualAlvo}
+                              onChange={(e) => setForm((f) => ({ ...f, percentualAlvo: e.target.value }))}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">%</span>
+                          </div>
+                          {totalInadimplencia != null && (
+                            <p className="text-xs text-slate-400 mt-1.5">
+                              Base da equipe:{" "}
+                              <span className="text-white font-medium">{formatarMoeda(totalInadimplencia)}</span>
+                              {form.percentualAlvo && (
+                                <span className="text-sky-400 ml-1">
+                                  → Alvo: {formatarMoeda((parseFloat(form.percentualAlvo) / 100) * totalInadimplencia)}
+                                </span>
+                              )}
+                            </p>
+                          )}
+                          {totalInadimplencia == null && form.equipeId && form.competenciaId && (
+                            <p className="text-xs text-slate-500 mt-1">Carregando base da equipe...</p>
+                          )}
+                        </>
+                      )}
                     </>
                   )}
                   {form.tipo === "QUANTIDADE" && (

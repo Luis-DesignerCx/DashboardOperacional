@@ -17,9 +17,12 @@ export interface AtribuicaoConsultor {
   totalContratos: number;
 }
 
+// fatores: mapa consultorId → fator de capacidade (0–1). Consultor com fator 0.5
+// recebe proporcionalmente metade dos contratos em relação a um consultor pleno.
 export function distribuirCarteira(
   contratos: ContratoDistribuicao[],
-  consultorIds: string[]
+  consultorIds: string[],
+  fatores?: Map<string, number>
 ): AtribuicaoConsultor[] {
   if (!consultorIds.length || !contratos.length) return [];
 
@@ -39,9 +42,11 @@ export function distribuirCarteira(
 
   for (const contrato of ordenados) {
     const alvo = atribuicoes.reduce((menor, atual) => {
-      return score(atual, clientesPorConsultor) < score(menor, clientesPorConsultor)
-        ? atual
-        : menor;
+      const fatorAtual = Math.max(0.01, fatores?.get(atual.consultorId) ?? 1);
+      const fatorMenor = Math.max(0.01, fatores?.get(menor.consultorId) ?? 1);
+      const scoreAtual = score(atual, clientesPorConsultor) / fatorAtual;
+      const scoreMenor = score(menor, clientesPorConsultor) / fatorMenor;
+      return scoreAtual < scoreMenor ? atual : menor;
     });
 
     alvo.contratoIds.push(contrato.contratoId);

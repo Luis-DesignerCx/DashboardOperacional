@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
         Consultor: consultor.nome,
         EmailConsultor: consultor.email,
         NumeroParcela: parcela.numero,
-        DataVencimento: parcela.dataVencimento.toLocaleDateString("pt-BR"),
+        DataVencimento: parcela.dataVencimento.toLocaleDateString("pt-BR", { timeZone: "UTC" }),
         DiasAtraso: parcela.diasAtraso,
         Origem: parcela.origem ?? "",
         MeioPagamento: parcela.meioPagamento ?? "",

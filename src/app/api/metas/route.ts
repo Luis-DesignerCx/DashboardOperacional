@@ -47,8 +47,8 @@ export async function POST(req: NextRequest) {
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
   if (!tipo) return NextResponse.json({ erro: "tipo obrigatório" }, { status: 400 });
 
-  if (tipo === "FINANCEIRA" && (!valorAlvo || Number(valorAlvo) <= 0)) {
-    return NextResponse.json({ erro: "Informe o valor alvo em R$" }, { status: 400 });
+  if (tipo === "FINANCEIRA" && (!valorAlvo || Number(valorAlvo) <= 0) && (!percentualAlvo || Number(percentualAlvo) <= 0)) {
+    return NextResponse.json({ erro: "Informe o valor alvo em R$ ou o percentual da inadimplência" }, { status: 400 });
   }
   if (tipo === "MONITORIA" && !thresholdsMonitoria) {
     return NextResponse.json({ erro: "Informe os thresholds de monitoria" }, { status: 400 });

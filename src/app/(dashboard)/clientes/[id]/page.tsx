@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import { formatarMoeda } from "@/lib/utils";
 import {
   ArrowLeft, Phone, Mail, FileText,
-  Calendar, Clock, CheckCircle2, AlertCircle, User, Pencil, Check, X,
+  Calendar, Clock, CheckCircle2, AlertCircle, User, Pencil, Check, X, Trash2,
 } from "lucide-react";
 
 interface Contrato {
@@ -211,6 +211,23 @@ export default function ClienteDetalhe() {
       }
     } finally {
       setSalvando(false);
+    }
+  }
+
+  async function excluirRecebimento(recId: string) {
+    if (!confirm("Excluir este recebimento? Esta ação não pode ser desfeita.")) return;
+    const res = await fetch(`/api/recebimentos?id=${recId}`, { method: "DELETE" });
+    if (res.ok) {
+      setCliente(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          contratos: prev.contratos.map(c => ({
+            ...c,
+            recebimentos: c.recebimentos.filter(r => r.id !== recId),
+          })),
+        };
+      });
     }
   }
 
@@ -507,7 +524,7 @@ export default function ClienteDetalhe() {
                       <div className="flex items-center gap-2">
                         <span className="text-slate-400 text-xs w-5 text-right">{p.numero}</span>
                         <span className="text-slate-400 text-xs">
-                          {new Date(p.dataVencimento).toLocaleDateString("pt-BR")}
+                          {new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                         </span>
                         {p.diasAtraso > 0 && (
                           <span className={`text-xs px-1.5 py-0.5 rounded-full ${badgeDias(p.diasAtraso)}`}>
@@ -578,19 +595,29 @@ export default function ClienteDetalhe() {
                           <div>
                             <p className="text-white text-sm font-medium">{formatarMoeda(Number(r.valor))}</p>
                             <p className="text-slate-500 text-xs">
-                              {r.formaPagamento.replace(/_/g, " ")} · {new Date(r.dataRecebimento).toLocaleDateString("pt-BR")}
+                              {r.formaPagamento.replace(/_/g, " ")} · {new Date(r.dataRecebimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                             </p>
                           </div>
                           {podeEditar && (
-                            <button
-                              onClick={() => {
-                                setRecValor(String(Number(r.valor).toFixed(2)).replace(".", ","));
-                                setEditandoRecebimento(r.id);
-                              }}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-all"
-                            >
-                              <Pencil size={13} />
-                            </button>
+                            <div className="opacity-0 group-hover:opacity-100 flex gap-1 transition-all">
+                              <button
+                                onClick={() => {
+                                  setRecValor(String(Number(r.valor).toFixed(2)).replace(".", ","));
+                                  setEditandoRecebimento(r.id);
+                                }}
+                                className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-800 transition-colors"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              {isGestorOuAdmin && (
+                                <button
+                                  onClick={() => excluirRecebimento(r.id)}
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       )}
@@ -617,7 +644,7 @@ export default function ClienteDetalhe() {
                       <span className="text-xs text-slate-300">{c.status.replace(/_/g, " ")}</span>
                     </div>
                     {c.observacao && <p className="text-slate-500 text-xs mt-0.5">{c.observacao}</p>}
-                    <p className="text-slate-700 text-xs mt-0.5">{new Date(c.criadoEm).toLocaleDateString("pt-BR")}</p>
+                    <p className="text-slate-700 text-xs mt-0.5">{new Date(c.criadoEm).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</p>
                   </div>
                 ))}
               </div>

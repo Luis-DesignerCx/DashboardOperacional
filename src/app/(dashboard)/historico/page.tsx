@@ -118,7 +118,7 @@ export default function HistoricoPage() {
                         <p className="text-white font-medium">{comp.descricao}</p>
                         {comp.fechadaEm && (
                           <p className="text-xs text-slate-400">
-                            Fechada em {new Date(comp.fechadaEm).toLocaleDateString("pt-BR")}
+                            Fechada em {new Date(comp.fechadaEm).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                           </p>
                         )}
                       </div>
@@ -137,7 +137,7 @@ export default function HistoricoPage() {
                           {comp.ultimaImportacao.nomeArquivo}
                         </p>
                         <p className="text-slate-400 text-xs">
-                          {new Date(comp.ultimaImportacao.criadoEm).toLocaleDateString("pt-BR")}
+                          {new Date(comp.ultimaImportacao.criadoEm).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                           {" · "}{comp.ultimaImportacao.totalContratos} contratos
                           {comp.ultimaImportacao.erros > 0 && (
                             <span className="text-amber-500"> · {comp.ultimaImportacao.erros} erros</span>
