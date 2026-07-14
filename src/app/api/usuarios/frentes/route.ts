@@ -9,7 +9,9 @@ export async function GET() {
 
   const equipeIds = await getEquipesGerenciadas(session.user.id);
 
-  return NextResponse.json(
-    equipeIds.map((id) => ({ equipeId: id, label: frenteLabel(id) }))
+  const frentes = await Promise.all(
+    equipeIds.map(async (id) => ({ equipeId: id, label: await frenteLabel(id) }))
   );
+
+  return NextResponse.json(frentes);
 }

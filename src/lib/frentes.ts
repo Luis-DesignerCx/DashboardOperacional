@@ -1,36 +1,34 @@
 import { prisma } from "@/lib/prisma";
 
-const FRENTE_LABEL: Record<string, string> = {
-  "eq-flash":  "Flash",
-  "eq-1-30":   "1 a 30 dias",
-  "eq-31-90":  "31 a 90 dias",
-  "eq-91-180": "91+ dias",
+const TIPO_ORDEM: Record<string, number> = {
+  FLASH: 1, CRA_1_30: 2, CR_31_90: 3, CR_PDD_91_180: 4,
 };
-
-const FRENTE_ORDER = ["eq-flash", "eq-1-30", "eq-31-90", "eq-91-180"];
 
 /**
  * Retorna todos os equipeIds que o usuário gerencia:
  * frente principal + frentes adicionais (EquipeConsultor).
- * Ordenado conforme FRENTE_ORDER.
+ * Ordenado pela ordem canônica das frentes.
  */
 export async function getEquipesGerenciadas(userId: string): Promise<string[]> {
   const usuario = await prisma.usuario.findUnique({
     where: { id: userId },
     select: {
-      equipeId: true,
-      frentesAdicionais: { select: { equipeId: true } },
+      equipe: { select: { id: true, tipo: true } },
+      frentesAdicionais: { select: { equipe: { select: { id: true, tipo: true } } } },
     },
   });
   if (!usuario) return [];
 
-  const ids = new Set<string>();
-  if (usuario.equipeId) ids.add(usuario.equipeId);
-  for (const fa of usuario.frentesAdicionais) ids.add(fa.equipeId);
+  const map = new Map<string, string>(); // id → tipo
+  if (usuario.equipe) map.set(usuario.equipe.id, usuario.equipe.tipo);
+  for (const fa of usuario.frentesAdicionais) map.set(fa.equipe.id, fa.equipe.tipo);
 
-  return FRENTE_ORDER.filter((id) => ids.has(id));
+  return [...map.entries()]
+    .sort(([, tA], [, tB]) => (TIPO_ORDEM[tA] ?? 9) - (TIPO_ORDEM[tB] ?? 9))
+    .map(([id]) => id);
 }
 
-export function frenteLabel(equipeId: string): string {
-  return FRENTE_LABEL[equipeId] ?? equipeId;
+export async function frenteLabel(equipeId: string): Promise<string> {
+  const e = await prisma.equipe.findUnique({ where: { id: equipeId }, select: { nome: true } });
+  return e?.nome ?? equipeId;
 }

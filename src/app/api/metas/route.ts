@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 import { Decimal } from "@prisma/client/runtime/library";
 
 export async function GET(req: NextRequest) {
@@ -15,10 +16,14 @@ export async function GET(req: NextRequest) {
 
   const where: any = {};
   if (competenciaId) where.competenciaId = competenciaId;
-  if (equipeId) where.equipeId = equipeId;
   if (consultorId) where.consultorId = consultorId;
-  if (session.user.perfil === "GESTOR" && session.user.equipeId && !equipeId) {
-    where.equipeId = session.user.equipeId;
+
+  if (equipeId) {
+    where.equipeId = equipeId;
+  } else if (session.user.perfil === "GESTOR") {
+    // Mostra metas de todas as frentes gerenciadas pelo gestor
+    const todasFrentes = await getEquipesGerenciadas(session.user.id);
+    if (todasFrentes.length > 0) where.equipeId = { in: todasFrentes };
   }
 
   const metas = await prisma.meta.findMany({
