@@ -88,7 +88,7 @@ export default function ClienteDetalhe() {
   const [editandoContrato, setEditandoContrato] = useState(false);
   const [contratoForm, setContratoForm] = useState({ maiorDiasAtraso: "", valorTotalAberto: "", statusContrato: "" });
   const [editandoParcela, setEditandoParcela] = useState<string | null>(null);
-  const [parcelaForm, setParcelaForm] = useState({ valorParcela: "", valorTotalAberto: "", diasAtraso: "", dataVencimento: "" });
+  const [parcelaForm, setParcelaForm] = useState({ valorParcela: "", valorTotalAberto: "", diasAtraso: "", dataVencimento: "", paga: false });
   const [editandoRecebimento, setEditandoRecebimento] = useState<string | null>(null);
   const [recValor, setRecValor] = useState("");
   const [salvando, setSalvando] = useState(false);
@@ -192,6 +192,7 @@ export default function ClienteDetalhe() {
                 valorTotalAberto: parcelaForm.valorTotalAberto !== "" ? parseFloat(parcelaForm.valorTotalAberto.replace(",", ".")) : p.valorTotalAberto,
                 diasAtraso: parcelaForm.diasAtraso !== "" ? parseInt(parcelaForm.diasAtraso) : p.diasAtraso,
                 dataVencimento: parcelaForm.dataVencimento ? parcelaForm.dataVencimento + "T00:00:00.000Z" : p.dataVencimento,
+                paga: parcelaForm.paga,
               }),
             })),
           };
@@ -525,6 +526,18 @@ export default function ClienteDetalhe() {
                             onChange={e => setParcelaForm(f => ({ ...f, dataVencimento: e.target.value }))}
                           />
                         </div>
+                        <div className="col-span-2 flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => setParcelaForm(f => ({ ...f, paga: !f.paga }))}
+                            className={`w-8 h-4 rounded-full transition-colors flex-shrink-0 ${parcelaForm.paga ? "bg-emerald-500" : "bg-slate-600"}`}
+                          >
+                            <span className={`block w-3 h-3 rounded-full bg-white shadow transition-transform mx-0.5 ${parcelaForm.paga ? "translate-x-4" : "translate-x-0"}`} />
+                          </button>
+                          <span className="text-xs text-slate-400">
+                            {parcelaForm.paga ? "Parcela paga — não aparece no recebimento" : "Parcela em aberto — aparece para receber"}
+                          </span>
+                        </div>
                       </div>
                       <div className="flex gap-2">
                         <button className={BTN_SAVE} onClick={() => salvarParcela(p.id)} disabled={salvando}>
@@ -561,6 +574,7 @@ export default function ClienteDetalhe() {
                                   valorTotalAberto: String(p.valorTotalAberto ?? ""),
                                   diasAtraso: String(p.diasAtraso ?? ""),
                                   dataVencimento: p.dataVencimento ? p.dataVencimento.substring(0, 10) : "",
+                                  paga: p.paga,
                                 });
                                 setEditandoParcela(p.id);
                               }}

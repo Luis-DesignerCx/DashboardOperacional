@@ -11,13 +11,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json();
-  const { valorParcela, valorTotalAberto, diasAtraso, dataVencimento } = body;
+  const { valorParcela, valorTotalAberto, diasAtraso, dataVencimento, paga } = body;
 
   const data: any = {};
   if (valorParcela !== undefined && valorParcela !== "") data.valorParcela = new Decimal(String(valorParcela).replace(",", "."));
   if (valorTotalAberto !== undefined && valorTotalAberto !== "") data.valorTotalAberto = new Decimal(String(valorTotalAberto).replace(",", "."));
   if (diasAtraso !== undefined && diasAtraso !== "") data.diasAtraso = parseInt(String(diasAtraso));
   if (dataVencimento) data.dataVencimento = new Date(dataVencimento + "T00:00:00.000Z");
+  if (paga !== undefined) data.paga = Boolean(paga);
 
   const parcela = await prisma.parcela.update({ where: { id: params.id }, data });
 

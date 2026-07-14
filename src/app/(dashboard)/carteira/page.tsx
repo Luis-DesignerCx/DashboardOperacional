@@ -686,6 +686,8 @@ export default function CarteiraPage() {
                     const temPromessa = c.promessas.length > 0;
                     const totalRecebido = c.recebimentos.reduce((s, r) => s + Number(r.valor), 0);
                     const totalAParte = c.recebimentos.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
+                    // Saldo real = soma das parcelas ainda não pagas (API já filtra paga:false)
+                    const saldoAberto = c.parcelas.reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0);
 
                     return (
                       <div key={item.id} className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition-colors group">
@@ -752,7 +754,7 @@ export default function CarteiraPage() {
                               ) : (
                                 <>
                                   <p className="text-white font-semibold text-sm tabular-nums">
-                                    {formatarMoeda(Math.max(0, Number(c.valorTotalAberto ?? 0) - totalRecebido))}
+                                    {formatarMoeda(saldoAberto)}
                                   </p>
                                   <p className={`text-xs font-medium tabular-nums ${diasAtrasoColor(c.maiorDiasAtraso)}`}>
                                     {c.maiorDiasAtraso ?? 0}d em atraso

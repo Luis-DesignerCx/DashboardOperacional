@@ -114,14 +114,11 @@ export async function DELETE(req: NextRequest) {
       ? "RECUPERACAO_PARCIAL"
       : "INADIMPLENTE";
 
-  // Reverte parcelas pagas para não-pagas se o contrato não está mais quitado
-  const parcelasPagas = rec.contrato.parcelas.filter((p) => p.paga);
-  if (parcelasPagas.length > 0 && statusRecuperacao !== "RECUPERADO_INTEGRALMENTE") {
-    await prisma.parcela.updateMany({
-      where: { id: { in: parcelasPagas.map((p) => p.id) } },
-      data: { paga: false },
-    });
-  }
+  // Reverte TODAS as parcelas do contrato para não-pagas (sem FK recebimento→parcela não sabemos qual foi marcada)
+  await prisma.parcela.updateMany({
+    where: { contratoId: rec.contratoId, paga: true },
+    data: { paga: false },
+  });
 
   await prisma.contrato.update({
     where: { id: rec.contratoId },
