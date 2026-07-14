@@ -298,36 +298,21 @@ export default function CarteiraPage() {
   async function salvarExternoRecebimento() {
     setExternoErro("");
     if (!externoContrato) return;
-    const valor = parseFloat(externoForm.valor.replace(",", "."));
-    if (!valor || valor <= 0) { setExternoErro("Informe um valor válido"); return; }
+    if (!externoForm.observacao.trim()) { setExternoErro("Informe o motivo da solicitação de transferência"); return; }
     setExternoSalvando(true);
-    const [resReceb, resSolic] = await Promise.all([
-      fetch("/api/recebimentos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contratoId: externoContrato.id,
-          valor,
-          dataRecebimento: externoForm.data,
-          formaPagamento: externoForm.formaPagamento,
-          observacao: externoForm.observacao || "Recebimento de cliente de outra carteira",
-          parcelasIds: [],
-        }),
+    const resSolic = await fetch("/api/solicitacoes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        tipo: "TRANSFERENCIA_CONTRATO",
+        contratoId: externoContrato.id,
+        motivo: `${externoForm.observacao.trim()} — ${externoContrato.cliente.nome} (${externoContrato.numero})`,
       }),
-      fetch("/api/solicitacoes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tipo: "TRANSFERENCIA_CONTRATO",
-          contratoId: externoContrato.id,
-          motivo: `Recebimento de ${externoContrato.cliente.nome} (${externoContrato.numero}) — cliente de outra carteira. Valor: R$ ${valor.toFixed(2).replace(".", ",")}`,
-        }),
-      }),
-    ]);
+    });
     setExternoSalvando(false);
-    if (!resReceb.ok) {
-      const d = await resReceb.json();
-      setExternoErro(d.erro || "Erro ao registrar recebimento");
+    if (!resSolic.ok) {
+      const d = await resSolic.json();
+      setExternoErro(d.erro || "Erro ao enviar solicitação");
       return;
     }
     setExternoSucesso(true);
@@ -995,8 +980,8 @@ export default function CarteiraPage() {
             {externoSucesso ? (
               <div className="p-8 text-center space-y-3">
                 <CheckCircle2 size={40} className="mx-auto text-emerald-400" />
-                <p className="text-white font-semibold">Recebimento registrado!</p>
-                <p className="text-slate-400 text-sm">Uma solicitação de transferência foi enviada ao gestor para aprovação.</p>
+                <p className="text-white font-semibold">Solicitação enviada!</p>
+                <p className="text-slate-400 text-sm">O gestor receberá a solicitação de transferência. Após aprovação, o cliente entrará na sua carteira.</p>
                 <button
                   onClick={() => setModal(null)}
                   className="mt-2 w-full bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
@@ -1080,52 +1065,21 @@ export default function CarteiraPage() {
                       </div>
                     </div>
 
-                    {/* Formulário de recebimento */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1.5">Valor recebido (R$) *</label>
-                        <input
-                          className={inputCls}
-                          placeholder="0,00"
-                          value={externoForm.valor}
-                          onChange={(e) => setExternoForm((f) => ({ ...f, valor: e.target.value }))}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-400 mb-1.5">Data do recebimento *</label>
-                        <input
-                          type="date"
-                          className={inputCls}
-                          value={externoForm.data}
-                          onChange={(e) => setExternoForm((f) => ({ ...f, data: e.target.value }))}
-                        />
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento *</label>
-                        <select
-                          className={inputCls}
-                          value={externoForm.formaPagamento}
-                          onChange={(e) => setExternoForm((f) => ({ ...f, formaPagamento: e.target.value }))}
-                        >
-                          <option value="PIX">PIX</option>
-                          <option value="CARTAO_CREDITO">Cartão de Crédito</option>
-                          <option value="BOLETO">Boleto</option>
-                        </select>
-                      </div>
-                      <div className="col-span-2">
-                        <label className="block text-xs text-slate-400 mb-1.5">Observação</label>
-                        <textarea
-                          rows={2}
-                          className={inputCls + " resize-none"}
-                          placeholder="Opcional"
-                          value={externoForm.observacao}
-                          onChange={(e) => setExternoForm((f) => ({ ...f, observacao: e.target.value }))}
-                        />
-                      </div>
+                    {/* Motivo da transferência */}
+                    <div>
+                      <label className="block text-xs text-slate-400 mb-1.5">Motivo da solicitação *</label>
+                      <textarea
+                        rows={3}
+                        autoFocus
+                        className={inputCls + " resize-none"}
+                        placeholder="Explique ao gestor o motivo da transferência de carteira..."
+                        value={externoForm.observacao}
+                        onChange={(e) => setExternoForm((f) => ({ ...f, observacao: e.target.value }))}
+                      />
                     </div>
 
                     <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg px-3 py-2">
-                      <p className="text-amber-400/80 text-xs">Uma solicitação de transferência será enviada ao gestor. Após aprovação, o cliente entrará na sua carteira.</p>
+                      <p className="text-amber-400/80 text-xs">Após aprovação do gestor, o cliente entrará na sua carteira. O recebimento deve ser registrado depois, com o cliente já vinculado.</p>
                     </div>
                   </div>
                 )}
@@ -1149,7 +1103,7 @@ export default function CarteiraPage() {
                     >
                       {externoSalvando
                         ? <><Loader2 size={14} className="animate-spin" /> Enviando...</>
-                        : <><ArrowLeftRight size={14} /> Registrar e solicitar</>
+                        : <><ArrowLeftRight size={14} /> Solicitar transferência</>
                       }
                     </button>
                   </div>
