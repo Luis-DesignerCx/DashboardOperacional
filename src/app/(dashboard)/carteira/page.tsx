@@ -173,6 +173,9 @@ export default function CarteiraPage() {
   });
   const [salvandoNovo, setSalvandoNovo] = useState(false);
   const [erroNovo, setErroNovo] = useState("");
+  const [novoBuscandoContrato, setNovoBuscandoContrato] = useState(false);
+  const [novoClienteEncontrado, setNovoClienteEncontrado] = useState(false);
+  const novoContratoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     fetch("/api/competencias").then((r) => r.json()).then((cs) => {
@@ -222,6 +225,38 @@ export default function CarteiraPage() {
     setPagina(1);
     carregarPagina(competenciaId, 1, false, busca, sort);
   }, [sort]);
+
+  // Lookup automático de contrato no modal a_parte
+  useEffect(() => {
+    if (novoForm.tipo !== "a_parte") { setNovoClienteEncontrado(false); return; }
+    if (!novoForm.numeroContrato || novoForm.numeroContrato.length < 3) {
+      setNovoClienteEncontrado(false);
+      return;
+    }
+    if (novoContratoTimer.current) clearTimeout(novoContratoTimer.current);
+    novoContratoTimer.current = setTimeout(async () => {
+      setNovoBuscandoContrato(true);
+      const data = await fetch(`/api/consulta?q=${encodeURIComponent(novoForm.numeroContrato)}`).then((r) => r.json()).catch(() => []);
+      setNovoBuscandoContrato(false);
+      if (Array.isArray(data) && data.length > 0) {
+        const exact = data.find((c: any) => c.numero.toUpperCase() === novoForm.numeroContrato.trim().toUpperCase());
+        const found = exact || null;
+        if (found) {
+          setNovoClienteEncontrado(true);
+          setNovoForm((f) => ({
+            ...f,
+            nomeCliente: found.cliente.nome || f.nomeCliente,
+            telefones: found.cliente.telefones || f.telefones,
+            emails: found.cliente.emails || f.emails,
+          }));
+        } else {
+          setNovoClienteEncontrado(false);
+        }
+      } else {
+        setNovoClienteEncontrado(false);
+      }
+    }, 400);
+  }, [novoForm.numeroContrato, novoForm.tipo]);
 
   // Busca externo com debounce
   useEffect(() => {
@@ -530,6 +565,7 @@ export default function CarteiraPage() {
     if (!res.ok) { setErroNovo(data.erro || "Erro ao cadastrar"); return; }
     setModal(null);
     setNovoForm(NOVO_FORM_VAZIO);
+    setNovoClienteEncontrado(false);
     carregarPagina(competenciaId, 1);
   }
 
@@ -577,7 +613,7 @@ export default function CarteiraPage() {
             <ArrowLeftRight size={15} /> Outra carteira
           </button>
           <button
-            onClick={() => { setNovoForm(NOVO_FORM_VAZIO); setErroNovo(""); setModal("novo"); }}
+            onClick={() => { setNovoForm(NOVO_FORM_VAZIO); setErroNovo(""); setNovoClienteEncontrado(false); setModal("novo"); }}
             className="flex items-center gap-2 bg-gr-500 hover:bg-gr-400 text-white text-sm font-medium px-3 py-2 rounded-xl transition-colors"
           >
             <Plus size={15} /> Novo cadastro
@@ -1557,24 +1593,56 @@ export default function CarteiraPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
-                  <label className="block text-xs text-slate-400 mb-1.5">Nome do cliente *</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">Número do contrato *</label>
+                  <div className="relative">
+                    <input
+                      className={inputCls + (novoForm.tipo === "a_parte" && novoClienteEncontrado ? " border-emerald-500/50" : "")}
+                      placeholder="Ex: GR-001234"
+                      value={novoForm.numeroContrato}
+                      onChange={(e) => {
+                        setNovoClienteEncontrado(false);
+                        setNovoForm((f) => ({ ...f, numeroContrato: e.target.value }));
+                      }}
+                    />
+                    {novoForm.tipo === "a_parte" && novoBuscandoContrato && (
+                      <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 animate-spin" />
+                    )}
+                  </div>
+                  {novoForm.tipo === "a_parte" && novoClienteEncontrado && (
+                    <p className="text-[11px] text-emerald-400 mt-1 flex items-center gap-1">
+                      <CheckCircle2 size={11} /> Cliente encontrado — dados preenchidos automaticamente
+                    </p>
+                  )}
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs text-slate-400 mb-1.5">
+                    Nome do cliente *
+                    {novoForm.tipo === "a_parte" && novoClienteEncontrado && (
+                      <span className="ml-1.5 text-emerald-400/70 font-normal">preenchido</span>
+                    )}
+                  </label>
                   <input className={inputCls} placeholder="Nome completo" value={novoForm.nomeCliente}
                     onChange={(e) => setNovoForm((f) => ({ ...f, nomeCliente: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">Telefone</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">
+                    Telefone
+                    {novoForm.tipo === "a_parte" && novoClienteEncontrado && novoForm.telefones && (
+                      <span className="ml-1.5 text-emerald-400/70 font-normal">preenchido</span>
+                    )}
+                  </label>
                   <input className={inputCls} placeholder="(11) 99999-9999" value={novoForm.telefones}
                     onChange={(e) => setNovoForm((f) => ({ ...f, telefones: e.target.value }))} />
                 </div>
                 <div>
-                  <label className="block text-xs text-slate-400 mb-1.5">E-mail</label>
+                  <label className="block text-xs text-slate-400 mb-1.5">
+                    E-mail
+                    {novoForm.tipo === "a_parte" && novoClienteEncontrado && novoForm.emails && (
+                      <span className="ml-1.5 text-emerald-400/70 font-normal">preenchido</span>
+                    )}
+                  </label>
                   <input className={inputCls} placeholder="cliente@email.com" value={novoForm.emails}
                     onChange={(e) => setNovoForm((f) => ({ ...f, emails: e.target.value }))} />
-                </div>
-                <div className="col-span-2">
-                  <label className="block text-xs text-slate-400 mb-1.5">Número do contrato *</label>
-                  <input className={inputCls} placeholder="Ex: GR-001234" value={novoForm.numeroContrato}
-                    onChange={(e) => setNovoForm((f) => ({ ...f, numeroContrato: e.target.value }))} />
                 </div>
 
                 {novoForm.tipo === "inadimplencia" && (
@@ -1704,7 +1772,7 @@ export default function CarteiraPage() {
               )}
             </div>
             <div className="flex gap-3 px-5 pb-5">
-              <button onClick={() => { setModal(null); setNovoForm(NOVO_FORM_VAZIO); }}
+              <button onClick={() => { setModal(null); setNovoForm(NOVO_FORM_VAZIO); setNovoClienteEncontrado(false); }}
                 className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>

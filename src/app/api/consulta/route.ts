@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
       valorTotalAberto: true,
       maiorDiasAtraso: true,
       statusRecuperacao: true,
-      cliente: { select: { id: true, nome: true, cpf: true, telefones: true } },
+      cliente: { select: { id: true, nome: true, cpf: true, telefones: true, emails: true } },
       empresa: { select: { nome: true } },
       carteiras: {
         where: { ativo: true },
