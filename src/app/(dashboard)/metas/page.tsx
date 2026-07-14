@@ -86,7 +86,7 @@ export default function MetasPage() {
   useEffect(() => {
     recarregar();
     fetch("/api/equipes").then((r) => r.json()).then((d) => {
-      const lista = Array.isArray(d) ? d : [];
+      const lista = (Array.isArray(d) ? d : []).filter((e: any) => e.tipo !== "CR_PDD_181");
       setEquipes(lista);
       if (lista.length > 0) setForm((f) => ({ ...f, equipeId: lista[0].id }));
     });
