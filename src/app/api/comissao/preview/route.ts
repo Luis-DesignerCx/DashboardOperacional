@@ -16,25 +16,35 @@ export async function GET(req: NextRequest) {
 
   const perfil = session.user.perfil;
 
-  let whereConsultores: any = { ativo: true, perfil: "CONSULTOR" };
-  if (perfil === "CONSULTOR") {
-    whereConsultores.id = session.user.id;
-  } else if (perfil === "GESTOR") {
-    whereConsultores.equipeId = session.user.equipeId;
-  } else if (equipeIdParam) {
-    whereConsultores.equipeId = equipeIdParam;
-  }
+  let consultores: { id: string; nome: string; equipeId: string | null }[] = [];
 
-  const consultores = await prisma.usuario.findMany({
-    where: whereConsultores,
-    select: { id: true, nome: true, equipeId: true },
-  });
+  if (perfil === "CONSULTOR") {
+    const c = await prisma.usuario.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, nome: true, equipeId: true },
+    });
+    if (c) consultores = [c];
+  } else {
+    const equipeAlvo = equipeIdParam ?? (perfil === "GESTOR" ? session.user.equipeId : null);
+    if (!equipeAlvo) return NextResponse.json({ erro: "equipeId obrigatório" }, { status: 400 });
+
+    // Consultor pertence à frente via equipeId primário OU via EquipeConsultor (frente adicional)
+    consultores = await prisma.usuario.findMany({
+      where: {
+        ativo: true,
+        perfil: "CONSULTOR",
+        OR: [
+          { equipeId: equipeAlvo },
+          { frentesAdicionais: { some: { equipeId: equipeAlvo } } },
+        ],
+      },
+      select: { id: true, nome: true, equipeId: true },
+    });
+  }
 
   if (consultores.length === 0) return NextResponse.json([]);
 
-  const equipeId = perfil === "GESTOR"
-    ? (session.user as any).equipeId
-    : equipeIdParam ?? consultores[0].equipeId;
+  const equipeId = equipeIdParam ?? (session.user as any).equipeId ?? consultores[0].equipeId;
 
   const [equipe, metas] = await Promise.all([
     equipeId ? prisma.equipe.findUnique({ where: { id: equipeId }, select: { comissaoBase: true } }) : null,

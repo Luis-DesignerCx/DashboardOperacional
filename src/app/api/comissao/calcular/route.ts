@@ -44,7 +44,14 @@ export async function POST(req: NextRequest) {
   }
 
   const consultores = await prisma.usuario.findMany({
-    where: { equipeId, ativo: true, perfil: "CONSULTOR" },
+    where: {
+      ativo: true,
+      perfil: "CONSULTOR",
+      OR: [
+        { equipeId },
+        { frentesAdicionais: { some: { equipeId } } },
+      ],
+    },
     select: { id: true, nome: true },
   });
 
