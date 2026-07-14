@@ -82,10 +82,11 @@ export async function GET(req: NextRequest) {
         0
       );
 
-      // Filtra metas: aplica apenas metas globais da equipe OU específicas deste consultor
-      const metasConsultor = metas.filter(
-        (m) => m.consultorId === null || m.consultorId === consultor.id
-      );
+      // Meta individual substitui a meta da equipe (ex: consultor de férias)
+      const especificas = metas.filter((m) => m.consultorId === consultor.id);
+      const metasConsultor = especificas.length > 0
+        ? especificas
+        : metas.filter((m) => m.consultorId === null);
 
       const metasComNota = metasConsultor.map((m) => {
         // Se a meta usa percentual, recalcula o alvo sobre a carteira individual
