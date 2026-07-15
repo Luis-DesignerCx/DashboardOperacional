@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import {
   FolderOpen, Search, Plus, X, AlertCircle,
   ChevronRight, UserPlus, Building2, Loader2, CheckCircle2, DollarSign, ArrowLeftRight, User,
-  Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2,
+  Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2, RefreshCw,
 } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 import Link from "next/link";
@@ -23,7 +23,7 @@ interface Contrato {
   contatos: { tipo: string; status: string; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string }[];
   recebimentos: { id: string; valor: number; valorAParte: number | null; dataRecebimento: string; formaPagamento: string }[];
-  parcelas: { id: string; numero: number; diasAtraso: number; valorTotalAberto: number; dataVencimento: string }[];
+  parcelas: { id: string; numero: number; diasAtraso: number; valorTotalAberto: number; dataVencimento: string; remanejada: boolean }[];
 }
 
 interface ItemCarteira {
@@ -168,7 +168,7 @@ export default function CarteiraPage() {
   const [erroPromRap, setErroPromRap] = useState("");
   const [promRapModo, setPromRapModo] = useState<"PROMESSA" | "LINK">("PROMESSA");
   const [contratoRecebimento, setContratoRecebimento] = useState<Contrato | null>(null);
-  const [recebForm, setRecebForm] = useState({ valor: "", valorManual: false, valorAParte: "", formaPagamento: "PIX", observacao: "", data: new Date().toISOString().slice(0, 10), parcelasIds: [] as string[] });
+  const [recebForm, setRecebForm] = useState({ valor: "", valorManual: false, valorAParte: "", formaPagamento: "PIX", observacao: "", data: new Date().toISOString().slice(0, 10), parcelasIds: [] as string[], parcelasRemanejadas: [] as string[] });
   const [salvandoReceb, setSalvandoReceb] = useState(false);
   const [erroReceb, setErroReceb] = useState("");
   const [modalAParte, setModalAParte] = useState<Contrato | null>(null);
@@ -369,6 +369,8 @@ export default function CarteiraPage() {
       observacao: "",
       data: new Date().toISOString().slice(0, 10),
       parcelasIds: [],
+      // Pré-marca parcelas já remanejadas no DB
+      parcelasRemanejadas: c.parcelas.filter((p) => p.remanejada).map((p) => p.id),
     });
     setErroReceb("");
     setModal("recebimento");
@@ -380,12 +382,29 @@ export default function CarteiraPage() {
       const novosIds = jaSelected
         ? f.parcelasIds.filter((id) => id !== parcela.id)
         : [...f.parcelasIds, parcela.id];
+      // Remove de remanejadas se estiver sendo marcada como recebida
+      const novasRem = f.parcelasRemanejadas.filter((id) => id !== parcela.id);
       const totalSelecionado = contratoRecebimento?.parcelas
         .filter((p) => novosIds.includes(p.id))
         .reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0) ?? 0;
-      // Só auto-preenche se o consultor não editou manualmente
       const novoValor = f.valorManual ? f.valor : (novosIds.length > 0 ? totalSelecionado.toFixed(2).replace(".", ",") : f.valor);
-      return { ...f, parcelasIds: novosIds, valor: novoValor };
+      return { ...f, parcelasIds: novosIds, parcelasRemanejadas: novasRem, valor: novoValor };
+    });
+  }
+
+  function toggleParcelaRemanejada(parcelaId: string) {
+    setRecebForm((f) => {
+      const jaRem = f.parcelasRemanejadas.includes(parcelaId);
+      const novasRem = jaRem
+        ? f.parcelasRemanejadas.filter((id) => id !== parcelaId)
+        : [...f.parcelasRemanejadas, parcelaId];
+      // Remove de recebidas se estiver sendo marcada como remanejada
+      const novosIds = f.parcelasIds.filter((id) => id !== parcelaId);
+      const totalSelecionado = contratoRecebimento?.parcelas
+        .filter((p) => novosIds.includes(p.id))
+        .reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0) ?? 0;
+      const novoValor = f.valorManual ? f.valor : (novosIds.length > 0 ? totalSelecionado.toFixed(2).replace(".", ",") : f.valor);
+      return { ...f, parcelasRemanejadas: novasRem, parcelasIds: novosIds, valor: novoValor };
     });
   }
 
@@ -413,6 +432,7 @@ export default function CarteiraPage() {
         formaPagamento: recebForm.formaPagamento,
         observacao: recebForm.observacao,
         parcelasIds: recebForm.parcelasIds,
+        parcelasRemanejadas: recebForm.parcelasRemanejadas,
       }),
     });
     const data = await res.json();
@@ -746,6 +766,7 @@ export default function CarteiraPage() {
                     const totalAParte = c.recebimentos.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
                     // Saldo real = soma das parcelas ainda não pagas (API já filtra paga:false)
                     const saldoAberto = c.parcelas.reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0);
+                    const temRemanejada = c.parcelas.some((p) => p.remanejada);
 
                     return (
                       <div key={item.id} className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-4 transition-colors group">
@@ -763,6 +784,12 @@ export default function CarteiraPage() {
                               {c.statusRecuperacao === "RECUPERACAO_PARCIAL" && (
                                 <span className="text-[10px] bg-teal-500/10 text-teal-400 border border-teal-500/20 px-1.5 py-0.5 rounded font-medium">
                                   Rec. Parcial
+                                </span>
+                              )}
+                              {/* Badge Remanejada */}
+                              {temRemanejada && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" && (
+                                <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded font-medium flex items-center gap-1">
+                                  <RefreshCw size={8} /> Remanejada
                                 </span>
                               )}
                               {/* Badge de situação — somente leitura */}
@@ -1168,36 +1195,62 @@ export default function CarteiraPage() {
               {/* Seleção de parcelas */}
               {contratoRecebimento.parcelas.length > 0 && (
                 <div>
-                  <p className="text-xs text-slate-400 mb-2">Selecione as parcelas pagas <span className="text-slate-400">(o valor é preenchido automaticamente)</span></p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-slate-400">Selecione o status de cada parcela</p>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-emerald-500 inline-block" /> Recebida</span>
+                      <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-sm bg-amber-500 inline-block" /> Remanejada</span>
+                    </div>
+                  </div>
                   <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
                     {[...contratoRecebimento.parcelas].sort((a, b) => new Date(a.dataVencimento).getTime() - new Date(b.dataVencimento).getTime()).map((p) => {
-                      const checked = recebForm.parcelasIds.includes(p.id);
+                      const recebida = recebForm.parcelasIds.includes(p.id);
+                      const remanejada = recebForm.parcelasRemanejadas.includes(p.id);
                       const venc = new Date(p.dataVencimento);
                       const vencLabel = `${String(venc.getUTCDate()).padStart(2,"0")}/${String(venc.getUTCMonth()+1).padStart(2,"0")}/${venc.getUTCFullYear()}`;
                       return (
-                        <button
+                        <div
                           key={p.id}
-                          type="button"
-                          onClick={() => toggleParcela(p)}
                           className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border text-sm transition-colors ${
-                            checked
+                            recebida
                               ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300"
-                              : "bg-slate-800 border-slate-700 text-slate-300 hover:border-slate-600"
+                              : remanejada
+                              ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
+                              : "bg-slate-800 border-slate-700 text-slate-300"
                           }`}
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
-                              checked ? "bg-emerald-500 border-emerald-500" : "border-slate-600"
-                            }`}>
-                              {checked && <CheckCircle2 size={10} className="text-white" />}
-                            </div>
+                          <div className="flex items-center gap-2.5 flex-1 min-w-0">
                             <span>{vencLabel}</span>
                             <span className={`text-xs ${p.diasAtraso > 90 ? "text-red-400" : p.diasAtraso > 30 ? "text-amber-400" : "text-sky-400"}`}>
                               {p.diasAtraso}d atraso
                             </span>
                           </div>
-                          <span className="font-semibold tabular-nums">{formatarMoeda(Number(p.valorTotalAberto ?? 0))}</span>
-                        </button>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold tabular-nums text-xs">{formatarMoeda(Number(p.valorTotalAberto ?? 0))}</span>
+                            {/* Botão Recebida */}
+                            <button
+                              type="button"
+                              onClick={() => toggleParcela(p)}
+                              title="Recebida"
+                              className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors flex-shrink-0 ${
+                                recebida ? "bg-emerald-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-emerald-500/30 hover:text-emerald-300"
+                              }`}
+                            >
+                              <CheckCircle2 size={13} />
+                            </button>
+                            {/* Botão Remanejada */}
+                            <button
+                              type="button"
+                              onClick={() => toggleParcelaRemanejada(p.id)}
+                              title="Remanejada"
+                              className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors flex-shrink-0 ${
+                                remanejada ? "bg-amber-500 text-white" : "bg-slate-700 text-slate-400 hover:bg-amber-500/30 hover:text-amber-300"
+                              }`}
+                            >
+                              <RefreshCw size={12} />
+                            </button>
+                          </div>
+                        </div>
                       );
                     })}
                   </div>

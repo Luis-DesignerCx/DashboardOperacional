@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const body = await req.json();
-  const { contratoId, valor, dataRecebimento, formaPagamento, observacao, parcelasIds, valorAParte } = body;
+  const { contratoId, valor, dataRecebimento, formaPagamento, observacao, parcelasIds, parcelasRemanejadas, valorAParte } = body;
 
   if (!contratoId || !valor || !dataRecebimento || !formaPagamento) {
     return NextResponse.json({ erro: "Campos obrigatórios: contratoId, valor, data, forma de pagamento" }, { status: 400 });
@@ -201,7 +201,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Marca parcelas específicas como pagas
+  // Marca parcelas recebidas como pagas
   if (Array.isArray(parcelasIds) && parcelasIds.length > 0) {
     await prisma.parcela.updateMany({
       where: { id: { in: parcelasIds } },
@@ -209,17 +209,33 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Monta observação com parcelas pagas
+  // Marca parcelas remanejadas (não entram no valor recebido, histórico preservado)
+  if (Array.isArray(parcelasRemanejadas) && parcelasRemanejadas.length > 0) {
+    await prisma.parcela.updateMany({
+      where: { id: { in: parcelasRemanejadas } },
+      data: { remanejada: true },
+    });
+  }
+
+  // Monta observação com parcelas pagas e remanejadas
   let observacaoContato = observacao || `Recebimento de ${formatarMoeda(Number(valorDecimal))} informado`;
-  if (Array.isArray(parcelasIds) && parcelasIds.length > 0) {
-    const parcelasPagas = await prisma.parcela.findMany({
-      where: { id: { in: parcelasIds } },
-      select: { numero: true, dataVencimento: true },
+  const todasIds = [
+    ...(Array.isArray(parcelasIds) ? parcelasIds : []),
+    ...(Array.isArray(parcelasRemanejadas) ? parcelasRemanejadas : []),
+  ];
+  if (todasIds.length > 0) {
+    const todasParcelas = await prisma.parcela.findMany({
+      where: { id: { in: todasIds } },
+      select: { id: true, numero: true, dataVencimento: true, remanejada: true },
       orderBy: { numero: "asc" },
     });
-    if (parcelasPagas.length > 0) {
-      const info = parcelasPagas
-        .map((p) => `Parcela ${p.numero} (venc. ${new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })})`)
+    if (todasParcelas.length > 0) {
+      const info = todasParcelas
+        .map((p) => {
+          const venc = new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+          const tag = p.remanejada ? " [remanejada]" : "";
+          return `Parcela ${p.numero} (venc. ${venc})${tag}`;
+        })
         .join(", ");
       observacaoContato += ` — ${info}`;
     }
