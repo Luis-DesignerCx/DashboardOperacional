@@ -150,6 +150,7 @@ export default function CarteiraPage() {
   const [sort, setSort] = useState("diasAtraso");
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
   const [situacaoFiltro, setSituacaoFiltro] = useState<string | null>(null);
+  const [statusRecupFiltro, setStatusRecupFiltro] = useState<string | null>(null);
   const [situacaoPopover, setSituacaoPopover] = useState<string | null>(null);
   const [salvandoSituacao, setSalvandoSituacao] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -621,7 +622,16 @@ export default function CarteiraPage() {
   const filtrados = carteira.filter((item) => {
     const empresaOk = !empresaFiltro || item.contrato.empresa.nome === empresaFiltro;
     const situacaoOk = !situacaoFiltro || item.contrato.situacao === situacaoFiltro;
-    return empresaOk && situacaoOk;
+    let statusRecupOk = true;
+    if (statusRecupFiltro === "RECUPERADO_INTEGRALMENTE") {
+      statusRecupOk = item.contrato.statusRecuperacao === "RECUPERADO_INTEGRALMENTE";
+    } else if (statusRecupFiltro === "RECUPERACAO_PARCIAL") {
+      statusRecupOk = item.contrato.statusRecuperacao === "RECUPERACAO_PARCIAL";
+    } else if (statusRecupFiltro === "INADIMPLENTE_TODOS") {
+      // Todos que não são adimplentes
+      statusRecupOk = item.contrato.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE";
+    }
+    return empresaOk && situacaoOk && statusRecupOk;
   });
 
   // Agrupar por faixa de inadimplência
@@ -691,6 +701,16 @@ export default function CarteiraPage() {
           <option value="INADIMPLENTE">Inadimplente</option>
           <option value="EM_NEGOCIACAO">Em negociação</option>
           <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
+        </select>
+        <select
+          value={statusRecupFiltro ?? ""}
+          onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
+          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+        >
+          <option value="">Recuperação — todas</option>
+          <option value="RECUPERADO_INTEGRALMENTE">Recebido</option>
+          <option value="RECUPERACAO_PARCIAL">Rec. Parcial</option>
+          <option value="INADIMPLENTE_TODOS">Inadimplente</option>
         </select>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Ordenar por</span>

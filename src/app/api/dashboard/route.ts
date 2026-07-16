@@ -47,10 +47,15 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   const iniComp = competencia ? new Date(competencia.ano, competencia.mes - 1, 1) : new Date(0);
   const fimComp = competencia ? new Date(competencia.ano, competencia.mes, 0, 23, 59, 59, 999) : new Date();
 
+  const recebWhere = {
+    consultorId,
+    contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId, competenciaId, ativo: true } } },
+    dataRecebimento: { gte: iniComp, lte: fimComp },
+  };
+
   const [
     carteira,
-    recebimentoAgg,
-    recebimentosAParte,
+    recebimentosDetalhados,
     promessasHojeAgg,
     promessasVencidasAgg,
     promessasAbertasAgg,
@@ -58,6 +63,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     metasResult,
     saldoParcelasAgg,
     qtdRecuperados,
+    parcelasRemanejadasAgg,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
@@ -66,26 +72,21 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
           select: {
             clienteId: true,
             valorTotalAberto: true,
+            empresa: { select: { nome: true } },
             promessas: { where: { status: "ABERTA" }, select: { id: true } },
           },
         },
       },
     }),
-    prisma.recebimento.aggregate({
-      where: {
-        consultorId,
-        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId, competenciaId, ativo: true } } },
-        dataRecebimento: { gte: iniComp, lte: fimComp },
-      },
-      _sum: { valor: true },
-    }),
+    // Recebimentos detalhados: cobre valor total, valorAParte, forma pagamento e empresa
     prisma.recebimento.findMany({
-      where: {
-        consultorId,
-        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId, competenciaId, ativo: true } } },
-        dataRecebimento: { gte: iniComp, lte: fimComp },
+      where: recebWhere,
+      select: {
+        valor: true,
+        valorAParte: true,
+        formaPagamento: true,
+        contrato: { select: { empresa: { select: { nome: true } } } },
       },
-      select: { valorAParte: true },
     }),
     prisma.promessa.aggregate({
       where: { consultorId, status: "ABERTA", dataPrometida: { gte: inicioHoje, lte: fimHoje } },
@@ -136,6 +137,17 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         carteiras: { some: { consultorId, competenciaId, ativo: true } },
       },
     }),
+    // Valor total de parcelas remanejadas na carteira do consultor
+    prisma.parcela.aggregate({
+      where: {
+        remanejada: true,
+        contrato: {
+          inadimplenciaEquivocada: false,
+          carteiras: { some: { consultorId, competenciaId, ativo: true } },
+        },
+      },
+      _sum: { valorTotalAberto: true },
+    }),
   ]);
 
   // Para a barra de progresso usa a meta FINANCEIRA (individual tem prioridade no mesmo tipo):
@@ -148,11 +160,56 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   const metaQtdGlobal = metasResult.find((m) => m.consultorId === null && m.tipo === "QUANTIDADE") ?? null;
   const metaQtd = metaQtdEsp ?? metaQtdGlobal;
 
+  // Derivar totais dos recebimentos detalhados
+  const valorRecebido = recebimentosDetalhados.reduce((s, r) => s + Number(r.valor ?? 0), 0);
+  const valorAParte = recebimentosDetalhados.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
+
+  // Valor remanejado total
+  const valorRemanejado = Number(parcelasRemanejadasAgg._sum.valorTotalAberto ?? 0);
+
+  // Agrupamento por forma de pagamento
+  const FORMAS_AGRUPADAS: Record<string, string> = {
+    PIX: "pix_boleto",
+    BOLETO: "pix_boleto",
+    TED: "pix_boleto",
+    LINK_PAGAMENTO: "pix_boleto",
+    DINHEIRO: "pix_boleto",
+    DEBITO_AUTOMATICO: "pix_boleto",
+    CARTAO_CREDITO: "cartao_credito",
+    CARTAO_DEBITO: "cartao_credito",
+  };
+  const recebidoPorFormaPagamento: Record<string, number> = { pix_boleto: 0, cartao_credito: 0 };
+  for (const r of recebimentosDetalhados) {
+    const forma = r.formaPagamento as string | null;
+    const grupo = forma ? (FORMAS_AGRUPADAS[forma] ?? "pix_boleto") : "pix_boleto";
+    recebidoPorFormaPagamento[grupo] += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
+  }
+
+  // Agrupamento por empreendimento (empresa)
+  const empresaMap = new Map<string, { contratos: number; recebido: number; saldo: number }>();
+  for (const cp of carteira) {
+    const nome = cp.contrato.empresa?.nome ?? "Sem empresa";
+    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: Number(cp.contrato.valorTotalAberto ?? 0) });
+    else empresaMap.get(nome)!.saldo += Number(cp.contrato.valorTotalAberto ?? 0);
+    empresaMap.get(nome)!.contratos += 1;
+  }
+  for (const r of recebimentosDetalhados) {
+    const nome = r.contrato?.empresa?.nome ?? "Sem empresa";
+    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: 0 });
+    empresaMap.get(nome)!.recebido += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
+  }
+  const porEmpresa = Array.from(empresaMap.entries())
+    .map(([nome, d]) => ({
+      nome,
+      contratos: d.contratos,
+      recebido: d.recebido,
+      eficiencia: d.saldo > 0 ? Math.round((d.recebido / d.saldo) * 10000) / 100 : 0,
+    }))
+    .sort((a, b) => b.recebido - a.recebido);
+
   const valorCarteira = carteira.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;
   const promessasAbertas = promessasAbertasAgg._count;
-  const valorRecebido = Number(recebimentoAgg._sum.valor ?? 0);
-  const valorAParte = recebimentosAParte.reduce((s: number, r: any) => s + Number(r.valorAParte ?? 0), 0);
 
   // Usa a mesma base de cálculo da comissão: soma de parcelas não pagas/não equivocadas
   const saldoConsultor = Number(saldoParcelasAgg._sum.valorTotalAberto ?? 0);
@@ -167,6 +224,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     valorCarteira,
     valorRecebido,
     valorAParte,
+    valorRemanejado,
     totalClientes,
     promessasAbertas,
     valorPromessasAbertas: Number(promessasAbertasAgg._sum.valorPrometido ?? 0),
@@ -178,6 +236,8 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     percentualMeta: (metaAlvo && metaAlvo > 0) ? Math.round(((valorRecebido + valorAParte) / metaAlvo) * 10000) / 100 : 0,
     metaAlvo,
     metaQuantidade: metaQtd?.quantidadeAlvo ? { alvo: Number(metaQtd.quantidadeAlvo), realizado: qtdRecuperados } : null,
+    recebidoPorFormaPagamento,
+    porEmpresa,
   };
 }
 
