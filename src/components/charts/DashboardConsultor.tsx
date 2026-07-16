@@ -272,7 +272,7 @@ export function DashboardConsultor() {
           </div>
           <div className="space-y-3">
             {/* Cabeçalho da tabela */}
-            <div className="grid grid-cols-5 gap-2 text-xs text-slate-500 uppercase tracking-wide px-1 pb-1 border-b border-slate-800">
+            <div className="grid grid-cols-5 gap-2 text-xs font-semibold text-slate-400 px-1 pb-2 border-b border-slate-700">
               <span>Empreendimento</span>
               <span className="text-right">Contratos</span>
               <span className="text-right">Inadimplência</span>
