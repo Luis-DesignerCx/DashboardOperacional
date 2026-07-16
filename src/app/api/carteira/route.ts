@@ -39,7 +39,18 @@ export async function GET(req: NextRequest) {
     orderBy = { contrato: { maiorDiasAtraso: "desc" } };
   }
 
-  const [total, contratos] = await Promise.all([
+  // Filtro de parcelas vivas com o mesmo escopo da carteira (para totalizar corretamente)
+  const whereParcelaTotal: any = {
+    paga: false,
+    remanejada: false,
+    equivocada: false,
+    contrato: {
+      inadimplenciaEquivocada: false,
+      carteiras: { some: where },
+    },
+  };
+
+  const [total, contratos, parcelasAgg] = await Promise.all([
     prisma.carteiraParcela.count({ where }),
     prisma.carteiraParcela.findMany({
       where,
@@ -83,9 +94,10 @@ export async function GET(req: NextRequest) {
       },
       orderBy,
     }),
+    prisma.parcela.aggregate({ where: whereParcelaTotal, _sum: { valorTotalAberto: true } }),
   ]);
 
-  const valorTotal = contratos.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
+  const valorTotal = Number(parcelasAgg._sum.valorTotalAberto ?? 0);
 
   return NextResponse.json({
     contratos,

@@ -71,9 +71,13 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         contrato: {
           select: {
             clienteId: true,
-            valorTotalAberto: true,
             empresa: { select: { nome: true } },
             promessas: { where: { status: "ABERTA" }, select: { id: true } },
+            // Parcelas vivas por contrato — base real de inadimplência por empresa
+            parcelas: {
+              where: { paga: false, remanejada: false, equivocada: false },
+              select: { valorTotalAberto: true },
+            },
           },
         },
       },
@@ -118,7 +122,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       },
       select: { valorAlvo: true, percentualAlvo: true, quantidadeAlvo: true, consultorId: true, tipo: true },
     }),
-    // Mesma query usada na comissão para garantir base de cálculo idêntica
+    // Base para meta financeira: paga:false, equivocada:false (inclui remanejadas, igual à comissão)
     prisma.parcela.aggregate({
       where: {
         paga: false,
@@ -137,10 +141,11 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         carteiras: { some: { consultorId, competenciaId, ativo: true } },
       },
     }),
-    // Valor total de parcelas remanejadas na carteira do consultor
+    // Parcelas remanejadas ainda não pagas
     prisma.parcela.aggregate({
       where: {
         remanejada: true,
+        paga: false,
         contrato: {
           inadimplenciaEquivocada: false,
           carteiras: { some: { consultorId, competenciaId, ativo: true } },
@@ -164,7 +169,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   const valorRecebido = recebimentosDetalhados.reduce((s, r) => s + Number(r.valor ?? 0), 0);
   const valorAParte = recebimentosDetalhados.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
 
-  // Valor remanejado total
+  // Valor remanejado: só parcelas remanejadas ainda não pagas
   const valorRemanejado = Number(parcelasRemanejadasAgg._sum.valorTotalAberto ?? 0);
 
   // Agrupamento por forma de pagamento
@@ -181,12 +186,14 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     recebidoPorFormaPagamento[grupo] += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
   }
 
-  // Agrupamento por empreendimento (empresa)
+  // Agrupamento por empreendimento usando parcelas vivas (mesma base do valorCarteira)
   const empresaMap = new Map<string, { contratos: number; recebido: number; saldo: number }>();
   for (const cp of carteira) {
     const nome = cp.contrato.empresa?.nome ?? "Sem empresa";
-    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: Number(cp.contrato.valorTotalAberto ?? 0) });
-    else empresaMap.get(nome)!.saldo += Number(cp.contrato.valorTotalAberto ?? 0);
+    const saldoContrato = (cp.contrato.parcelas as { valorTotalAberto: any }[])
+      .reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0);
+    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: saldoContrato });
+    else empresaMap.get(nome)!.saldo += saldoContrato;
     empresaMap.get(nome)!.contratos += 1;
   }
   for (const r of recebimentosDetalhados) {
@@ -204,7 +211,8 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     }))
     .sort((a, b) => b.recebido - a.recebido);
 
-  const valorCarteira = carteira.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
+  // valorCarteira = soma de parcelas vivas (paga:false, remanejada:false, equivocada:false) — mesma base da tabela por empresa
+  const valorCarteira = porEmpresa.reduce((s, e) => s + e.inadimplencia, 0);
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;
   const promessasAbertas = promessasAbertasAgg._count;
 
