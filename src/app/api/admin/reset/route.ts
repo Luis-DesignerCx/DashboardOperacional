@@ -9,19 +9,26 @@ export async function POST() {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
   }
 
-  // Deleção em ordem respeitando chaves estrangeiras
-  await prisma.carteiraParcela.deleteMany({});
-  await prisma.parcela.deleteMany({});
-  await prisma.recebimento.deleteMany({});
-  await prisma.promessa.deleteMany({});
-  await prisma.contato.deleteMany({});
-  await prisma.comissao.deleteMany({});
-  await prisma.meta.deleteMany({});
-  await prisma.importacao.deleteMany({});
-  await prisma.auditoria.deleteMany({});
-  await prisma.contrato.deleteMany({});
-  await prisma.cliente.deleteMany({});
-  await prisma.competencia.deleteMany({});
+  try {
+    // Deleção em ordem respeitando chaves estrangeiras
+    await prisma.carteiraParcela.deleteMany({});
+    await prisma.parcela.deleteMany({});
+    await prisma.recebimento.deleteMany({});
+    await prisma.promessa.deleteMany({});
+    await prisma.contato.deleteMany({});
+    await prisma.comissao.deleteMany({});
+    await prisma.meta.deleteMany({});
+    await prisma.solicitacao.deleteMany({});
+    await prisma.feriasConsultor.deleteMany({});
+    await prisma.importacao.deleteMany({});
+    await prisma.auditoria.deleteMany({});
+    await prisma.contrato.deleteMany({});
+    await prisma.cliente.deleteMany({});
+    await prisma.competencia.deleteMany({});
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error("[admin/reset]", err);
+    return NextResponse.json({ erro: err.message || "Erro ao limpar base" }, { status: 500 });
+  }
 }
