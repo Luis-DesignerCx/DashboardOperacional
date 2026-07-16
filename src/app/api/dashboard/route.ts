@@ -115,7 +115,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         competenciaId,
         OR: [{ consultorId: null }, { consultorId }],
       },
-      select: { valorAlvo: true, percentualAlvo: true, consultorId: true, tipo: true },
+      select: { valorAlvo: true, percentualAlvo: true, quantidadeAlvo: true, consultorId: true, tipo: true },
     }),
     // Mesma query usada na comissão para garantir base de cálculo idêntica
     prisma.parcela.aggregate({
