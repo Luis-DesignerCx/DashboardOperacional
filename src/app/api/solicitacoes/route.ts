@@ -23,6 +23,7 @@ export async function GET() {
         select: {
           numero: true,
           cliente: { select: { nome: true } },
+          empresa: { select: { nome: true } },
           carteiras: {
             where: { ativo: true },
             select: {

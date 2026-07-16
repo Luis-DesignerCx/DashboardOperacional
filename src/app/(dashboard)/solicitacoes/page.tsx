@@ -33,6 +33,7 @@ interface Solicitacao {
   contrato?: {
     numero: string;
     cliente: { nome: string };
+    empresa: { nome: string };
     carteiras?: { consultor: { nome: string; equipe?: Equipe | null } }[];
   } | null;
 }
@@ -106,35 +107,49 @@ export default function SolicitacoesPage() {
                         {LABEL_TIPO[s.tipo]}
                       </span>
                     </div>
-                    <p className="text-white font-medium">{s.solicitante.nome}</p>
-                    {s.solicitante.equipe && (
-                      <p className="text-slate-500 text-xs">
-                        Frente: <span className="text-slate-400">{FRENTE_LABEL[s.solicitante.equipe.tipo] ?? s.solicitante.equipe.nome}</span>
-                      </p>
+                    {/* Cliente / Contrato / Empresa — aparece para todos os tipos */}
+                    {s.contrato ? (
+                      <div className="mt-1 mb-2">
+                        <p className="text-white font-semibold">{s.contrato.cliente.nome}</p>
+                        <p className="text-slate-400 text-xs mt-0.5">
+                          {s.contrato.numero}
+                          {s.contrato.empresa?.nome && (
+                            <span className="text-slate-500"> · {s.contrato.empresa.nome}</span>
+                          )}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-white font-medium mb-1">{s.solicitante.nome}</p>
                     )}
+
+                    {/* Solicitante / Frente */}
+                    <p className="text-slate-500 text-xs">
+                      Solicitante: <span className="text-slate-400">{s.solicitante.nome}</span>
+                      {s.solicitante.equipe && (
+                        <span className="text-slate-500"> · Frente: <span className="text-slate-400">{FRENTE_LABEL[s.solicitante.equipe.tipo] ?? s.solicitante.equipe.nome}</span></span>
+                      )}
+                    </p>
+
+                    {/* Info extra para transferência */}
                     {s.tipo === "TRANSFERENCIA_CONTRATO" && s.contrato && (() => {
                       const donoAtual = s.contrato.carteiras?.[0]?.consultor;
                       const frenteSolicitante = s.solicitante.equipe?.tipo;
                       const frenteDono = donoAtual?.equipe?.tipo;
                       const frenteDiferente = frenteSolicitante && frenteDono && frenteSolicitante !== frenteDono;
-                      return (
-                        <div className={`mt-1 rounded-lg px-3 py-2 border text-sm ${frenteDiferente ? "bg-amber-500/10 border-amber-500/30" : "bg-slate-800 border-slate-700"}`}>
-                          <p className={`font-mono text-xs ${frenteDiferente ? "text-amber-300" : "text-slate-300"}`}>
-                            {s.contrato.cliente.nome} · {s.contrato.numero}
+                      return donoAtual ? (
+                        <div className={`mt-1.5 rounded-lg px-3 py-2 border text-xs ${frenteDiferente ? "bg-amber-500/10 border-amber-500/30" : "bg-slate-800 border-slate-700"}`}>
+                          <p className="text-slate-400">
+                            Dono atual: <span className="text-slate-300">{donoAtual.nome}</span>
+                            {donoAtual.equipe && <span className={`ml-1 ${frenteDiferente ? "text-amber-400 font-medium" : "text-slate-500"}`}>({FRENTE_LABEL[donoAtual.equipe.tipo] ?? donoAtual.equipe.nome})</span>}
                           </p>
-                          {donoAtual && (
-                            <p className="text-xs mt-0.5 text-slate-400">
-                              Dono atual: <span className="text-slate-300">{donoAtual.nome}</span>
-                              {donoAtual.equipe && <span className={`ml-1 ${frenteDiferente ? "text-amber-400 font-medium" : "text-slate-500"}`}>({FRENTE_LABEL[donoAtual.equipe.tipo] ?? donoAtual.equipe.nome})</span>}
-                            </p>
-                          )}
                           {frenteDiferente && (
                             <p className="text-[11px] text-amber-400 font-medium mt-1">⚠ Transferência entre frentes diferentes</p>
                           )}
                         </div>
-                      );
+                      ) : null;
                     })()}
-                    <p className="text-slate-400 text-sm mt-1">{s.motivo}</p>
+
+                    <p className="text-slate-400 text-sm mt-1.5">{s.motivo}</p>
                     {s.resposta && (
                       <p className="text-slate-500 text-sm mt-1 italic">Resposta: {s.resposta}</p>
                     )}
