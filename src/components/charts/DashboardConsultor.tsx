@@ -233,7 +233,7 @@ export function DashboardConsultor() {
             <div className="bg-slate-800/60 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign size={15} className="text-emerald-400" />
-                <p className="text-xs text-slate-400 uppercase tracking-wide">Pix · Boleto · TED · Outros</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Pix · Boleto · Link de Pagamento</p>
               </div>
               <p className="text-2xl font-bold text-white">{formatarMoeda(pixBoleto)}</p>
               <p className="text-xs text-slate-500 mt-1">
