@@ -171,12 +171,8 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   const FORMAS_AGRUPADAS: Record<string, string> = {
     PIX: "pix_boleto",
     BOLETO: "pix_boleto",
-    TED: "pix_boleto",
-    LINK_PAGAMENTO: "pix_boleto",
-    DINHEIRO: "pix_boleto",
-    DEBITO_AUTOMATICO: "pix_boleto",
     CARTAO_CREDITO: "cartao_credito",
-    CARTAO_DEBITO: "cartao_credito",
+    LINK_PAGAMENTO: "cartao_credito",
   };
   const recebidoPorFormaPagamento: Record<string, number> = { pix_boleto: 0, cartao_credito: 0 };
   for (const r of recebimentosDetalhados) {

@@ -233,7 +233,7 @@ export function DashboardConsultor() {
             <div className="bg-slate-800/60 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <DollarSign size={15} className="text-emerald-400" />
-                <p className="text-xs text-slate-400 uppercase tracking-wide">Pix · Boleto · Link de Pagamento</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Pix · Boleto</p>
               </div>
               <p className="text-2xl font-bold text-white">{formatarMoeda(pixBoleto)}</p>
               <p className="text-xs text-slate-500 mt-1">
@@ -248,7 +248,7 @@ export function DashboardConsultor() {
             <div className="bg-slate-800/60 rounded-xl p-4">
               <div className="flex items-center gap-2 mb-3">
                 <CreditCard size={15} className="text-violet-400" />
-                <p className="text-xs text-slate-400 uppercase tracking-wide">Cartão de Crédito · Débito</p>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">Cartão de Crédito</p>
               </div>
               <p className="text-2xl font-bold text-white">{formatarMoeda(cartaoCredito)}</p>
               <p className="text-xs text-slate-500 mt-1">
