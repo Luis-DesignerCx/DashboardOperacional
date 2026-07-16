@@ -57,6 +57,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     agendadosHoje,
     metasResult,
     saldoParcelasAgg,
+    qtdRecuperados,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
@@ -128,13 +129,24 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       },
       _sum: { valorTotalAberto: true },
     }),
+    // Contratos recuperados integralmente (para meta QUANTIDADE)
+    prisma.contrato.count({
+      where: {
+        statusRecuperacao: "RECUPERADO_INTEGRALMENTE",
+        carteiras: { some: { consultorId, competenciaId, ativo: true } },
+      },
+    }),
   ]);
 
-  // Para a barra de progresso usa a meta FINANCEIRA:
-  // individual tem prioridade sobre a da equipe no mesmo tipo
+  // Para a barra de progresso usa a meta FINANCEIRA (individual tem prioridade no mesmo tipo):
   const metaFinancEsp = metasResult.find((m) => m.consultorId === consultorId && m.tipo === "FINANCEIRA") ?? null;
   const metaFinancGlobal = metasResult.find((m) => m.consultorId === null && m.tipo === "FINANCEIRA") ?? null;
   const meta = metaFinancEsp ?? metaFinancGlobal;
+
+  // Meta QUANTIDADE (individual tem prioridade)
+  const metaQtdEsp = metasResult.find((m) => m.consultorId === consultorId && m.tipo === "QUANTIDADE") ?? null;
+  const metaQtdGlobal = metasResult.find((m) => m.consultorId === null && m.tipo === "QUANTIDADE") ?? null;
+  const metaQtd = metaQtdEsp ?? metaQtdGlobal;
 
   const valorCarteira = carteira.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;
@@ -165,6 +177,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     agendadosHoje,
     percentualMeta: (metaAlvo && metaAlvo > 0) ? Math.round(((valorRecebido + valorAParte) / metaAlvo) * 10000) / 100 : 0,
     metaAlvo,
+    metaQuantidade: metaQtd?.valorAlvo ? { alvo: Number(metaQtd.valorAlvo), realizado: qtdRecuperados } : null,
   };
 }
 

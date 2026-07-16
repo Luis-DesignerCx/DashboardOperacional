@@ -75,13 +75,21 @@ export async function POST(req: NextRequest) {
       });
       const saldoConsultor = Number(saldoAgg._sum.valorTotalAberto ?? 0);
 
-      const recebimentos = await prisma.recebimento.findMany({
-        where: {
-          consultorId: consultor.id,
-          contrato: { carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
-        },
-        select: { valor: true, valorAParte: true },
-      });
+      const [recebimentos, qtdRecuperados] = await Promise.all([
+        prisma.recebimento.findMany({
+          where: {
+            consultorId: consultor.id,
+            contrato: { carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
+          },
+          select: { valor: true, valorAParte: true },
+        }),
+        prisma.contrato.count({
+          where: {
+            statusRecuperacao: "RECUPERADO_INTEGRALMENTE",
+            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } },
+          },
+        }),
+      ]);
 
       const totalRecebido = recebimentos.reduce(
         (s, r) => s + Number(r.valor) + Number(r.valorAParte ?? 0),
@@ -114,7 +122,7 @@ export async function POST(req: NextRequest) {
         };
       });
 
-      const { totalComissao, breakdown } = calcularComissaoMetas(comissaoBase, metasComNota, totalRecebido);
+      const { totalComissao, breakdown } = calcularComissaoMetas(comissaoBase, metasComNota, totalRecebido, qtdRecuperados);
 
       const metaFin = metasComNota.find((m) => m.tipo === "FINANCEIRA");
       const percentualMeta = metaFin?.valorAlvo ? (totalRecebido / metaFin.valorAlvo) * 100 : 0;

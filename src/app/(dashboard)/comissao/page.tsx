@@ -315,7 +315,8 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                       <td className="px-3 py-2.5 text-right text-emerald-400 font-semibold tabular-nums">{formatarMoeda(valorBase)}</td>
                       <td className="px-3 py-2.5 text-right text-slate-400 tabular-nums">
                         {m.tipo === "FINANCEIRA" && m.valorAlvo ? formatarMoeda(m.valorAlvo) :
-                         m.tipo === "MONITORIA" && m.thresholdsMonitoria ? `Nota ≥ ${m.thresholdsMonitoria["100"] ?? "?"} → 100%` : "—"}
+                         m.tipo === "MONITORIA" && m.thresholdsMonitoria ? `Nota ≥ ${m.thresholdsMonitoria["100"] ?? "?"} → 100%` :
+                         m.tipo === "QUANTIDADE" && m.valorAlvo ? `${m.valorAlvo} contratos` : "—"}
                       </td>
                     </tr>
                   );
@@ -385,7 +386,11 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                             <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{Math.round(bd.peso * 100)}%</td>
                             <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{formatarMoeda(bd.valorBase)}</td>
                             <td className="px-4 py-3 text-right tabular-nums">
-                              {bd.tipo === "MONITORIA" ? (
+                              {bd.tipo === "QUANTIDADE" ? (
+                                <span className="text-slate-300">
+                                  {bd.realizado != null ? `${bd.realizado} contratos` : "—"}
+                                </span>
+                              ) : bd.tipo === "MONITORIA" ? (
                                 <input
                                   type="number"
                                   min="0"
@@ -589,6 +594,8 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
                       <td className="px-4 py-3 text-right text-slate-300 tabular-nums">
                         {bd.tipo === "FINANCEIRA"
                           ? (bd.realizado != null ? formatarMoeda(bd.realizado) : "—")
+                          : bd.tipo === "QUANTIDADE"
+                          ? (bd.realizado != null ? `${bd.realizado} contratos` : "—")
                           : (bd.realizado != null ? `${bd.realizado}` : "—")}
                       </td>
                       <td className={`px-4 py-3 text-right font-semibold tabular-nums ${faixaCor(bd.atingimento)}`}>

@@ -175,33 +175,10 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Calcula total recebido e atualiza statusRecuperacao
   const totalRecebidoAntes = contrato.recebimentos.reduce((s, r) => s + Number(r.valor), 0);
   const totalRecebido = totalRecebidoAntes + Number(valorDecimal);
-  const valorAberto = Number(contrato.valorTotalAberto ?? 0);
 
-  const statusRecuperacao =
-    totalRecebido >= valorAberto
-      ? "RECUPERADO_INTEGRALMENTE"
-      : totalRecebido > 0
-      ? "RECUPERACAO_PARCIAL"
-      : "INADIMPLENTE";
-
-  await prisma.contrato.update({
-    where: { id: contratoId },
-    // Recebimento confirmado → reseta situação (promessa/negociação eram expectativa, não pagamento)
-    data: { statusRecuperacao, situacao: "INADIMPLENTE" },
-  });
-
-  // Se quitado integralmente, fecha todas as promessas abertas do contrato
-  if (statusRecuperacao === "RECUPERADO_INTEGRALMENTE") {
-    await prisma.promessa.updateMany({
-      where: { contratoId, status: "ABERTA" },
-      data: { status: "PAGA" },
-    });
-  }
-
-  // Marca parcelas recebidas como pagas
+  // Marca parcelas ANTES de calcular status para refletir estado final
   if (Array.isArray(parcelasIds) && parcelasIds.length > 0) {
     await prisma.parcela.updateMany({
       where: { id: { in: parcelasIds } },
@@ -214,6 +191,32 @@ export async function POST(req: NextRequest) {
     await prisma.parcela.updateMany({
       where: { id: { in: parcelasRemanejadas } },
       data: { remanejada: true },
+    });
+  }
+
+  // Conta parcelas ainda pendentes (nem pagas nem remanejadas)
+  const parcelasPendentes = await prisma.parcela.count({
+    where: { contratoId, paga: false, remanejada: false, equivocada: false },
+  });
+
+  // Contrato adimplente se não restar nenhuma parcela pendente
+  const statusRecuperacao =
+    parcelasPendentes === 0
+      ? "RECUPERADO_INTEGRALMENTE"
+      : totalRecebido > 0
+      ? "RECUPERACAO_PARCIAL"
+      : "INADIMPLENTE";
+
+  await prisma.contrato.update({
+    where: { id: contratoId },
+    data: { statusRecuperacao, situacao: "INADIMPLENTE" },
+  });
+
+  // Se quitado integralmente, fecha todas as promessas abertas do contrato
+  if (statusRecuperacao === "RECUPERADO_INTEGRALMENTE") {
+    await prisma.promessa.updateMany({
+      where: { contratoId, status: "ABERTA" },
+      data: { status: "PAGA" },
     });
   }
 

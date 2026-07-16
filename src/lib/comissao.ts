@@ -31,7 +31,8 @@ export function calcularComissaoMetas(
     thresholdsMonitoria?: Record<string, number> | null;
     notaMonitoria?: number;
   }>,
-  totalRecebido: number
+  totalRecebido: number,
+  quantidadeContratos?: number
 ): ResultadoComissao {
   const breakdown: MetaBreakdown[] = [];
   let totalComissao = 0;
@@ -57,6 +58,10 @@ export function calcularComissaoMetas(
           ? calcularAtingimentoMonitoria(nota, meta.thresholdsMonitoria)
           : 0;
       }
+    } else if (meta.tipo === "QUANTIDADE") {
+      alvo = meta.valorAlvo != null ? Number(meta.valorAlvo) : null;
+      realizado = quantidadeContratos != null ? quantidadeContratos : null;
+      atingimento = alvo && alvo > 0 && realizado != null ? (realizado / alvo) * 100 : 0;
     }
 
     const multiplicador = calcularMultiplicador(atingimento);

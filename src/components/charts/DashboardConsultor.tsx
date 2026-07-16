@@ -19,6 +19,7 @@ interface DadosConsultor {
   agendadosHoje: number;
   percentualMeta: number;
   metaAlvo: number | null;
+  metaQuantidade?: { alvo: number; realizado: number } | null;
 }
 
 function CardMetrica({ titulo, valor, sub, icon: Icon, cor }: {
@@ -139,7 +140,7 @@ export function DashboardConsultor() {
         />
       </div>
 
-      {/* Barra de progresso da meta */}
+      {/* Barra de progresso — meta financeira */}
       {dados.metaAlvo && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <div className="flex justify-between items-center mb-3">
@@ -160,6 +161,36 @@ export function DashboardConsultor() {
             <span>{formatarMoeda(dados.valorRecebido + dados.valorAParte)} recebido</span>
             <span>{formatarMoeda(dados.metaAlvo)} meta</span>
           </div>
+        </div>
+      )}
+
+      {/* Contratos recuperados — meta quantidade */}
+      {dados.metaQuantidade && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+          {(() => {
+            const { alvo, realizado } = dados.metaQuantidade!;
+            const pct = alvo > 0 ? Math.min((realizado / alvo) * 100, 100) : 0;
+            return (
+              <>
+                <div className="flex justify-between items-center mb-3">
+                  <p className="text-sm font-medium text-white">Contratos Recuperados</p>
+                  <span className={`text-sm font-bold ${pct >= 100 ? "text-emerald-400" : "text-gr-400"}`}>
+                    {realizado} / {alvo}
+                  </span>
+                </div>
+                <div className="h-3 bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${pct >= 100 ? "bg-emerald-500" : pct >= 70 ? "bg-gr-500" : "bg-slate-600"}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <div className="flex justify-between mt-2 text-xs text-slate-500">
+                  <span>{realizado} contrato{realizado !== 1 ? "s" : ""} adimplente{realizado !== 1 ? "s" : ""}</span>
+                  <span>meta: {alvo} contratos</span>
+                </div>
+              </>
+            );
+          })()}
         </div>
       )}
 
