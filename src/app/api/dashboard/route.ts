@@ -177,7 +177,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     agendadosHoje,
     percentualMeta: (metaAlvo && metaAlvo > 0) ? Math.round(((valorRecebido + valorAParte) / metaAlvo) * 10000) / 100 : 0,
     metaAlvo,
-    metaQuantidade: metaQtd?.valorAlvo ? { alvo: Number(metaQtd.valorAlvo), realizado: qtdRecuperados } : null,
+    metaQuantidade: metaQtd?.quantidadeAlvo ? { alvo: Number(metaQtd.quantidadeAlvo), realizado: qtdRecuperados } : null,
   };
 }
 

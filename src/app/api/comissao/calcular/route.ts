@@ -107,8 +107,9 @@ export async function POST(req: NextRequest) {
       );
 
       const metasComNota = metasConsultor.map((m) => {
-        // Se a meta usa percentual, recalcula o alvo sobre a carteira individual
-        const valorAlvo = m.percentualAlvo && saldoConsultor > 0
+        const valorAlvo = m.tipo === "QUANTIDADE"
+          ? (m.quantidadeAlvo ? Number(m.quantidadeAlvo) : null)
+          : m.percentualAlvo && saldoConsultor > 0
           ? (Number(m.percentualAlvo) / 100) * saldoConsultor
           : m.valorAlvo ? Number(m.valorAlvo) : null;
         return {

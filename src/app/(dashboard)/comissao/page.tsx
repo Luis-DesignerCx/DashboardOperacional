@@ -15,6 +15,7 @@ interface MetaItem {
   tipo: string;
   peso: number;
   valorAlvo: number | null;
+  quantidadeAlvo: number | null;
   thresholdsMonitoria: Record<string, number> | null;
 }
 
@@ -115,6 +116,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
       tipo: m.tipo,
       peso: Number(m.peso),
       valorAlvo: m.valorAlvo ? Number(m.valorAlvo) : null,
+      quantidadeAlvo: m.quantidadeAlvo ? Number(m.quantidadeAlvo) : null,
       thresholdsMonitoria: m.thresholdsMonitoria ?? null,
     })) : [];
     setMetas(metaLista);
@@ -316,7 +318,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                       <td className="px-3 py-2.5 text-right text-slate-400 tabular-nums">
                         {m.tipo === "FINANCEIRA" && m.valorAlvo ? formatarMoeda(m.valorAlvo) :
                          m.tipo === "MONITORIA" && m.thresholdsMonitoria ? `Nota ≥ ${m.thresholdsMonitoria["100"] ?? "?"} → 100%` :
-                         m.tipo === "QUANTIDADE" && m.valorAlvo ? `${m.valorAlvo} contratos` : "—"}
+                         m.tipo === "QUANTIDADE" && m.quantidadeAlvo ? `${m.quantidadeAlvo} contratos` : "—"}
                       </td>
                     </tr>
                   );
