@@ -199,6 +199,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       nome,
       contratos: d.contratos,
       recebido: d.recebido,
+      inadimplencia: d.saldo,
       eficiencia: d.saldo > 0 ? Math.round((d.recebido / d.saldo) * 10000) / 100 : 0,
     }))
     .sort((a, b) => b.recebido - a.recebido);

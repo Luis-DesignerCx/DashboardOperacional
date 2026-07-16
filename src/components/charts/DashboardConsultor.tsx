@@ -12,6 +12,7 @@ interface PorEmpresa {
   nome: string;
   contratos: number;
   recebido: number;
+  inadimplencia: number;
   eficiencia: number;
 }
 
@@ -271,16 +272,18 @@ export function DashboardConsultor() {
           </div>
           <div className="space-y-3">
             {/* Cabeçalho da tabela */}
-            <div className="grid grid-cols-4 gap-2 text-xs text-slate-500 uppercase tracking-wide px-1 pb-1 border-b border-slate-800">
+            <div className="grid grid-cols-5 gap-2 text-xs text-slate-500 uppercase tracking-wide px-1 pb-1 border-b border-slate-800">
               <span>Empreendimento</span>
               <span className="text-right">Contratos</span>
+              <span className="text-right">Inadimplência</span>
               <span className="text-right">Recebido</span>
               <span className="text-right">Eficiência</span>
             </div>
             {dados.porEmpresa.map((e) => (
-              <div key={e.nome} className="grid grid-cols-4 gap-2 items-center px-1 py-1.5 rounded-lg hover:bg-slate-800/50 transition-colors">
+              <div key={e.nome} className="grid grid-cols-5 gap-2 items-center px-1 py-1.5 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-sm text-white truncate">{e.nome}</span>
                 <span className="text-sm text-slate-300 text-right">{e.contratos}</span>
+                <span className="text-sm text-slate-300 text-right">{formatarMoeda(e.inadimplencia)}</span>
                 <span className="text-sm text-slate-300 text-right">{formatarMoeda(e.recebido)}</span>
                 <span className={`text-sm font-semibold text-right ${e.eficiencia >= 80 ? "text-emerald-400" : e.eficiencia >= 50 ? "text-amber-400" : "text-slate-400"}`}>
                   {e.eficiencia.toFixed(1)}%
