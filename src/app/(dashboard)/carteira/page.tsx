@@ -680,18 +680,39 @@ export default function CarteiraPage() {
         </div>
       </div>
 
-      {/* Busca + Ordenação */}
+      {/* Busca + Filtros + Ordenação — tudo em uma linha */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-52">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text"
-            placeholder="Buscar por cliente ou contrato (busca em toda a carteira)..."
+            placeholder="Buscar por cliente ou contrato..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
           />
         </div>
+        <select
+          value={statusRecupFiltro ?? ""}
+          onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
+          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+        >
+          <option value="">Recuperação — todas</option>
+          <option value="RECUPERADO_INTEGRALMENTE">Recebido</option>
+          <option value="RECUPERACAO_PARCIAL">Rec. Parcial</option>
+          <option value="INADIMPLENTE_TODOS">Inadimplente</option>
+        </select>
+        <select
+          value={situacaoFiltro ?? ""}
+          onChange={(e) => setSituacaoFiltro(e.target.value || null)}
+          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+        >
+          <option value="">Situação — todas</option>
+          <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
+          <option value="LINK_ENVIADO">Link enviado</option>
+          <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
+          <option value="LIGAR_DEPOIS">Ligar depois</option>
+        </select>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Ordenar por</span>
           <select
@@ -706,33 +727,8 @@ export default function CarteiraPage() {
         </div>
       </div>
 
-      {/* Filtros — dropdowns + empreendimento */}
+      {/* Empreendimento — pills */}
       <div className="space-y-2">
-        <div className="flex gap-3 flex-wrap">
-          <select
-            value={statusRecupFiltro ?? ""}
-            onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
-          >
-            <option value="">Recuperação — todas</option>
-            <option value="RECUPERADO_INTEGRALMENTE">Recebido</option>
-            <option value="RECUPERACAO_PARCIAL">Rec. Parcial</option>
-            <option value="INADIMPLENTE_TODOS">Inadimplente</option>
-          </select>
-          <select
-            value={situacaoFiltro ?? ""}
-            onChange={(e) => setSituacaoFiltro(e.target.value || null)}
-            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
-          >
-            <option value="">Situação — todas</option>
-            <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
-            <option value="LINK_ENVIADO">Link enviado</option>
-            <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
-            <option value="LIGAR_DEPOIS">Ligar depois</option>
-          </select>
-        </div>
-
-        {/* Empreendimento — pills */}
         {empresas.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <button
