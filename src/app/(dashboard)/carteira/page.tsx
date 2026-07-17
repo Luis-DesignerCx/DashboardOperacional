@@ -149,7 +149,6 @@ export default function CarteiraPage() {
   const [busca, setBusca] = useState("");
   const [sort, setSort] = useState("diasAtraso");
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
-  const [situacaoFiltro, setSituacaoFiltro] = useState<string | null>(null);
   const [statusRecupFiltro, setStatusRecupFiltro] = useState<string | null>(null);
   const [situacaoPopover, setSituacaoPopover] = useState<string | null>(null);
   const [salvandoSituacao, setSalvandoSituacao] = useState<string | null>(null);
@@ -621,7 +620,6 @@ export default function CarteiraPage() {
   // Filtros client-side (sort/busca são server-side)
   const filtrados = carteira.filter((item) => {
     const empresaOk = !empresaFiltro || item.contrato.empresa.nome === empresaFiltro;
-    const situacaoOk = !situacaoFiltro || item.contrato.situacao === situacaoFiltro;
     let statusRecupOk = true;
     if (statusRecupFiltro === "RECUPERADO_INTEGRALMENTE") {
       statusRecupOk = item.contrato.statusRecuperacao === "RECUPERADO_INTEGRALMENTE";
@@ -631,7 +629,7 @@ export default function CarteiraPage() {
       // Todos que não são adimplentes
       statusRecupOk = item.contrato.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE";
     }
-    return empresaOk && situacaoOk && statusRecupOk;
+    return empresaOk && statusRecupOk;
   });
 
   // Agrupar por faixa de inadimplência
@@ -692,16 +690,6 @@ export default function CarteiraPage() {
             className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
           />
         </div>
-        <select
-          value={situacaoFiltro ?? ""}
-          onChange={(e) => setSituacaoFiltro(e.target.value || null)}
-          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
-        >
-          <option value="">Todas as situações</option>
-          <option value="INADIMPLENTE">Inadimplente</option>
-          <option value="EM_NEGOCIACAO">Em negociação</option>
-          <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
-        </select>
         <select
           value={statusRecupFiltro ?? ""}
           onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
