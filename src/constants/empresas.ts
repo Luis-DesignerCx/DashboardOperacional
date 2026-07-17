@@ -7,6 +7,7 @@ export const PREFIXOS_EMPRESA: Record<string, string> = {
   RP: "Royal Prime",
   RS: "Royal Star",
   FP: "Fã Pass",
+  PON: "Fã Pass",
 };
 
 export const EMPRESAS = [
@@ -16,7 +17,7 @@ export const EMPRESAS = [
   { nome: "Royal Star", prefixos: ["RS"] },
   { nome: "Pitangui", prefixos: ["PG"] },
   { nome: "Mydest", prefixos: [] }, // todos os demais contratos
-  { nome: "Fã Pass", prefixos: ["FP"] },
+  { nome: "Fã Pass", prefixos: ["FP", "PON"] },
 ];
 
 // Identifica empresa pelo número do contrato
