@@ -20,34 +20,37 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ erro: "equipeId e competenciaId obrigatórios" }, { status: 400 });
   }
 
-  // Monta filtro da carteira
-  const where: any = {
-    competenciaId,
-    ativo: true,
-    contrato: { inadimplenciaEquivocada: false },
-  };
+  let consultorIds: string[];
 
   if (consultorId) {
-    where.consultorId = consultorId;
+    consultorIds = [consultorId];
   } else {
-    // Todos os consultores da equipe
     const equipe = await prisma.equipe.findUnique({
       where: { id: equipeId },
-      select: { usuarios: { where: { ativo: true, perfil: "CONSULTOR" }, select: { id: true } } },
+      select: {
+        usuarios: { where: { ativo: true, perfil: "CONSULTOR" }, select: { id: true } },
+        consultoresAdicionais: { where: { ativo: true, perfil: "CONSULTOR" }, select: { id: true } },
+      },
     });
     if (!equipe) return NextResponse.json({ totalInadimplencia: 0 });
-    where.consultorId = { in: equipe.usuarios.map((u) => u.id) };
+    consultorIds = [
+      ...equipe.usuarios.map((u) => u.id),
+      ...equipe.consultoresAdicionais.map((u) => u.id),
+    ];
   }
 
-  const carteiras = await prisma.carteiraParcela.findMany({
-    where,
-    select: { contrato: { select: { valorTotalAberto: true } } },
+  // Mesma base do dashboard e da comissão: parcelas paga:false, equivocada:false
+  const agg = await prisma.parcela.aggregate({
+    where: {
+      paga: false,
+      equivocada: false,
+      contrato: {
+        inadimplenciaEquivocada: false,
+        carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } },
+      },
+    },
+    _sum: { valorTotalAberto: true },
   });
 
-  const totalInadimplencia = carteiras.reduce(
-    (s, c) => s + Number(c.contrato.valorTotalAberto ?? 0),
-    0
-  );
-
-  return NextResponse.json({ totalInadimplencia });
+  return NextResponse.json({ totalInadimplencia: Number(agg._sum.valorTotalAberto ?? 0) });
 }

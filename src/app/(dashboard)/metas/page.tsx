@@ -472,7 +472,7 @@ export default function MetasPage() {
                           </div>
                           {totalInadimplencia != null && (
                             <p className="text-xs text-slate-400 mt-1.5">
-                              Base da equipe:{" "}
+                              {form.consultorId ? "Base do consultor:" : "Base da equipe:"}{" "}
                               <span className="text-white font-medium">{formatarMoeda(totalInadimplencia)}</span>
                               {form.percentualAlvo && (
                                 <span className="text-sky-400 ml-1">
@@ -482,7 +482,7 @@ export default function MetasPage() {
                             </p>
                           )}
                           {totalInadimplencia == null && form.equipeId && form.competenciaId && (
-                            <p className="text-xs text-slate-500 mt-1">Carregando base da equipe...</p>
+                            <p className="text-xs text-slate-500 mt-1">Carregando base...</p>
                           )}
                         </>
                       )}
