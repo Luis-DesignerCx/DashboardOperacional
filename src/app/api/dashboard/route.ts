@@ -82,14 +82,14 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         },
       },
     }),
-    // Recebimentos detalhados: cobre valor total, valorAParte, forma pagamento e empresa
+    // Recebimentos detalhados: cobre valor total, valorAParte, forma pagamento, empresa e cliente
     prisma.recebimento.findMany({
       where: recebWhere,
       select: {
         valor: true,
         valorAParte: true,
         formaPagamento: true,
-        contrato: { select: { empresa: { select: { nome: true } } } },
+        contrato: { select: { clienteId: true, empresa: { select: { nome: true } } } },
       },
     }),
     prisma.promessa.aggregate({
@@ -186,20 +186,27 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     recebidoPorFormaPagamento[grupo] += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
   }
 
+  // Clientes distintos que fizeram pelo menos um pagamento na competência
+  const clientesPagaramTotal = new Set(
+    recebimentosDetalhados.map((r) => r.contrato?.clienteId).filter(Boolean)
+  ).size;
+
   // Agrupamento por empreendimento usando parcelas vivas (mesma base do valorCarteira)
-  const empresaMap = new Map<string, { contratos: number; recebido: number; saldo: number }>();
+  const empresaMap = new Map<string, { contratos: number; recebido: number; saldo: number; clientesPagaram: Set<string> }>();
   for (const cp of carteira) {
     const nome = cp.contrato.empresa?.nome ?? "Sem empresa";
     const saldoContrato = (cp.contrato.parcelas as { valorTotalAberto: any }[])
       .reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0);
-    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: saldoContrato });
+    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: saldoContrato, clientesPagaram: new Set() });
     else empresaMap.get(nome)!.saldo += saldoContrato;
     empresaMap.get(nome)!.contratos += 1;
   }
   for (const r of recebimentosDetalhados) {
     const nome = r.contrato?.empresa?.nome ?? "Sem empresa";
-    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: 0 });
-    empresaMap.get(nome)!.recebido += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
+    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: 0, clientesPagaram: new Set() });
+    const entry = empresaMap.get(nome)!;
+    entry.recebido += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
+    if (r.contrato?.clienteId) entry.clientesPagaram.add(r.contrato.clienteId);
   }
   const porEmpresa = Array.from(empresaMap.entries())
     .map(([nome, d]) => ({
@@ -207,6 +214,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       contratos: d.contratos,
       recebido: d.recebido,
       inadimplencia: d.saldo,
+      clientesPagaram: d.clientesPagaram.size,
       eficiencia: (d.recebido + d.saldo) > 0 ? Math.round((d.recebido / (d.recebido + d.saldo)) * 10000) / 100 : 0,
     }))
     .sort((a, b) => b.recebido - a.recebido);
@@ -231,6 +239,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     valorAParte,
     valorRemanejado,
     totalClientes,
+    clientesPagaram: clientesPagaramTotal,
     promessasAbertas,
     valorPromessasAbertas: Number(promessasAbertasAgg._sum.valorPrometido ?? 0),
     promessasHoje: promessasHojeAgg._count,

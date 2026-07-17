@@ -13,6 +13,7 @@ interface PorEmpresa {
   contratos: number;
   recebido: number;
   inadimplencia: number;
+  clientesPagaram: number;
   eficiencia: number;
 }
 
@@ -22,6 +23,7 @@ interface DadosConsultor {
   valorAParte: number;
   valorRemanejado: number;
   totalClientes: number;
+  clientesPagaram: number;
   promessasAbertas: number;
   valorPromessasAbertas: number;
   promessasHoje: number;
@@ -150,7 +152,7 @@ export function DashboardConsultor() {
         <CardMetrica
           titulo="Total Recebido"
           valor={formatarMoeda(totalRecebido)}
-          sub={dados.metaAlvo ? `Meta: ${formatarMoeda(dados.metaAlvo)}` : "Inadimplência + À parte"}
+          sub={`${dados.clientesPagaram ?? 0} cliente${(dados.clientesPagaram ?? 0) !== 1 ? "s" : ""} pagaram`}
           icon={TrendingUp}
           cor="bg-gr-500"
         />
@@ -272,17 +274,19 @@ export function DashboardConsultor() {
           </div>
           <div className="space-y-3">
             {/* Cabeçalho da tabela */}
-            <div className="grid grid-cols-5 gap-2 text-xs font-semibold text-slate-400 px-1 pb-2 border-b border-slate-700">
+            <div className="grid grid-cols-6 gap-2 text-xs font-semibold text-slate-400 px-1 pb-2 border-b border-slate-700">
               <span>Empreendimento</span>
               <span className="text-right">Contratos</span>
+              <span className="text-right">Pagaram</span>
               <span className="text-right">Inadimplência</span>
               <span className="text-right">Recebido</span>
               <span className="text-right">Eficiência</span>
             </div>
             {dados.porEmpresa.map((e) => (
-              <div key={e.nome} className="grid grid-cols-5 gap-2 items-center px-1 py-1.5 rounded-lg hover:bg-slate-800/50 transition-colors">
+              <div key={e.nome} className="grid grid-cols-6 gap-2 items-center px-1 py-1.5 rounded-lg hover:bg-slate-800/50 transition-colors">
                 <span className="text-sm text-white truncate">{e.nome}</span>
                 <span className="text-sm text-slate-300 text-right">{e.contratos}</span>
+                <span className="text-sm text-emerald-400 font-medium text-right">{e.clientesPagaram ?? 0}</span>
                 <span className="text-sm text-slate-300 text-right">{formatarMoeda(e.inadimplencia)}</span>
                 <span className="text-sm text-slate-300 text-right">{formatarMoeda(e.recebido)}</span>
                 <span className={`text-sm font-semibold text-right ${e.eficiencia >= 80 ? "text-emerald-400" : e.eficiencia >= 50 ? "text-amber-400" : "text-slate-400"}`}>
