@@ -150,6 +150,7 @@ export default function CarteiraPage() {
   const [sort, setSort] = useState("diasAtraso");
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
   const [statusRecupFiltro, setStatusRecupFiltro] = useState<string | null>(null);
+  const [situacaoFiltro, setSituacaoFiltro] = useState<string | null>(null);
   const [situacaoPopover, setSituacaoPopover] = useState<string | null>(null);
   const [salvandoSituacao, setSalvandoSituacao] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -211,12 +212,16 @@ export default function CarteiraPage() {
 
   const buscaMainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function carregarPagina(cId: string, pg: number, append = false, buscaParam?: string, sortParam?: string) {
+  async function carregarPagina(cId: string, pg: number, append = false, buscaParam?: string, sortParam?: string, statusRecupParam?: string | null, situacaoParam?: string | null) {
     if (!append) setCarregando(true); else setCarregandoMais(true);
     const b = buscaParam ?? busca;
     const s = sortParam ?? sort;
+    const sr = statusRecupParam !== undefined ? statusRecupParam : statusRecupFiltro;
+    const sit = situacaoParam !== undefined ? situacaoParam : situacaoFiltro;
     const params = new URLSearchParams({ competenciaId: cId, page: String(pg), sort: s });
     if (b) params.set("busca", b);
+    if (sr) params.set("statusRecuperacao", sr);
+    if (sit) params.set("situacao", sit);
     const data = await fetch(`/api/carteira?${params}`).then((r) => r.json()).catch(() => ({}));
     const contratos: ItemCarteira[] = Array.isArray(data.contratos) ? data.contratos : [];
     if (append) setCarteira((prev) => [...prev, ...contratos]);
@@ -250,6 +255,13 @@ export default function CarteiraPage() {
     setPagina(1);
     carregarPagina(competenciaId, 1, false, busca, sort);
   }, [sort]);
+
+  // Reload quando filtros de status mudam (server-side, sem paginação)
+  useEffect(() => {
+    if (!competenciaId) return;
+    setPagina(1);
+    carregarPagina(competenciaId, 1, false, busca, sort, statusRecupFiltro, situacaoFiltro);
+  }, [statusRecupFiltro, situacaoFiltro]);
 
   // Lookup automático de contrato no modal a_parte
   useEffect(() => {
@@ -617,20 +629,10 @@ export default function CarteiraPage() {
 
   const empresas = Array.from(new Set(carteira.map((i) => i.contrato.empresa.nome))).sort();
 
-  // Filtros client-side (sort/busca são server-side)
-  const filtrados = carteira.filter((item) => {
-    const empresaOk = !empresaFiltro || item.contrato.empresa.nome === empresaFiltro;
-    let statusRecupOk = true;
-    if (statusRecupFiltro === "RECUPERADO_INTEGRALMENTE") {
-      statusRecupOk = item.contrato.statusRecuperacao === "RECUPERADO_INTEGRALMENTE";
-    } else if (statusRecupFiltro === "RECUPERACAO_PARCIAL") {
-      statusRecupOk = item.contrato.statusRecuperacao === "RECUPERACAO_PARCIAL";
-    } else if (statusRecupFiltro === "INADIMPLENTE_TODOS") {
-      // Todos que não são adimplentes
-      statusRecupOk = item.contrato.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE";
-    }
-    return empresaOk && statusRecupOk;
-  });
+  // Apenas empresa permanece client-side (status/situação são server-side)
+  const filtrados = carteira.filter((item) =>
+    !empresaFiltro || item.contrato.empresa.nome === empresaFiltro
+  );
 
   // Agrupar por faixa de inadimplência
   const porFaixa = filtrados.reduce<Record<string, ItemCarteira[]>>((acc, item) => {
@@ -678,7 +680,7 @@ export default function CarteiraPage() {
         </div>
       </div>
 
-      {/* Busca + Filtros */}
+      {/* Busca + Ordenação */}
       <div className="flex gap-3 flex-wrap">
         <div className="relative flex-1 min-w-52">
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" />
@@ -690,16 +692,6 @@ export default function CarteiraPage() {
             className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
           />
         </div>
-        <select
-          value={statusRecupFiltro ?? ""}
-          onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
-          className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
-        >
-          <option value="">Recuperação — todas</option>
-          <option value="RECUPERADO_INTEGRALMENTE">Recebido</option>
-          <option value="RECUPERACAO_PARCIAL">Rec. Parcial</option>
-          <option value="INADIMPLENTE_TODOS">Inadimplente</option>
-        </select>
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Ordenar por</span>
           <select
@@ -714,34 +706,81 @@ export default function CarteiraPage() {
         </div>
       </div>
 
-      {/* Filtros por empresa */}
-      {empresas.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setEmpresaFiltro(null)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              !empresaFiltro
-                ? "bg-gr-500 text-white"
-                : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
-            }`}
-          >
-            Todas
-          </button>
-          {empresas.map((emp) => (
+      {/* Filtros organizados em grupos */}
+      <div className="space-y-2">
+        {/* Recuperação */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500 w-24 flex-shrink-0">Recuperação</span>
+          {[
+            { label: "Todas", value: null },
+            { label: "Recebido", value: "RECUPERADO_INTEGRALMENTE" },
+            { label: "Rec. Parcial", value: "RECUPERACAO_PARCIAL" },
+            { label: "Inadimplente", value: "INADIMPLENTE_TODOS" },
+          ].map(({ label, value }) => (
             <button
-              key={emp}
-              onClick={() => setEmpresaFiltro(emp === empresaFiltro ? null : emp)}
+              key={label}
+              onClick={() => setStatusRecupFiltro(value)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                empresaFiltro === emp
+                statusRecupFiltro === value
                   ? "bg-gr-500 text-white"
                   : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
               }`}
             >
-              {emp}
+              {label}
             </button>
           ))}
         </div>
-      )}
+
+        {/* Situação do contato */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-slate-500 w-24 flex-shrink-0">Situação</span>
+          {[
+            { label: "Todas", value: null },
+            { label: "Promessa de pagamento", value: "PROMESSA_PAGAMENTO" },
+            { label: "Link enviado", value: "LINK_ENVIADO" },
+            { label: "Aguardando retorno", value: "AGUARDANDO_RETORNO" },
+            { label: "Ligar depois", value: "LIGAR_DEPOIS" },
+          ].map(({ label, value }) => (
+            <button
+              key={label}
+              onClick={() => setSituacaoFiltro(value)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                situacaoFiltro === value
+                  ? "bg-sky-600 text-white"
+                  : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Empreendimento */}
+        {empresas.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs text-slate-500 w-24 flex-shrink-0">Empreendimento</span>
+            <button
+              onClick={() => setEmpresaFiltro(null)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                !empresaFiltro ? "bg-gr-500 text-white" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+              }`}
+            >
+              Todas
+            </button>
+            {empresas.map((emp) => (
+              <button
+                key={emp}
+                onClick={() => setEmpresaFiltro(emp === empresaFiltro ? null : emp)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  empresaFiltro === emp ? "bg-gr-500 text-white" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                }`}
+              >
+                {emp}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Lista por faixa */}
       {carregando ? (

@@ -29,13 +29,15 @@ export async function GET(req: NextRequest) {
       where: { id: equipeId },
       select: {
         usuarios: { where: { ativo: true, perfil: "CONSULTOR" }, select: { id: true } },
-        consultoresAdicionais: { where: { ativo: true, perfil: "CONSULTOR" }, select: { id: true } },
+        consultoresAdic: { select: { consultor: { select: { id: true, ativo: true, perfil: true } } } },
       },
     });
     if (!equipe) return NextResponse.json({ totalInadimplencia: 0 });
     consultorIds = [
       ...equipe.usuarios.map((u) => u.id),
-      ...equipe.consultoresAdicionais.map((u) => u.id),
+      ...equipe.consultoresAdic
+        .filter((ec) => ec.consultor.ativo && ec.consultor.perfil === "CONSULTOR")
+        .map((ec) => ec.consultor.id),
     ];
   }
 

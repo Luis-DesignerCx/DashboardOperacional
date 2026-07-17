@@ -15,8 +15,13 @@ export async function GET(req: NextRequest) {
 
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
   const busca = searchParams.get("busca")?.trim() || "";
-  const sort = searchParams.get("sort") ?? "diasAtraso"; // diasAtraso | parcelasAtraso | parcelasAberto
+  const sort = searchParams.get("sort") ?? "diasAtraso";
+  const statusRecuperacao = searchParams.get("statusRecuperacao") || "";
+  const situacao = searchParams.get("situacao") || "";
   const skip = (page - 1) * PAGE_SIZE;
+
+  // Quando qualquer filtro de status está ativo, retorna tudo sem paginação
+  const temFiltroAtivo = !!(statusRecuperacao || situacao);
 
   const where: any = { competenciaId, ativo: true };
   if (session.user.perfil === "CONSULTOR") where.consultorId = session.user.id;
@@ -27,6 +32,16 @@ export async function GET(req: NextRequest) {
       { cliente: { nome: { contains: busca, mode: "insensitive" } } },
       { numero: { contains: busca, mode: "insensitive" } },
     ];
+  }
+  if (statusRecuperacao === "RECUPERADO_INTEGRALMENTE") {
+    where.contrato.statusRecuperacao = "RECUPERADO_INTEGRALMENTE";
+  } else if (statusRecuperacao === "RECUPERACAO_PARCIAL") {
+    where.contrato.statusRecuperacao = "RECUPERACAO_PARCIAL";
+  } else if (statusRecuperacao === "INADIMPLENTE_TODOS") {
+    where.contrato.statusRecuperacao = { not: "RECUPERADO_INTEGRALMENTE" };
+  }
+  if (situacao) {
+    where.contrato.situacao = situacao;
   }
 
   // Ordenação
@@ -53,8 +68,7 @@ export async function GET(req: NextRequest) {
     prisma.carteiraParcela.count({ where }),
     prisma.carteiraParcela.findMany({
       where,
-      skip,
-      take: PAGE_SIZE,
+      ...(temFiltroAtivo ? {} : { skip, take: PAGE_SIZE }),
       select: {
         id: true,
         contrato: {
@@ -104,6 +118,6 @@ export async function GET(req: NextRequest) {
     valorTotal,
     page,
     pageSize: PAGE_SIZE,
-    temMais: skip + contratos.length < total,
+    temMais: temFiltroAtivo ? false : skip + contratos.length < total,
   });
 }
