@@ -706,59 +706,35 @@ export default function CarteiraPage() {
         </div>
       </div>
 
-      {/* Filtros organizados em grupos */}
+      {/* Filtros — dropdowns + empreendimento */}
       <div className="space-y-2">
-        {/* Recuperação */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500 w-24 flex-shrink-0">Recuperação</span>
-          {[
-            { label: "Todas", value: null },
-            { label: "Recebido", value: "RECUPERADO_INTEGRALMENTE" },
-            { label: "Rec. Parcial", value: "RECUPERACAO_PARCIAL" },
-            { label: "Inadimplente", value: "INADIMPLENTE_TODOS" },
-          ].map(({ label, value }) => (
-            <button
-              key={label}
-              onClick={() => setStatusRecupFiltro(value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                statusRecupFiltro === value
-                  ? "bg-gr-500 text-white"
-                  : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex gap-3 flex-wrap">
+          <select
+            value={statusRecupFiltro ?? ""}
+            onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
+            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+          >
+            <option value="">Recuperação — todas</option>
+            <option value="RECUPERADO_INTEGRALMENTE">Recebido</option>
+            <option value="RECUPERACAO_PARCIAL">Rec. Parcial</option>
+            <option value="INADIMPLENTE_TODOS">Inadimplente</option>
+          </select>
+          <select
+            value={situacaoFiltro ?? ""}
+            onChange={(e) => setSituacaoFiltro(e.target.value || null)}
+            className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+          >
+            <option value="">Situação — todas</option>
+            <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
+            <option value="LINK_ENVIADO">Link enviado</option>
+            <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
+            <option value="LIGAR_DEPOIS">Ligar depois</option>
+          </select>
         </div>
 
-        {/* Situação do contato */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-slate-500 w-24 flex-shrink-0">Situação</span>
-          {[
-            { label: "Todas", value: null },
-            { label: "Promessa de pagamento", value: "PROMESSA_PAGAMENTO" },
-            { label: "Link enviado", value: "LINK_ENVIADO" },
-            { label: "Aguardando retorno", value: "AGUARDANDO_RETORNO" },
-            { label: "Ligar depois", value: "LIGAR_DEPOIS" },
-          ].map(({ label, value }) => (
-            <button
-              key={label}
-              onClick={() => setSituacaoFiltro(value)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                situacaoFiltro === value
-                  ? "bg-sky-600 text-white"
-                  : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Empreendimento */}
+        {/* Empreendimento — pills */}
         {empresas.length > 0 && (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs text-slate-500 w-24 flex-shrink-0">Empreendimento</span>
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setEmpresaFiltro(null)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
