@@ -73,9 +73,9 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
             clienteId: true,
             empresa: { select: { nome: true } },
             promessas: { where: { status: "ABERTA" }, select: { id: true } },
-            // Parcelas vivas por contrato — base real de inadimplência por empresa
+            // Todas as parcelas em aberto (inclui remanejadas — ainda são dívidas ativas)
             parcelas: {
-              where: { paga: false, remanejada: false, equivocada: false },
+              where: { paga: false, equivocada: false },
               select: { valorTotalAberto: true },
             },
           },
@@ -207,12 +207,12 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       contratos: d.contratos,
       recebido: d.recebido,
       inadimplencia: d.saldo,
-      eficiencia: d.saldo > 0 ? Math.round((d.recebido / d.saldo) * 10000) / 100 : 0,
+      eficiencia: (d.recebido + d.saldo) > 0 ? Math.round((d.recebido / (d.recebido + d.saldo)) * 10000) / 100 : 0,
     }))
     .sort((a, b) => b.recebido - a.recebido);
 
-  // valorCarteira = soma de parcelas vivas (paga:false, remanejada:false, equivocada:false) — mesma base da tabela por empresa
-  const valorCarteira = porEmpresa.reduce((s, e) => s + e.inadimplencia, 0);
+  // valorCarteira = saldo devedor total (paga:false, equivocada:false, inclui remanejadas — ainda são dívidas ativas)
+  const valorCarteira = Number(saldoParcelasAgg._sum.valorTotalAberto ?? 0);
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;
   const promessasAbertas = promessasAbertasAgg._count;
 

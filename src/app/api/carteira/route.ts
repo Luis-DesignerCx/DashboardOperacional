@@ -42,7 +42,6 @@ export async function GET(req: NextRequest) {
   // Filtro de parcelas vivas com o mesmo escopo da carteira (para totalizar corretamente)
   const whereParcelaTotal: any = {
     paga: false,
-    remanejada: false,
     equivocada: false,
     contrato: {
       inadimplenciaEquivocada: false,
