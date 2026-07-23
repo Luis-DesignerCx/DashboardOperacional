@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 
 // GET /api/historico/exportar?competenciaId=xxx — exporta planilha da competência
 export async function GET(req: NextRequest) {
+  try {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
   if (!["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
@@ -166,4 +167,8 @@ export async function GET(req: NextRequest) {
       "Content-Disposition": `attachment; filename="${nomeArquivo}"`,
     },
   });
+  } catch (err: any) {
+    console.error("[exportar]", err);
+    return NextResponse.json({ erro: err?.message ?? "Erro interno" }, { status: 500 });
+  }
 }

@@ -73,7 +73,12 @@ export default function HistoricoPage() {
     setExportando(competenciaId);
     try {
       const res = await fetch(`/api/historico/exportar?competenciaId=${competenciaId}`);
-      if (!res.ok) { alert("Erro ao exportar."); return; }
+      if (!res.ok) {
+        const ct = res.headers.get("content-type") ?? "";
+        const msg = ct.includes("json") ? (await res.json()).erro : await res.text();
+        alert(`Erro ao exportar: ${msg}`);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
