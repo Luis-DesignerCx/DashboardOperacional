@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle } from "lucide-react";
+import { formatarMoeda } from "@/lib/utils";
 
 interface Competencia {
   id: string;
@@ -50,6 +51,14 @@ export default function ImportacaoPage() {
   const [criandoComp, setCriandoComp] = useState(false);
   const [erroComp, setErroComp] = useState("");
 
+  // Fã Pass
+  const [fpArquivo, setFpArquivo] = useState<File | null>(null);
+  const [fpCarregando, setFpCarregando] = useState(false);
+  const [fpResultado, setFpResultado] = useState<any | null>(null);
+  const [fpErro, setFpErro] = useState("");
+  const [fpStatus, setFpStatus] = useState<any | null>(null);
+  const [fpFechando, setFpFechando] = useState(false);
+
   // Férias
   const [ferias, setFerias] = useState<FeriasEntry[]>([]);
   const [consultores, setConsultores] = useState<Consultor[]>([]);
@@ -57,6 +66,42 @@ export default function ImportacaoPage() {
   const [novaFeriasInicio, setNovaFeriasInicio] = useState("");
   const [novaFeriasFim, setNovaFeriasFim] = useState("");
   const [salvandoFerias, setSalvandoFerias] = useState(false);
+
+  async function carregarFpStatus(cId: string) {
+    const d = await fetch(`/api/fapass/status?competenciaId=${cId}`).then((r) => r.json()).catch(() => null);
+    if (d && !d.erro) setFpStatus(d);
+    else setFpStatus(null);
+  }
+
+  async function handleFpSync() {
+    if (!fpArquivo || !competenciaId) return;
+    setFpCarregando(true);
+    setFpErro("");
+    setFpResultado(null);
+    const form = new FormData();
+    form.append("arquivo", fpArquivo);
+    form.append("competenciaId", competenciaId);
+    form.append("origem", "MANUAL");
+    const res = await fetch("/api/fapass/sync", { method: "POST", body: form });
+    const data = await res.json();
+    setFpCarregando(false);
+    if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
+    else { setFpResultado(data); carregarFpStatus(competenciaId); }
+  }
+
+  async function handleFpFecharCiclo() {
+    if (!competenciaId || !confirm("Confirma o fechamento do ciclo Fã Pass para esta competência?")) return;
+    setFpFechando(true);
+    const res = await fetch("/api/fapass/fechar-ciclo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ competenciaId }),
+    });
+    const data = await res.json();
+    setFpFechando(false);
+    if (res.ok) { await recarregarCompetencias(); carregarFpStatus(competenciaId); }
+    else alert(data.erro || "Erro ao fechar ciclo");
+  }
 
   async function recarregarCompetencias() {
     const data = await fetch("/api/competencias").then((r) => r.json());
@@ -245,7 +290,7 @@ export default function ImportacaoPage() {
 
           <select
             value={competenciaId}
-            onChange={(e) => { setCompetenciaId(e.target.value); setTipoImport(null); }}
+            onChange={(e) => { setCompetenciaId(e.target.value); setTipoImport(null); if (e.target.value) carregarFpStatus(e.target.value); }}
             className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
           >
             <option value="">Selecione a competência</option>
@@ -467,6 +512,109 @@ export default function ImportacaoPage() {
             <><Upload size={16} /> Importar e Distribuir Carteira</>
           )}
         </button>
+      </div>
+
+      {/* ── Seção Fã Pass ──────────────────────────────────────────────────── */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-white">Fã Pass</h2>
+            <p className="text-xs text-slate-400 mt-0.5">Integração via QUERY — Base CAR Passaporte BC</p>
+          </div>
+          {fpStatus?.ultimaSync && (
+            <div className="text-right">
+              <p className="text-xs text-slate-400">Última sync</p>
+              <p className="text-xs text-slate-300 font-medium">
+                {new Date(fpStatus.ultimaSync.criadoEm).toLocaleDateString("pt-BR")} · {new Date(fpStatus.ultimaSync.criadoEm).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Status cards */}
+        {fpStatus && (
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-slate-800/60 rounded-xl p-3">
+              <p className="text-xs text-slate-400">Inadimplência</p>
+              <p className="text-sm font-bold text-white mt-0.5">{formatarMoeda(fpStatus.totalInadimplencia)}</p>
+              <p className="text-xs text-slate-500">{fpStatus.totalContratos} contratos</p>
+            </div>
+            <div className="bg-slate-800/60 rounded-xl p-3">
+              <p className="text-xs text-slate-400">Baixado</p>
+              <p className="text-sm font-bold text-emerald-400 mt-0.5">{formatarMoeda(fpStatus.totalBaixado)}</p>
+            </div>
+            <div className={`rounded-xl p-3 ${fpStatus.divergenciasPendentes > 0 ? "bg-amber-500/10 border border-amber-500/20" : "bg-slate-800/60"}`}>
+              <p className="text-xs text-slate-400">Divergências</p>
+              <p className={`text-sm font-bold mt-0.5 ${fpStatus.divergenciasPendentes > 0 ? "text-amber-400" : "text-slate-300"}`}>
+                {fpStatus.divergenciasPendentes}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Upload do arquivo */}
+        {competenciaId && (
+          <>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Arquivo da QUERY</label>
+              <label className="flex items-center gap-3 w-full border border-dashed border-slate-700 rounded-xl px-4 py-3 cursor-pointer hover:border-gr-500 hover:bg-gr-500/5 transition-colors">
+                <FileSpreadsheet size={18} className="text-slate-500 flex-shrink-0" />
+                <span className="text-sm text-slate-400 truncate">
+                  {fpArquivo ? fpArquivo.name : "Base CAR Passaporte BC.xlsx"}
+                </span>
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { setFpArquivo(e.target.files?.[0] || null); setFpResultado(null); setFpErro(""); }} />
+              </label>
+            </div>
+
+            {fpErro && (
+              <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 text-sm">
+                <XCircle size={16} /> {fpErro}
+              </div>
+            )}
+
+            {fpResultado && (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 space-y-1">
+                <div className="flex items-center gap-2">
+                  <CheckCircle size={16} className="text-emerald-400" />
+                  <p className="text-emerald-400 font-medium text-sm">{fpResultado.primeiraSync ? "Competência inicializada" : "Query atualizada"}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-400 mt-2">
+                  <span>{fpResultado.totalRegistros} registros FP/PON lidos</span>
+                  <span>{fpResultado.novosInadimplentes} inadimplentes novos</span>
+                  <span>{fpResultado.novosFlash} flash novos</span>
+                  <span>{fpResultado.totalBaixas} baixas processadas</span>
+                  {fpResultado.totalDivergencias > 0 && (
+                    <span className="text-amber-400 col-span-2 flex items-center gap-1">
+                      <AlertTriangle size={12} /> {fpResultado.totalDivergencias} divergências detectadas
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleFpSync}
+                disabled={!fpArquivo || fpCarregando}
+                className="flex-1 flex items-center justify-center gap-2 bg-gr-500 hover:bg-gr-600 disabled:bg-gr-500/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+              >
+                {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Processando...</> : <><RefreshCw size={15} /> Atualizar Query</>}
+              </button>
+              <button
+                onClick={handleFpFecharCiclo}
+                disabled={fpFechando || !fpStatus?.totalContratos}
+                className="flex items-center gap-2 px-4 py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                {fpFechando ? <Loader2 size={15} className="animate-spin" /> : <Lock size={15} />}
+                Fechar Ciclo
+              </button>
+            </div>
+          </>
+        )}
+
+        {!competenciaId && (
+          <p className="text-xs text-slate-500">Selecione uma competência acima para usar o Fã Pass.</p>
+        )}
       </div>
     </div>
   );
