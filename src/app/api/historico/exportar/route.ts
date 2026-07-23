@@ -1,3 +1,5 @@
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -21,35 +23,35 @@ export async function GET(req: NextRequest) {
   if (!competencia) return NextResponse.json({ erro: "Competência não encontrada" }, { status: 404 });
 
   // Busca todos os contratos atribuídos nesta competência
-  const [carteiras, feriasComp] = await Promise.all([
-    prisma.carteiraParcela.findMany({
-      where: { competenciaId },
-      include: {
-        contrato: {
-          include: {
-            cliente: true,
-            empresa: true,
-            parcelas: { orderBy: { numero: "asc" } },
-            recebimentos: {
-              select: { valor: true, valorAParte: true, dataRecebimento: true, formaPagamento: true },
-            },
+  const carteiras = await prisma.carteiraParcela.findMany({
+    where: { competenciaId },
+    include: {
+      contrato: {
+        include: {
+          cliente: true,
+          empresa: true,
+          parcelas: { orderBy: { numero: "asc" } },
+          recebimentos: {
+            select: { valor: true, valorAParte: true, dataRecebimento: true, formaPagamento: true },
           },
         },
-        consultor: { select: { id: true, nome: true, email: true } },
       },
-      orderBy: { atribuidoEm: "asc" },
-    }),
-    prisma.feriasConsultor.findMany({
-      where: { competenciaId, congelado: true },
-      select: {
-        consultorId: true,
-        snapshotSaldo: true,
-        snapshotRecebido: true,
-        snapshotMetaAlvo: true,
-        consultor: { select: { nome: true, email: true } },
-      },
-    }),
-  ]);
+      consultor: { select: { id: true, nome: true, email: true } },
+    },
+    orderBy: { atribuidoEm: "asc" },
+  });
+
+  // Férias congeladas — query separada para não derrubar o export principal se a coluna ainda não existir no banco
+  const feriasComp = await prisma.feriasConsultor.findMany({
+    where: { competenciaId, congelado: true },
+    select: {
+      consultorId: true,
+      snapshotSaldo: true,
+      snapshotRecebido: true,
+      snapshotMetaAlvo: true,
+      consultor: { select: { nome: true, email: true } },
+    },
+  }).catch(() => [] as any[]);
 
   // Mapa de snapshots por consultorId
   const snapshotMap = new Map(feriasComp.map((f) => [f.consultorId, f]));
