@@ -22,6 +22,10 @@ export async function GET(req: NextRequest) {
   const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
   if (!competencia) return NextResponse.json({ erro: "Competência não encontrada" }, { status: 404 });
 
+  // Período da competência (mesmo critério do dashboard)
+  const periodoInicio = new Date(competencia.ano, competencia.mes - 1, 1);
+  const periodoFim    = new Date(competencia.ano, competencia.mes, 1);
+
   // Busca todos os contratos atribuídos nesta competência
   const carteiras = await prisma.carteiraParcela.findMany({
     where: { competenciaId },
@@ -32,6 +36,9 @@ export async function GET(req: NextRequest) {
           empresa: true,
           parcelas: { orderBy: { numero: "asc" } },
           recebimentos: {
+            where: {
+              dataRecebimento: { gte: periodoInicio, lt: periodoFim },
+            },
             select: { valor: true, valorAParte: true, dataRecebimento: true, formaPagamento: true },
           },
         },
