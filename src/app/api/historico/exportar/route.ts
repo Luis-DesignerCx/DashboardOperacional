@@ -36,9 +36,15 @@ export async function GET(req: NextRequest) {
           },
         },
       },
-      consultor: { select: { id: true, nome: true, email: true } },
+      consultor: { select: { id: true, nome: true, email: true, equipeId: true } },
     },
     orderBy: { atribuidoEm: "asc" },
+  });
+
+  // Metas FINANCEIRAS da competência — para calcular metaAlvo de quem não está congelado
+  const metas = await prisma.meta.findMany({
+    where: { competenciaId, tipo: "FINANCEIRA" },
+    select: { consultorId: true, equipeId: true, percentualAlvo: true, valorAlvo: true },
   });
 
   // Férias congeladas — query separada para não derrubar o export principal se a coluna ainda não existir no banco
@@ -98,8 +104,8 @@ export async function GET(req: NextRequest) {
 
   // ── Resumo por consultor (respeita snapshot de férias congeladas) ────────────
   const resumoMap = new Map<string, {
-    nome: string; email: string;
-    inadimplencia: number; recebido: number; metaAlvo: number | null; congelado: boolean;
+    nome: string; email: string; equipeId: string | null;
+    inadimplencia: number; recebido: number; metaAlvo: number | null; emFerias: boolean;
   }>();
 
   for (const carteira of carteiras) {
@@ -108,7 +114,12 @@ export async function GET(req: NextRequest) {
     if (snap) continue; // consultor congelado — valores vêm do snapshot abaixo
 
     if (!resumoMap.has(cId)) {
-      resumoMap.set(cId, { nome: carteira.consultor.nome, email: carteira.consultor.email, inadimplencia: 0, recebido: 0, metaAlvo: null, congelado: false });
+      resumoMap.set(cId, {
+        nome: carteira.consultor.nome,
+        email: carteira.consultor.email,
+        equipeId: carteira.consultor.equipeId ?? null,
+        inadimplencia: 0, recebido: 0, metaAlvo: null, emFerias: false,
+      });
     }
     const entry = resumoMap.get(cId)!;
     const saldoParcelas = carteira.contrato.parcelas.reduce((s, p) => s + Number(p.valorTotalAberto), 0);
@@ -117,15 +128,30 @@ export async function GET(req: NextRequest) {
     entry.recebido += recebidoContrato;
   }
 
+  // Calcula metaAlvo para consultores não-congelados
+  for (const [cId, entry] of resumoMap.entries()) {
+    // Tenta meta específica do consultor, depois meta da equipe
+    const meta =
+      metas.find((m) => m.consultorId === cId) ??
+      metas.find((m) => !m.consultorId && m.equipeId === entry.equipeId);
+    if (!meta) continue;
+    if (meta.percentualAlvo) {
+      entry.metaAlvo = Number(((entry.inadimplencia * Number(meta.percentualAlvo)) / 100).toFixed(2));
+    } else if (meta.valorAlvo) {
+      entry.metaAlvo = Number(meta.valorAlvo);
+    }
+  }
+
   // Consultores congelados: usa snapshot fixo
   for (const snap of feriasComp) {
     resumoMap.set(snap.consultorId, {
       nome: snap.consultor.nome,
       email: snap.consultor.email,
+      equipeId: null,
       inadimplencia: Number(snap.snapshotSaldo ?? 0),
       recebido: Number(snap.snapshotRecebido ?? 0),
       metaAlvo: snap.snapshotMetaAlvo ? Number(snap.snapshotMetaAlvo) : null,
-      congelado: true,
+      emFerias: true,
     });
   }
 
@@ -138,7 +164,7 @@ export async function GET(req: NextRequest) {
       TotalRecebido: r.recebido,
       MetaAlvo: r.metaAlvo ?? "",
       PercAtingido: r.metaAlvo && r.metaAlvo > 0 ? Number(((r.recebido / r.metaAlvo) * 100).toFixed(2)) : "",
-      Congelado: r.congelado ? "Sim" : "Não",
+      Ferias: r.emFerias ? "Sim" : "Não",
     }));
 
   // Gera XLSX
