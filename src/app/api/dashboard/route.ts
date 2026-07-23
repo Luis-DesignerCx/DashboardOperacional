@@ -410,6 +410,13 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
 }
 
 async function dashboardExecutivo(competenciaId: string) {
+  const competenciaExec = await prisma.competencia.findUnique({
+    where: { id: competenciaId },
+    select: { mes: true, ano: true },
+  });
+  const iniExec = competenciaExec ? new Date(competenciaExec.ano, competenciaExec.mes - 1, 1) : new Date(0);
+  const fimExec = competenciaExec ? new Date(competenciaExec.ano, competenciaExec.mes, 0, 23, 59, 59, 999) : new Date();
+
   const [carteiras, recebimentosPorContrato, parcelasCount, empresas] = await Promise.all([
     // Seleção mínima — sem recebimentos
     prisma.carteiraParcela.findMany({
@@ -426,10 +433,13 @@ async function dashboardExecutivo(competenciaId: string) {
         },
       },
     }),
-    // GroupBy contrato — SUM no banco em vez de carregar todos os registros
+    // GroupBy contrato — filtra apenas recebimentos do mês da competência
     prisma.recebimento.groupBy({
       by: ["contratoId"],
-      where: { contrato: { carteiras: { some: { competenciaId, ativo: true } } } },
+      where: {
+        contrato: { carteiras: { some: { competenciaId, ativo: true } } },
+        dataRecebimento: { gte: iniExec, lte: fimExec },
+      },
       _sum: { valor: true },
     }),
     prisma.parcela.count({
