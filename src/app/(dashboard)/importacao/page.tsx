@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake } from "lucide-react";
 
 interface Competencia {
   id: string;
@@ -21,6 +21,11 @@ interface FeriasEntry {
   consultorId: string;
   dataInicio: string;
   dataFim: string;
+  congelado: boolean;
+  congeladoEm?: string | null;
+  snapshotSaldo?: number | null;
+  snapshotRecebido?: number | null;
+  snapshotMetaAlvo?: number | null;
   consultor: { id: string; nome: string };
 }
 
@@ -130,6 +135,26 @@ export default function ImportacaoPage() {
   async function removerFerias(id: string) {
     await fetch(`/api/ferias?id=${id}`, { method: "DELETE" });
     setFerias((prev) => prev.filter((f) => f.id !== id));
+  }
+
+  async function toggleCongelar(f: FeriasEntry) {
+    const endpoint = f.congelado ? "descongelar" : "congelar";
+    const res = await fetch(`/api/ferias/${f.id}/${endpoint}`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setFerias((prev) => prev.map((item) =>
+        item.id === f.id
+          ? {
+              ...item,
+              congelado: !f.congelado,
+              congeladoEm: f.congelado ? null : new Date().toISOString(),
+              snapshotSaldo: data.snapshotSaldo ?? null,
+              snapshotRecebido: data.snapshotRecebido ?? null,
+              snapshotMetaAlvo: data.snapshotMetaAlvo ?? null,
+            }
+          : item
+      ));
+    }
   }
 
   async function handleImportar() {
@@ -272,20 +297,41 @@ export default function ImportacaoPage() {
             {ferias.length > 0 && (
               <div className="space-y-1.5">
                 {ferias.map((f) => (
-                  <div key={f.id} className="flex items-center justify-between bg-slate-800 rounded-lg px-3 py-2">
-                    <div>
-                      <span className="text-sm text-white">{f.consultor.nome}</span>
-                      <span className="text-xs text-slate-400 ml-2">
+                  <div key={f.id} className={`flex items-center justify-between rounded-lg px-3 py-2 ${f.congelado ? "bg-sky-500/10 border border-sky-500/20" : "bg-slate-800"}`}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-white">{f.consultor.nome}</span>
+                        {f.congelado && (
+                          <span className="flex items-center gap-1 text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded">
+                            <Snowflake size={10} /> Congelado
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs text-slate-400">
                         {new Date(f.dataInicio).toLocaleDateString("pt-BR", { timeZone: "UTC" })} →{" "}
                         {new Date(f.dataFim).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                       </span>
+                      {f.congelado && f.snapshotMetaAlvo != null && (
+                        <p className="text-xs text-sky-400 mt-0.5">
+                          Meta congelada: R$ {Number(f.snapshotMetaAlvo).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                        </p>
+                      )}
                     </div>
-                    <button
-                      onClick={() => removerFerias(f.id)}
-                      className="text-slate-500 hover:text-red-400 transition-colors ml-2"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                      <button
+                        onClick={() => toggleCongelar(f)}
+                        title={f.congelado ? "Descongelar" : "Congelar carteira/meta"}
+                        className={`p-1.5 rounded-lg transition-colors ${f.congelado ? "text-sky-400 hover:text-sky-300 bg-sky-500/10 hover:bg-sky-500/20" : "text-slate-500 hover:text-sky-400 hover:bg-sky-500/10"}`}
+                      >
+                        <Snowflake size={14} />
+                      </button>
+                      <button
+                        onClick={() => removerFerias(f.id)}
+                        className="text-slate-500 hover:text-red-400 transition-colors p-1.5"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>

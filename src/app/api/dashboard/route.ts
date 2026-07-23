@@ -64,6 +64,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     saldoParcelasAgg,
     qtdRecuperados,
     parcelasRemanejadasAgg,
+    feriasSnapshot,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
@@ -121,6 +122,10 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
         OR: [{ consultorId: null }, { consultorId }],
       },
       select: { valorAlvo: true, percentualAlvo: true, quantidadeAlvo: true, consultorId: true, tipo: true },
+    }),
+    prisma.feriasConsultor.findUnique({
+      where: { consultorId_competenciaId: { consultorId, competenciaId } },
+      select: { congelado: true, snapshotSaldo: true, snapshotRecebido: true, snapshotMetaAlvo: true },
     }),
     // Base para meta financeira: paga:false, equivocada:false (inclui remanejadas, igual à comissão)
     prisma.parcela.aggregate({
@@ -227,11 +232,14 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   // Usa a mesma base de cálculo da comissão: soma de parcelas não pagas/não equivocadas
   const saldoConsultor = Number(saldoParcelasAgg._sum.valorTotalAberto ?? 0);
 
-  const metaAlvo = meta
-    ? meta.percentualAlvo && saldoConsultor > 0
-      ? (Number(meta.percentualAlvo) / 100) * saldoConsultor
-      : meta.valorAlvo ? Number(meta.valorAlvo) : null
-    : null;
+  // Se carteira congelada (férias), usa snapshot fixo da meta
+  const metaAlvo = (feriasSnapshot?.congelado && feriasSnapshot.snapshotMetaAlvo)
+    ? Number(feriasSnapshot.snapshotMetaAlvo)
+    : meta
+      ? meta.percentualAlvo && saldoConsultor > 0
+        ? (Number(meta.percentualAlvo) / 100) * saldoConsultor
+        : meta.valorAlvo ? Number(meta.valorAlvo) : null
+      : null;
 
   return {
     valorCarteira,

@@ -489,6 +489,11 @@ model FeriasConsultor {
   competenciaId String
   dataInicio    DateTime
   dataFim       DateTime
+  congelado         Boolean   @default(false)
+  congeladoEm       DateTime?
+  snapshotSaldo     Decimal?  @db.Decimal(15, 2)
+  snapshotRecebido  Decimal?  @db.Decimal(15, 2)
+  snapshotMetaAlvo  Decimal?  @db.Decimal(15, 2)
   criadoEm      DateTime    @default(now())
 
   consultor     Usuario     @relation(fields: [consultorId], references: [id])
@@ -507,4 +512,77 @@ model Configuracao {
   valor String
 
   @@map("configuracoes")
+}
+
+// ─── FÃ PASS — INTEGRAÇÃO QUERY ───────────────────────────────────────────────
+
+model FaPassSync {
+  id                String    @id @default(cuid())
+  competenciaId     String
+  origem            String    // "SCRIPT" | "MANUAL"
+  primeiraSync      Boolean   @default(false)
+  totalRegistros    Int       @default(0)
+  totalContratos    Int       @default(0)
+  totalFlash        Int       @default(0)
+  totalBaixas       Int       @default(0)
+  totalDivergencias Int       @default(0)
+  status            String    @default("PROCESSANDO")
+  erro              String?
+  criadoEm          DateTime  @default(now())
+  concluidoEm       DateTime?
+
+  @@index([competenciaId])
+  @@map("fapass_syncs")
+}
+
+// Snapshot congelado da inadimplência no início da competência (inclui flash)
+model FaPassInadimplencia {
+  id                   String     @id @default(cuid())
+  competenciaId        String
+  contratoNumero       String
+  valor                Decimal    @db.Decimal(15, 2)
+  vencimentoMaisAntigo DateTime
+  faixa                TipoEquipe
+  isFlash              Boolean    @default(false)
+  syncId               String
+  criadoEm             DateTime   @default(now())
+
+  @@unique([competenciaId, contratoNumero])
+  @@index([competenciaId])
+  @@map("fapass_inadimplencia")
+}
+
+// Baixas confirmadas pela query
+model FaPassBaixa {
+  id             String   @id @default(cuid())
+  competenciaId  String
+  contratoNumero String
+  valor          Decimal  @db.Decimal(15, 2)
+  tipoPagamento  String   // "BOLETO_PIX" | "CARTAO"
+  dataBaixa      DateTime?
+  syncId         String
+  criadoEm       DateTime @default(now())
+
+  @@index([competenciaId])
+  @@map("fapass_baixas")
+}
+
+// Divergências entre query e lançamentos dos consultores
+model FaPassDivergencia {
+  id             String    @id @default(cuid())
+  competenciaId  String
+  contratoNumero String
+  contratoId     String?
+  consultorId    String?
+  gestorId       String?
+  valorSistema   Decimal   @db.Decimal(15, 2)
+  valorQuery     Decimal   @db.Decimal(15, 2)
+  status         String    @default("PENDENTE")
+  syncId         String
+  criadoEm       DateTime  @default(now())
+  resolvidaEm    DateTime?
+
+  @@index([competenciaId])
+  @@index([gestorId])
+  @@map("fapass_divergencias")
 }
