@@ -157,7 +157,8 @@ export async function GET(req: NextRequest) {
   const wsResumo = XLSX.utils.json_to_sheet(linhasResumo);
   wsResumo["!cols"] = [{ wch: 30 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 10 }];
 
-  XLSX.utils.book_append_sheet(wb, ws, competencia.descricao.slice(0, 31));
+  const nomeAba = competencia.descricao.replace(/[:\\/?\*\[\]]/g, "-").slice(0, 31);
+  XLSX.utils.book_append_sheet(wb, ws, nomeAba);
   XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo Comissão");
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
