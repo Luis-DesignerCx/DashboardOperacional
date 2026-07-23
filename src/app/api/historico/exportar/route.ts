@@ -20,23 +20,38 @@ export async function GET(req: NextRequest) {
   if (!competencia) return NextResponse.json({ erro: "Competência não encontrada" }, { status: 404 });
 
   // Busca todos os contratos atribuídos nesta competência
-  const carteiras = await prisma.carteiraParcela.findMany({
-    where: { competenciaId },
-    include: {
-      contrato: {
-        include: {
-          cliente: true,
-          empresa: true,
-          parcelas: { orderBy: { numero: "asc" } },
-          recebimentos: {
-            select: { valor: true, valorAParte: true, dataRecebimento: true, formaPagamento: true },
+  const [carteiras, feriasComp] = await Promise.all([
+    prisma.carteiraParcela.findMany({
+      where: { competenciaId },
+      include: {
+        contrato: {
+          include: {
+            cliente: true,
+            empresa: true,
+            parcelas: { orderBy: { numero: "asc" } },
+            recebimentos: {
+              select: { valor: true, valorAParte: true, dataRecebimento: true, formaPagamento: true },
+            },
           },
         },
+        consultor: { select: { id: true, nome: true, email: true } },
       },
-      consultor: { select: { nome: true, email: true } },
-    },
-    orderBy: { atribuidoEm: "asc" },
-  });
+      orderBy: { atribuidoEm: "asc" },
+    }),
+    prisma.feriasConsultor.findMany({
+      where: { competenciaId, congelado: true },
+      select: {
+        consultorId: true,
+        snapshotSaldo: true,
+        snapshotRecebido: true,
+        snapshotMetaAlvo: true,
+        consultor: { select: { nome: true, email: true } },
+      },
+    }),
+  ]);
+
+  // Mapa de snapshots por consultorId
+  const snapshotMap = new Map(feriasComp.map((f) => [f.consultorId, f]));
 
   // Monta linhas: uma por parcela
   const linhas: any[] = [];
@@ -78,6 +93,51 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── Resumo por consultor (respeita snapshot de férias congeladas) ────────────
+  const resumoMap = new Map<string, {
+    nome: string; email: string;
+    inadimplencia: number; recebido: number; metaAlvo: number | null; congelado: boolean;
+  }>();
+
+  for (const carteira of carteiras) {
+    const cId = carteira.consultor.id;
+    const snap = snapshotMap.get(cId);
+    if (snap) continue; // consultor congelado — valores vêm do snapshot abaixo
+
+    if (!resumoMap.has(cId)) {
+      resumoMap.set(cId, { nome: carteira.consultor.nome, email: carteira.consultor.email, inadimplencia: 0, recebido: 0, metaAlvo: null, congelado: false });
+    }
+    const entry = resumoMap.get(cId)!;
+    const saldoParcelas = carteira.contrato.parcelas.reduce((s, p) => s + Number(p.valorTotalAberto), 0);
+    const recebidoContrato = carteira.contrato.recebimentos.reduce((s, r) => s + Number(r.valor) + Number(r.valorAParte ?? 0), 0);
+    entry.inadimplencia += saldoParcelas;
+    entry.recebido += recebidoContrato;
+  }
+
+  // Consultores congelados: usa snapshot fixo
+  for (const snap of feriasComp) {
+    resumoMap.set(snap.consultorId, {
+      nome: snap.consultor.nome,
+      email: snap.consultor.email,
+      inadimplencia: Number(snap.snapshotSaldo ?? 0),
+      recebido: Number(snap.snapshotRecebido ?? 0),
+      metaAlvo: snap.snapshotMetaAlvo ? Number(snap.snapshotMetaAlvo) : null,
+      congelado: true,
+    });
+  }
+
+  const linhasResumo = Array.from(resumoMap.values())
+    .sort((a, b) => a.nome.localeCompare(b.nome))
+    .map((r) => ({
+      Consultor: r.nome,
+      Email: r.email,
+      Inadimplencia: r.inadimplencia,
+      TotalRecebido: r.recebido,
+      MetaAlvo: r.metaAlvo ?? "",
+      PercAtingido: r.metaAlvo && r.metaAlvo > 0 ? Number(((r.recebido / r.metaAlvo) * 100).toFixed(2)) : "",
+      Congelado: r.congelado ? "Sim" : "Não",
+    }));
+
   // Gera XLSX
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.json_to_sheet(linhas);
@@ -91,7 +151,11 @@ export async function GET(req: NextRequest) {
     { wch: 24 }, { wch: 14 },
   ];
 
+  const wsResumo = XLSX.utils.json_to_sheet(linhasResumo);
+  wsResumo["!cols"] = [{ wch: 30 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 10 }];
+
   XLSX.utils.book_append_sheet(wb, ws, competencia.descricao.slice(0, 31));
+  XLSX.utils.book_append_sheet(wb, wsResumo, "Resumo Comissão");
 
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const nomeArquivo = `inadimplencia_${competencia.descricao.replace(/\s+/g, "_")}.xlsx`;
