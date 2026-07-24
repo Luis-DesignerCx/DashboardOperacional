@@ -54,6 +54,12 @@ export async function GET(req: NextRequest) {
     select: { consultorId: true, equipeId: true, percentualAlvo: true, valorAlvo: true },
   });
 
+  // Comissões calculadas da competência (valorFinal = comissão atingida)
+  const comissoes = await prisma.comissao.findMany({
+    where: { competenciaId },
+    select: { usuarioId: true, valorFinal: true },
+  });
+
   // Férias congeladas — query separada para não derrubar o export principal se a coluna ainda não existir no banco
   const feriasComp = await prisma.feriasConsultor.findMany({
     where: { competenciaId, congelado: true },
@@ -68,18 +74,23 @@ export async function GET(req: NextRequest) {
 
   // Mapa de snapshots por consultorId
   const snapshotMap = new Map(feriasComp.map((f) => [f.consultorId, f]));
+  // Mapa de comissões por usuarioId
+  const comissaoMap = new Map(comissoes.map((c) => [c.usuarioId, Number(c.valorFinal)]));
 
   // Monta linhas: uma por parcela
   const linhas: any[] = [];
+  // Controla quais contratos já tiveram ValorRecebido apontado (evita duplicação por parcela)
+  const contratosComRecebido = new Set<string>();
 
   for (const carteira of carteiras) {
     const { contrato, consultor } = carteira;
     const { cliente, empresa } = contrato;
 
-    // Totais de recebimento por contrato
     const totalRecebidoInadimplencia = contrato.recebimentos.reduce((s, r) => s + Number(r.valor), 0);
     const totalAParte = contrato.recebimentos.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
     const statusRec = contrato.statusRecuperacao ?? "INADIMPLENTE";
+    const primeiraVez = !contratosComRecebido.has(contrato.id);
+    if (primeiraVez) contratosComRecebido.add(contrato.id);
 
     for (const parcela of contrato.parcelas) {
       linhas.push({
@@ -100,11 +111,12 @@ export async function GET(req: NextRequest) {
         MeioPagamento: parcela.meioPagamento ?? "",
         ValorParcela: Number(parcela.valorParcela),
         ValorTotalAberto: Number(parcela.valorTotalAberto),
-        TotalParcelasVencidas: contrato.totalParcelasVencidas ?? "",
+        TotalParcelasVincidas: contrato.totalParcelasVencidas ?? "",
         ValorContrato: Number(contrato.valorContrato ?? 0),
         MaiorDiasAtraso: contrato.maiorDiasAtraso ?? 0,
-        ValorRecebidoInadimplencia: totalRecebidoInadimplencia,
-        ValorAParte: totalAParte,
+        // Recebimento apenas na primeira linha do contrato — evita soma inflada por parcela
+        ValorRecebidoInadimplencia: primeiraVez ? totalRecebidoInadimplencia : "",
+        ValorAParte: primeiraVez ? totalAParte : "",
       });
     }
   }
@@ -112,7 +124,7 @@ export async function GET(req: NextRequest) {
   // ── Resumo por consultor (respeita snapshot de férias congeladas) ────────────
   const resumoMap = new Map<string, {
     nome: string; email: string; equipeId: string | null;
-    inadimplencia: number; recebido: number; metaAlvo: number | null; emFerias: boolean;
+    inadimplencia: number; recebido: number; metaAlvo: number | null; emFerias: boolean; consultorId: string;
   }>();
 
   for (const carteira of carteiras) {
@@ -125,7 +137,7 @@ export async function GET(req: NextRequest) {
         nome: carteira.consultor.nome,
         email: carteira.consultor.email,
         equipeId: carteira.consultor.equipeId ?? null,
-        inadimplencia: 0, recebido: 0, metaAlvo: null, emFerias: false,
+        inadimplencia: 0, recebido: 0, metaAlvo: null, emFerias: false, consultorId: cId,
       });
     }
     const entry = resumoMap.get(cId)!;
@@ -159,20 +171,26 @@ export async function GET(req: NextRequest) {
       recebido: Number(snap.snapshotRecebido ?? 0),
       metaAlvo: snap.snapshotMetaAlvo ? Number(snap.snapshotMetaAlvo) : null,
       emFerias: true,
+      consultorId: snap.consultorId,
     });
   }
 
   const linhasResumo = Array.from(resumoMap.values())
     .sort((a, b) => a.nome.localeCompare(b.nome))
-    .map((r) => ({
-      Consultor: r.nome,
-      Email: r.email,
-      Inadimplencia: r.inadimplencia,
-      TotalRecebido: r.recebido,
-      MetaAlvo: r.metaAlvo ?? "",
-      PercAtingido: r.metaAlvo && r.metaAlvo > 0 ? Number(((r.recebido / r.metaAlvo) * 100).toFixed(2)) : "",
-      Ferias: r.emFerias ? "Sim" : "Não",
-    }));
+    .map((r) => {
+      const percAtingido = r.metaAlvo && r.metaAlvo > 0 ? Number(((r.recebido / r.metaAlvo) * 100).toFixed(2)) : "";
+      const comissaoAtingida = comissaoMap.get(r.consultorId) ?? "";
+      return {
+        Consultor: r.nome,
+        Email: r.email,
+        Inadimplencia: r.inadimplencia,
+        TotalRecebido: r.recebido,
+        MetaAlvo: r.metaAlvo ?? "",
+        PercAtingido: percAtingido,
+        ComissaoAtingida: comissaoAtingida,
+        Ferias: r.emFerias ? "Sim" : "Não",
+      };
+    });
 
   // Gera XLSX
   const wb = XLSX.utils.book_new();
@@ -188,7 +206,7 @@ export async function GET(req: NextRequest) {
   ];
 
   const wsResumo = XLSX.utils.json_to_sheet(linhasResumo);
-  wsResumo["!cols"] = [{ wch: 30 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 10 }];
+  wsResumo["!cols"] = [{ wch: 30 }, { wch: 30 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 10 }];
 
   const nomeAba = competencia.descricao.replace(/[:\\/?\*\[\]]/g, "-").slice(0, 31);
   XLSX.utils.book_append_sheet(wb, ws, nomeAba);
