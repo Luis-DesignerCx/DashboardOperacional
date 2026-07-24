@@ -94,6 +94,7 @@ export default function ImportacaoPage() {
       const ct = res.headers.get("content-type") ?? "";
       const data = ct.includes("json") ? await res.json() : { erro: await res.text() };
       if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
+      else if (data._debug) { setFpErro(`DEBUG — ${data.mensagem}\n${data.totalLinhas} linhas lidas. Cabeçalho: ${JSON.stringify(data.cabecalho)}`); }
       else { setFpResultado(data); carregarFpStatus(competenciaId); }
     } catch (e: any) {
       setFpErro(e?.message?.includes("payload") ? "Arquivo muito grande. Contate o suporte." : "Erro ao processar o arquivo. Tente novamente.");

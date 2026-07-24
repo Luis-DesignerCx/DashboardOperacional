@@ -111,6 +111,21 @@ export async function POST(req: NextRequest) {
     // ── 2. Filtra apenas FP/PON ──────────────────────────────────────────────
     const linhasFP = linhasDados.filter((row) => isFaPass(String(row[C.documento] ?? "")));
 
+    // DEBUG: retorna estrutura das primeiras linhas se nenhum FP/PON encontrado
+    if (linhasFP.length === 0 && linhasDados.length > 0) {
+      const cabecalho = linhas[0] ?? [];
+      const amostra = linhasDados.slice(0, 3).map((row) =>
+        cabecalho.map((col: any, i: number) => `[${i}] ${col}: ${row[i]}`)
+      );
+      return NextResponse.json({
+        _debug: true,
+        totalLinhas: linhasDados.length,
+        cabecalho,
+        amostra,
+        mensagem: "Nenhuma linha FP/PON encontrada — verifique mapeamento de colunas",
+      });
+    }
+
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
     const ontem = new Date(hoje.getTime() - 86400000);
