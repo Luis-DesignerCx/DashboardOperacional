@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
@@ -44,8 +46,8 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     where: { id: competenciaId },
     select: { mes: true, ano: true },
   });
-  const iniComp = competencia ? new Date(competencia.ano, competencia.mes - 1, 1) : new Date(0);
-  const fimComp = competencia ? new Date(competencia.ano, competencia.mes, 0, 23, 59, 59, 999) : new Date();
+  const iniComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+  const fimComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes,    1, 2, 59, 59, 999)) : new Date();
 
   const recebWhere = {
     consultorId,
@@ -269,8 +271,8 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     where: { id: competenciaId },
     select: { mes: true, ano: true },
   });
-  const iniComp = competencia ? new Date(competencia.ano, competencia.mes - 1, 1) : new Date(0);
-  const fimComp = competencia ? new Date(competencia.ano, competencia.mes, 0, 23, 59, 59, 999) : new Date();
+  const iniComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+  const fimComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes,    1, 2, 59, 59, 999)) : new Date();
 
   // Sem filtro = todas as frentes
   const semFiltro = equipeIds.length === 0;
@@ -414,8 +416,9 @@ async function dashboardExecutivo(competenciaId: string) {
     where: { id: competenciaId },
     select: { mes: true, ano: true },
   });
-  const iniExec = competenciaExec ? new Date(competenciaExec.ano, competenciaExec.mes - 1, 1) : new Date(0);
-  const fimExec = competenciaExec ? new Date(competenciaExec.ano, competenciaExec.mes, 0, 23, 59, 59, 999) : new Date();
+  // UTC-3 (Brasília) — primeiro e último instante do mês em UTC
+  const iniExec = competenciaExec ? new Date(Date.UTC(competenciaExec.ano, competenciaExec.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+  const fimExec = competenciaExec ? new Date(Date.UTC(competenciaExec.ano, competenciaExec.mes,    1, 2, 59, 59, 999)) : new Date();
 
   const [carteiras, recebimentosPorContrato, parcelasCount, empresas] = await Promise.all([
     // Seleção mínima — sem recebimentos
