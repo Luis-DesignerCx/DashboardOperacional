@@ -79,17 +79,24 @@ export default function ImportacaoPage() {
     setFpErro("");
     setFpResultado(null);
     try {
-      const form = new FormData();
-      form.append("arquivo", fpArquivo);
-      form.append("competenciaId", competenciaId);
-      form.append("origem", "MANUAL");
-      const res = await fetch("/api/fapass/sync", { method: "POST", body: form });
+      // Parseia o Excel no browser para evitar FUNCTION_PAYLOAD_TOO_LARGE
+      const XLSX = await import("xlsx");
+      const buffer = await fpArquivo.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: "buffer" });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const linhas: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+
+      const res = await fetch("/api/fapass/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ linhas, competenciaId, origem: "MANUAL" }),
+      });
       const ct = res.headers.get("content-type") ?? "";
       const data = ct.includes("json") ? await res.json() : { erro: await res.text() };
       if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
       else { setFpResultado(data); carregarFpStatus(competenciaId); }
-    } catch {
-      setFpErro("Timeout ou erro de conexão ao processar o arquivo. Tente novamente.");
+    } catch (e: any) {
+      setFpErro(e?.message?.includes("payload") ? "Arquivo muito grande. Contate o suporte." : "Erro ao processar o arquivo. Tente novamente.");
     } finally {
       setFpCarregando(false);
     }

@@ -85,13 +85,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const formData = await req.formData();
-  const arquivo = formData.get("arquivo") as File;
-  const competenciaId = formData.get("competenciaId") as string;
-  const origem = (formData.get("origem") as string) || "MANUAL";
+  const body = await req.json().catch(() => null);
+  const linhas: any[][] = body?.linhas;
+  const competenciaId: string = body?.competenciaId;
+  const origem: string = body?.origem || "MANUAL";
 
-  if (!arquivo || !competenciaId) {
-    return NextResponse.json({ erro: "Arquivo e competência são obrigatórios" }, { status: 400 });
+  if (!linhas || !competenciaId) {
+    return NextResponse.json({ erro: "Dados e competência são obrigatórios" }, { status: 400 });
   }
 
   const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
@@ -104,16 +104,12 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    // ── 1. Parse do arquivo ──────────────────────────────────────────────────
-    const XLSX = await import("xlsx");
-    const buffer = Buffer.from(await arquivo.arrayBuffer());
-    const wb = XLSX.read(buffer, { type: "buffer" });
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    const todasLinhas: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
-    const linhas = todasLinhas.slice(1);
+    // ── 1. Dados já parseados no frontend ───────────────────────────────────
+    // linhas[0] = cabeçalho, slice(1) = dados
+    const linhasDados = linhas.slice(1);
 
     // ── 2. Filtra apenas FP/PON ──────────────────────────────────────────────
-    const linhasFP = linhas.filter((row) => isFaPass(String(row[C.documento] ?? "")));
+    const linhasFP = linhasDados.filter((row) => isFaPass(String(row[C.documento] ?? "")));
 
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
