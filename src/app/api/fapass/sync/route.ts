@@ -392,22 +392,35 @@ export async function POST(req: NextRequest) {
         ])
       );
 
+      // Busca carteiras e gestores em lote (evita N+1 queries no loop)
+      const idsContratosBaixa = contratosComBaixa
+        .map((doc) => numParaId.get(doc))
+        .filter((id): id is string => !!id);
+
+      const carteirasBulk = idsContratosBaixa.length > 0
+        ? await prisma.carteiraParcela.findMany({
+            where: { contratoId: { in: idsContratosBaixa }, competenciaId, ativo: true },
+            select: { contratoId: true, consultorId: true, consultor: { select: { equipeId: true } } },
+          })
+        : [];
+      const carteiraMap = new Map(carteirasBulk.map((c) => [c.contratoId, c]));
+
+      const equipeIds = [...new Set(carteirasBulk.map((c) => c.consultor?.equipeId).filter((id): id is string => !!id))];
+      const equipesBulk = equipeIds.length > 0
+        ? await prisma.equipe.findMany({ where: { id: { in: equipeIds } }, select: { id: true, gestorId: true } })
+        : [];
+      const equipeGestorMap = new Map(equipesBulk.map((e) => [e.id, e.gestorId]));
+
       for (const [doc, valorQuery] of baixasPorContrato) {
         const valorSistema = recebMap.get(doc) ?? 0;
         const diff = Math.abs(valorQuery - valorSistema);
-        if (diff < 0.01) continue; // sem divergência
+        if (diff < 0.01) continue;
 
         const contratoId = numParaId.get(doc) ?? null;
-        const carteira = contratoId
-          ? await prisma.carteiraParcela.findFirst({
-              where: { contratoId, competenciaId, ativo: true },
-              select: { consultorId: true, consultor: { select: { equipeId: true } } },
-            })
-          : null;
-
+        const carteira = contratoId ? carteiraMap.get(contratoId) : null;
         const consultorId = carteira?.consultorId ?? null;
-        const gestorId = carteira?.consultor
-          ? (await prisma.equipe.findFirst({ where: { id: carteira.consultor.equipeId ?? "" }, select: { gestorId: true } }))?.gestorId ?? null
+        const gestorId = carteira?.consultor?.equipeId
+          ? equipeGestorMap.get(carteira.consultor.equipeId) ?? null
           : null;
 
         divergencias.push({

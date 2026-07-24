@@ -78,15 +78,21 @@ export default function ImportacaoPage() {
     setFpCarregando(true);
     setFpErro("");
     setFpResultado(null);
-    const form = new FormData();
-    form.append("arquivo", fpArquivo);
-    form.append("competenciaId", competenciaId);
-    form.append("origem", "MANUAL");
-    const res = await fetch("/api/fapass/sync", { method: "POST", body: form });
-    const data = await res.json();
-    setFpCarregando(false);
-    if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
-    else { setFpResultado(data); carregarFpStatus(competenciaId); }
+    try {
+      const form = new FormData();
+      form.append("arquivo", fpArquivo);
+      form.append("competenciaId", competenciaId);
+      form.append("origem", "MANUAL");
+      const res = await fetch("/api/fapass/sync", { method: "POST", body: form });
+      const ct = res.headers.get("content-type") ?? "";
+      const data = ct.includes("json") ? await res.json() : { erro: await res.text() };
+      if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
+      else { setFpResultado(data); carregarFpStatus(competenciaId); }
+    } catch {
+      setFpErro("Timeout ou erro de conexão ao processar o arquivo. Tente novamente.");
+    } finally {
+      setFpCarregando(false);
+    }
   }
 
   async function handleFpFecharCiclo() {
