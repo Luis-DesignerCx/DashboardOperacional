@@ -63,10 +63,10 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     promessasAbertasAgg,
     agendadosHoje,
     metasResult,
+    feriasSnapshot,
     saldoParcelasAgg,
     qtdRecuperados,
     parcelasRemanejadasAgg,
-    feriasSnapshot,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
