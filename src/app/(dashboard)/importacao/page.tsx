@@ -79,12 +79,18 @@ export default function ImportacaoPage() {
     setFpErro("");
     setFpResultado(null);
     try {
-      // Parseia o Excel no browser para evitar FUNCTION_PAYLOAD_TOO_LARGE
-      const XLSX = await import("xlsx");
+      // Parseia o Excel em Web Worker para não travar o browser
       const buffer = await fpArquivo.arrayBuffer();
-      const wb = XLSX.read(buffer, { type: "buffer" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const linhas: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+      const linhas = await new Promise<any[][]>((resolve, reject) => {
+        const worker = new Worker(new URL("../../workers/xlsx-parser.worker.ts", import.meta.url));
+        worker.onmessage = (e) => {
+          worker.terminate();
+          if (e.data.ok) resolve(e.data.linhas);
+          else reject(new Error(e.data.erro));
+        };
+        worker.onerror = (e) => { worker.terminate(); reject(new Error(e.message)); };
+        worker.postMessage({ buffer }, [buffer]);
+      });
 
       const res = await fetch("/api/fapass/sync", {
         method: "POST",
@@ -94,10 +100,10 @@ export default function ImportacaoPage() {
       const ct = res.headers.get("content-type") ?? "";
       const data = ct.includes("json") ? await res.json() : { erro: await res.text() };
       if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
-      else if (data._debug) { setFpErro(`DEBUG — ${data.mensagem}\n${data.totalLinhas} linhas lidas. Cabeçalho: ${JSON.stringify(data.cabecalho)}`); }
+      else if (data._debug) { setFpErro(`DEBUG — ${data.mensagem} | ${data.totalLinhas} linhas | Cabeçalho: ${JSON.stringify(data.cabecalho)}`); }
       else { setFpResultado(data); carregarFpStatus(competenciaId); }
     } catch (e: any) {
-      setFpErro(e?.message?.includes("payload") ? "Arquivo muito grande. Contate o suporte." : "Erro ao processar o arquivo. Tente novamente.");
+      setFpErro("Erro ao processar o arquivo: " + (e?.message || "tente novamente."));
     } finally {
       setFpCarregando(false);
     }
