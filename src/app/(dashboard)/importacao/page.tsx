@@ -82,7 +82,7 @@ export default function ImportacaoPage() {
       // Parseia o Excel em Web Worker para não travar o browser
       const buffer = await fpArquivo.arrayBuffer();
       const linhas = await new Promise<any[][]>((resolve, reject) => {
-        const worker = new Worker(new URL("../../workers/xlsx-parser.worker.ts", import.meta.url));
+        const worker = new Worker(new URL("../../../workers/xlsx-parser.worker.ts", import.meta.url), { type: "module" });
         worker.onmessage = (e) => {
           worker.terminate();
           if (e.data.ok) resolve(e.data.linhas);
