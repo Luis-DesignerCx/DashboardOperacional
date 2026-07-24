@@ -85,22 +85,26 @@ export default function ImportacaoPage() {
         const worker = new Worker(new URL("../../../workers/xlsx-parser.worker.ts", import.meta.url), { type: "module" });
         worker.onmessage = (e) => {
           worker.terminate();
-          if (e.data.ok) resolve(e.data.linhas);
+          if (e.data.ok) resolve(e.data);
           else reject(new Error(e.data.erro));
         };
         worker.onerror = (e) => { worker.terminate(); reject(new Error(e.message)); };
         worker.postMessage({ buffer }, [buffer]);
       });
 
+      const workerResult = linhas as any;
+      const { linhasFP, colsDetectadas, cabecalho, debugAmostra, totalLinhasArquivo } = workerResult;
       const res = await fetch("/api/fapass/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linhas, competenciaId, origem: "MANUAL" }),
+        body: JSON.stringify({ linhasFP, colsDetectadas, competenciaId, origem: "MANUAL", totalLinhasArquivo }),
       });
       const ct = res.headers.get("content-type") ?? "";
       const data = ct.includes("json") ? await res.json() : { erro: await res.text() };
       if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
-      else if (data._debug) { setFpErro(`DEBUG — ${data.mensagem} | ${data.totalLinhas} linhas | Cabeçalho: ${JSON.stringify(data.cabecalho)}`); }
+      else if (data._debug) {
+        setFpErro(`DEBUG — ${data.mensagem}\nTotal linhas: ${totalLinhasArquivo} | FP/PON encontrados: ${linhasFP?.length ?? 0}\nColunas detectadas: ${JSON.stringify(colsDetectadas)}\nCabeçalho: ${JSON.stringify(cabecalho?.slice(0, 25))}\nAmostra:\n${(debugAmostra ?? []).join("\n")}`);
+      }
       else { setFpResultado(data); carregarFpStatus(competenciaId); }
     } catch (e: any) {
       setFpErro("Erro ao processar o arquivo: " + (e?.message || "tente novamente."));

@@ -11,26 +11,19 @@ import { distribuirCarteira } from "@/utils/distribuicao-carteira";
 import { fatorFerias } from "@/utils/dias-uteis";
 import { Decimal } from "@prisma/client/runtime/library";
 
-// Colunas da Base CAR Passaporte BC.xlsx (0-based)
+// Colunas após remapeamento pelo worker (índices 0-8)
+// worker envia: [documento, tipo, fornecedor, valor, saldo, status, vencimento, dataBaixa, tiposBaixa]
 const C = {
-  id:           0,  // Id
-  documento:    1,  // Documento — número do contrato (FP/PON)
-  tipo:         6,  // Tipo — meio de pagamento / identificador
-  fornecedor:   7,  // Fornecedor — nome do cliente
-  valor:        8,  // Valor
-  saldoPendente:14, // SaldoPendente
-  status:       16, // Status (B=baixado, P=pendente)
-  vencimento:   17, // Vencimento
-  dataBaixa:    18, // DataBaixa
-  tiposBaixa:   19, // TiposBaixa
+  documento:    0,
+  tipo:         1,
+  fornecedor:   2,
+  valor:        3,
+  saldoPendente:4,
+  status:       5,
+  vencimento:   6,
+  dataBaixa:    7,
+  tiposBaixa:   8,
 } as const;
-
-const PREFIXOS_FAPASS = ["FP", "PON"];
-
-function isFaPass(doc: string): boolean {
-  const upper = doc.toUpperCase().trim();
-  return PREFIXOS_FAPASS.some((p) => upper.startsWith(p));
-}
 
 function parseBRDate(val: any): Date | null {
   if (!val) return null;
@@ -86,11 +79,12 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  const linhas: any[][] = body?.linhas;
+  const linhasFPBody: any[][] = body?.linhasFP;  // já filtradas e remapeadas pelo worker
   const competenciaId: string = body?.competenciaId;
   const origem: string = body?.origem || "MANUAL";
+  const totalLinhasArquivo: number = body?.totalLinhasArquivo ?? 0;
 
-  if (!linhas || !competenciaId) {
+  if (!linhasFPBody || !competenciaId) {
     return NextResponse.json({ erro: "Dados e competência são obrigatórios" }, { status: 400 });
   }
 
@@ -104,25 +98,15 @@ export async function POST(req: NextRequest) {
   });
 
   try {
-    // ── 1. Dados já parseados no frontend ───────────────────────────────────
-    // linhas[0] = cabeçalho, slice(1) = dados
-    const linhasDados = linhas.slice(1);
+    // ── 1. Linhas FP/PON já filtradas e remapeadas pelo worker ──────────────
+    const linhasFP = linhasFPBody;
 
-    // ── 2. Filtra apenas FP/PON ──────────────────────────────────────────────
-    const linhasFP = linhasDados.filter((row) => isFaPass(String(row[C.documento] ?? "")));
-
-    // DEBUG: retorna estrutura das primeiras linhas se nenhum FP/PON encontrado
-    if (linhasFP.length === 0 && linhasDados.length > 0) {
-      const cabecalho = linhas[0] ?? [];
-      const amostra = linhasDados.slice(0, 3).map((row) =>
-        cabecalho.map((col: any, i: number) => `[${i}] ${col}: ${row[i]}`)
-      );
+    // DEBUG: se nenhum FP/PON encontrado, retorna info para diagnóstico
+    if (linhasFP.length === 0 && totalLinhasArquivo > 0) {
       return NextResponse.json({
         _debug: true,
-        totalLinhas: linhasDados.length,
-        cabecalho,
-        amostra,
-        mensagem: "Nenhuma linha FP/PON encontrada — verifique mapeamento de colunas",
+        mensagem: "Nenhuma linha FP/PON encontrada pelo worker",
+        totalLinhasArquivo,
       });
     }
 
@@ -457,7 +441,7 @@ export async function POST(req: NextRequest) {
       where: { id: sync.id },
       data: {
         primeiraSync,
-        totalRegistros: linhasFP.length,
+        totalRegistros: totalLinhasArquivo,
         totalContratos: gruposInad.size,
         totalFlash: novosSnap.filter((s) => s.isFlash).length,
         totalBaixas: baixas.length,
