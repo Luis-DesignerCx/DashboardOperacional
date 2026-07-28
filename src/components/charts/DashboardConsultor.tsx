@@ -21,6 +21,7 @@ interface DadosConsultor {
   valorCarteira: number;
   valorRecebido: number;
   valorAParte: number;
+  recebimentoAParte: number;
   valorRemanejado: number;
   totalClientes: number;
   clientesPagaram: number;
@@ -162,6 +163,13 @@ export function DashboardConsultor() {
           sub="Fora da inadimplência"
           icon={Layers}
           cor="bg-sky-600"
+        />
+        <CardMetrica
+          titulo="Rec. a Parte"
+          valor={formatarMoeda(dados.recebimentoAParte ?? 0)}
+          sub="Fora da planilha oficial"
+          icon={Layers}
+          cor="bg-indigo-600"
         />
         <CardMetrica
           titulo="Remanejado"
