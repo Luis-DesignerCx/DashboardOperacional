@@ -720,13 +720,6 @@ export default function ImportacaoPage() {
                     <p className="text-xs text-slate-500">Lançado no sistema, fora da planilha</p>
                     <p className={`text-sm font-bold mt-1 ${bxResultado.naoConfirmados > 0 ? "text-sky-400" : "text-slate-400"}`}>{bxResultado.naoConfirmados}</p>
                   </button>
-                  {bxResultado.foraCarteira > 0 && (
-                    <div className="bg-slate-800/60 rounded-xl p-3">
-                      <p className="text-xs text-slate-400">Fora desta carteira</p>
-                      <p className="text-xs text-slate-500">Na planilha, não na competência</p>
-                      <p className="text-sm font-bold text-slate-500 mt-1">{bxResultado.foraCarteira}</p>
-                    </div>
-                  )}
                 </div>
 
                 {/* Detalhe expandido */}
