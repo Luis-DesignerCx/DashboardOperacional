@@ -101,11 +101,11 @@ export async function POST(req: NextRequest) {
     // ── 1. Linhas FP/PON já filtradas e remapeadas pelo worker ──────────────
     const linhasFP = linhasFPBody;
 
-    // DEBUG: se nenhum FP/PON encontrado, retorna info para diagnóstico
-    if (linhasFP.length === 0 && totalLinhasArquivo > 0) {
+    // Aborta sem alterar dados se o worker não entregou nenhuma linha
+    if (linhasFP.length === 0) {
       return NextResponse.json({
         _debug: true,
-        mensagem: "Nenhuma linha FP/PON encontrada pelo worker",
+        mensagem: "Arquivo muito grande para processar pelo browser. Use o script local.",
         totalLinhasArquivo,
       });
     }
