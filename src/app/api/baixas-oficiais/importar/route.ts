@@ -120,11 +120,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "Nenhuma baixa válida encontrada para a competência selecionada." }, { status: 422 });
   }
 
-  // ── Busca contratos no banco ──────────────────────────────────────────────────
-  const contratosDB = await prisma.contrato.findMany({
-    where: { numero: { in: numerosContratos } },
-    select: { id: true, numero: true, clienteId: true, cliente: { select: { nome: true } } },
+  // ── Busca APENAS contratos ativos na carteira desta competência ──────────────
+  // Somente contratos com CarteiraParcela nesta competência são relevantes para o cruzamento
+  const carteiras = await prisma.carteiraParcela.findMany({
+    where: {
+      competenciaId,
+      ativo: true,
+      contrato: { numero: { in: numerosContratos } },
+    },
+    select: { contratoId: true, contrato: { select: { id: true, numero: true, clienteId: true, cliente: { select: { nome: true } } } } },
   });
+
+  const contratosDB = carteiras.map((k) => k.contrato);
   const contratoMap = new Map(contratosDB.map((c) => [c.numero, c]));
 
   // ── Busca recebimentos na competência para esses contratos ───────────────────
@@ -160,6 +167,7 @@ export async function POST(req: NextRequest) {
     const contratoDB = contratoMap.get(numContrato);
 
     if (!contratoDB) {
+      // Não está na carteira desta competência — ignorar para cruzamento
       naoEncontrados.push({ contrato: numContrato, cliente: dado.cliente, valorPlanilha: dado.valor });
       continue;
     }

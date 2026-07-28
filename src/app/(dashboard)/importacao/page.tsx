@@ -717,7 +717,7 @@ export default function ImportacaoPage() {
                   </button>
                   {bxResultado.naoEncontrados > 0 && (
                     <div className="bg-slate-800/60 rounded-xl p-3">
-                      <p className="text-xs text-slate-400">Não cadastrados no sistema</p>
+                      <p className="text-xs text-slate-400">Fora da carteira desta competência</p>
                       <p className="text-sm font-bold text-slate-400 mt-0.5">{bxResultado.naoEncontrados}</p>
                     </div>
                   )}
