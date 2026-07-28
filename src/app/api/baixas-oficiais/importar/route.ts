@@ -127,15 +127,28 @@ export async function POST(req: NextRequest) {
   // ── 3. Recebimentos de todos os contratos da carteira no mês ─────────────────
   const recebimentosDB = await prisma.recebimento.findMany({
     where: { contratoId: { in: todosIds }, dataRecebimento: { gte: iniComp, lt: fimComp } },
-    select: { id: true, contratoId: true, valor: true, dataRecebimento: true },
+    select: { id: true, contratoId: true, valor: true, dataRecebimento: true, parcelasIds: true },
   });
 
-  // Agrupa recebimentos por contratoId
-  const recMap = new Map<string, { ids: string[]; valorTotal: number }>();
+  // Busca os valores das parcelas flagadas (para comparação precisa por parcela)
+  const todosParcIds = [...new Set(recebimentosDB.flatMap((r) => r.parcelasIds))];
+  const parcelasValores = todosParcIds.length > 0
+    ? await prisma.parcela.findMany({
+        where: { id: { in: todosParcIds } },
+        select: { id: true, valorTotalAberto: true },
+      })
+    : [];
+  const parcelaValorMap = new Map(parcelasValores.map((p) => [p.id, Number(p.valorTotalAberto)]));
+
+  // Agrupa recebimentos por contratoId; computa valorFlagado = soma das parcelas cobertas
+  const recMap = new Map<string, { ids: string[]; valorTotal: number; valorFlagado: number }>();
   for (const r of recebimentosDB) {
+    const valorFlagado = r.parcelasIds.length > 0
+      ? r.parcelasIds.reduce((s, pid) => s + (parcelaValorMap.get(pid) ?? 0), 0)
+      : Number(r.valor);
     const e = recMap.get(r.contratoId);
-    if (e) { e.ids.push(r.id); e.valorTotal += Number(r.valor); }
-    else recMap.set(r.contratoId, { ids: [r.id], valorTotal: Number(r.valor) });
+    if (e) { e.ids.push(r.id); e.valorTotal += Number(r.valor); e.valorFlagado += valorFlagado; }
+    else recMap.set(r.contratoId, { ids: [r.id], valorTotal: Number(r.valor), valorFlagado });
   }
 
   // ── 4. Cruzamento: base = todos os contratos da carteira ─────────────────────
@@ -158,7 +171,10 @@ export async function POST(req: NextRequest) {
     const rec = recMap.get(contrato.id);
 
     if (naPlanilha && rec) {
-      const diff = Math.abs(rec.valorTotal - naPlanilha.valor);
+      // Compara planilha contra valorFlagado (parcelas que o consultor marcou como pagas).
+      // Se não há parcelasIds (recebimentos antigos), cai de volta para valorTotal.
+      const valorComparar = rec.valorFlagado > 0 ? rec.valorFlagado : rec.valorTotal;
+      const diff = Math.abs(valorComparar - naPlanilha.valor);
       if (diff <= TOLERANCIA) {
         confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
         recIdsConfirmados.push(...rec.ids);

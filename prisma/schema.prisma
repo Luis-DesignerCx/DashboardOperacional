@@ -376,6 +376,7 @@ model Recebimento {
   dataRecebimento DateTime
   formaPagamento  FormaPagamento
   justificativa   String
+  parcelasIds     String[]       @default([])
   baixaOficial    Boolean        @default(false)
   valorBaixado    Decimal?       @db.Decimal(15, 2)
   divergencia     Boolean        @default(false)

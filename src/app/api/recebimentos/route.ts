@@ -171,6 +171,7 @@ export async function POST(req: NextRequest) {
       dataRecebimento: new Date(dataRecebimento),
       formaPagamento: formaPagamento as FormaPagamento,
       justificativa: observacao || "Recebimento registrado pelo consultor",
+      parcelasIds: Array.isArray(parcelasIds) ? parcelasIds : [],
       aprovado: true,
     },
   });
