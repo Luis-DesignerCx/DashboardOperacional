@@ -1,0 +1,60 @@
+name: Fã Pass — Sync Query
+
+on:
+  repository_dispatch:
+    types: [fapass-sync]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências Python
+        run: pip install openpyxl requests
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instalar dependências Node
+        run: npm ci
+
+      - name: Gerar cliente Prisma
+        run: npx prisma generate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Baixar planilha do Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FAPASS_FILE_PATH: ${{ github.event.client_payload.filePath }}
+        run: python scripts/fapass-download.py
+
+      - name: Extrair dados FP/PON da planilha
+        run: python scripts/fapass-extrair.py "planilhas/upload.xlsx"
+
+      - name: Importar para o banco de dados
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+          FAPASS_COMPETENCIA_ID: ${{ github.event.client_payload.competenciaId }}
+          FAPASS_SYNC_ID: ${{ github.event.client_payload.syncId }}
+        run: node scripts/fapass-importar.mjs
+
+      - name: Limpar arquivos temporários
+        if: always()
+        run: |
+          rm -f planilhas/upload.xlsx
+          rm -f scripts/fapass-dados.json

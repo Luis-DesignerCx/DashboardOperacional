@@ -54,10 +54,12 @@ export default function ImportacaoPage() {
   // Fã Pass
   const [fpArquivo, setFpArquivo] = useState<File | null>(null);
   const [fpCarregando, setFpCarregando] = useState(false);
+  const [fpProgresso, setFpProgresso] = useState("");
   const [fpResultado, setFpResultado] = useState<any | null>(null);
   const [fpErro, setFpErro] = useState("");
   const [fpStatus, setFpStatus] = useState<any | null>(null);
   const [fpFechando, setFpFechando] = useState(false);
+  const [fpSyncId, setFpSyncId] = useState<string | null>(null);
 
   // Férias
   const [ferias, setFerias] = useState<FeriasEntry[]>([]);
@@ -73,43 +75,97 @@ export default function ImportacaoPage() {
     else setFpStatus(null);
   }
 
+  // Polling: aguarda o GitHub Actions concluir verificando o status do sync
+  function iniciarPolling(syncId: string, cId: string) {
+    setFpSyncId(syncId);
+    const intervalo = setInterval(async () => {
+      try {
+        const d = await fetch(`/api/fapass/status?competenciaId=${cId}`).then((r) => r.json());
+        if (!d || d.erro) return;
+        const ultimaSync = d.ultimaSync;
+        if (!ultimaSync || ultimaSync.id !== syncId) return;
+        if (ultimaSync.status === "CONCLUIDO") {
+          clearInterval(intervalo);
+          setFpCarregando(false);
+          setFpProgresso("");
+          setFpSyncId(null);
+          setFpStatus(d);
+          setFpResultado({
+            primeiraSync: ultimaSync.primeiraSync,
+            totalRegistros: ultimaSync.totalRegistros,
+            totalContratos: ultimaSync.totalContratos,
+            novosInadimplentes: ultimaSync.totalContratos - ultimaSync.totalFlash,
+            novosFlash: ultimaSync.totalFlash,
+            totalBaixas: ultimaSync.totalBaixas,
+            totalDivergencias: ultimaSync.totalDivergencias,
+          });
+        } else if (ultimaSync.status === "ERRO") {
+          clearInterval(intervalo);
+          setFpCarregando(false);
+          setFpProgresso("");
+          setFpSyncId(null);
+          setFpErro(ultimaSync.erro || "Erro durante o processamento.");
+        }
+      } catch { /* ignora erros de rede no polling */ }
+    }, 8000);
+    // Segurança: para o polling após 25 minutos
+    setTimeout(() => {
+      clearInterval(intervalo);
+      if (fpCarregando) {
+        setFpCarregando(false);
+        setFpProgresso("");
+        setFpErro("Tempo limite de processamento atingido. Verifique o status manualmente.");
+      }
+    }, 25 * 60 * 1000);
+  }
+
   async function handleFpSync() {
     if (!fpArquivo || !competenciaId) return;
     setFpCarregando(true);
     setFpErro("");
     setFpResultado(null);
+    setFpProgresso("Preparando upload...");
     try {
-      // Parseia o Excel em Web Worker para não travar o browser
-      const buffer = await fpArquivo.arrayBuffer();
-      const linhas = await new Promise<any[][]>((resolve, reject) => {
-        const worker = new Worker(new URL("../../../workers/xlsx-parser.worker.ts", import.meta.url), { type: "module" });
-        worker.onmessage = (e) => {
-          worker.terminate();
-          if (e.data.ok) resolve(e.data);
-          else reject(new Error(e.data.erro));
-        };
-        worker.onerror = (e) => { worker.terminate(); reject(new Error(e.message)); };
-        worker.postMessage({ buffer }, [buffer]);
-      });
-
-      const workerResult = linhas as any;
-      const { linhasFP, colsDetectadas, cabecalho, debugAmostra, totalLinhasArquivo } = workerResult;
-      const res = await fetch("/api/fapass/sync", {
+      // 1. Solicita URL assinada para upload direto ao Supabase Storage
+      const urlRes = await fetch("/api/fapass/upload-url", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ linhasFP, colsDetectadas, competenciaId, origem: "MANUAL", totalLinhasArquivo }),
+        body: JSON.stringify({ competenciaId }),
       });
-      const ct = res.headers.get("content-type") ?? "";
-      const data = ct.includes("json") ? await res.json() : { erro: await res.text() };
-      if (!res.ok) { setFpErro(data.erro || "Erro ao processar"); }
-      else if (data._debug) {
-        setFpErro(`DEBUG — ${data.mensagem}\nTotal linhas: ${totalLinhasArquivo} | FP/PON encontrados: ${linhasFP?.length ?? 0}\nColunas detectadas: ${JSON.stringify(colsDetectadas)}\nCabeçalho: ${JSON.stringify(cabecalho?.slice(0, 25))}\nAmostra:\n${(debugAmostra ?? []).join("\n")}`);
+      if (!urlRes.ok) {
+        const d = await urlRes.json();
+        throw new Error(d.erro || "Erro ao obter URL de upload");
       }
-      else { setFpResultado(data); carregarFpStatus(competenciaId); }
+      const { uploadUrl, filePath, syncId } = await urlRes.json();
+
+      // 2. Faz o upload diretamente para o Supabase Storage (sem passar pelo Vercel)
+      setFpProgresso(`Enviando arquivo (${(fpArquivo.size / 1_048_576).toFixed(0)} MB)...`);
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+        body: fpArquivo,
+      });
+      if (!uploadRes.ok) throw new Error("Falha no upload do arquivo. Tente novamente.");
+
+      // 3. Dispara o GitHub Actions para processar
+      setFpProgresso("Iniciando processamento em segundo plano...");
+      const triggerRes = await fetch("/api/fapass/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ syncId, filePath, competenciaId }),
+      });
+      if (!triggerRes.ok) {
+        const d = await triggerRes.json();
+        throw new Error(d.erro || "Erro ao iniciar processamento");
+      }
+
+      // 4. Inicia polling para exibir resultado quando Actions concluir (~3-5 min)
+      setFpProgresso("Processando em segundo plano — atualizando automaticamente...");
+      iniciarPolling(syncId, competenciaId);
     } catch (e: any) {
-      setFpErro("Erro ao processar o arquivo: " + (e?.message || "tente novamente."));
-    } finally {
+      setFpErro(e?.message || "Erro ao processar o arquivo.");
       setFpCarregando(false);
+      setFpProgresso("");
     }
   }
 
@@ -590,6 +646,13 @@ export default function ImportacaoPage() {
               </label>
             </div>
 
+            {fpCarregando && fpProgresso && (
+              <div className="flex items-center gap-2 text-slate-300 bg-slate-800/60 border border-slate-700 rounded-lg px-4 py-3 text-sm">
+                <Loader2 size={15} className="animate-spin text-gr-400 flex-shrink-0" />
+                <span>{fpProgresso}</span>
+              </div>
+            )}
+
             {fpErro && (
               <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 text-sm">
                 <XCircle size={16} /> {fpErro}
@@ -622,7 +685,7 @@ export default function ImportacaoPage() {
                 disabled={!fpArquivo || fpCarregando}
                 className="flex-1 flex items-center justify-center gap-2 bg-gr-500 hover:bg-gr-600 disabled:bg-gr-500/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
-                {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Processando...</> : <><RefreshCw size={15} /> Atualizar Query</>}
+                {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Enviando...</> : <><RefreshCw size={15} /> Atualizar Query</>}
               </button>
               <button
                 onClick={handleFpFecharCiclo}

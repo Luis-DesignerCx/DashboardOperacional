@@ -33,10 +33,14 @@ async function main() {
   const linhasFP = JSON.parse(readFileSync(dadosPath, "utf-8"));
   console.log(`\nRegistros carregados: ${linhasFP.length}`);
 
-  const competencia = await prisma.competencia.findFirst({
-    where: { fechada: false },
-    orderBy: [{ ano: "desc" }, { mes: "desc" }],
-  });
+  // Suporte a FAPASS_COMPETENCIA_ID passado pelo GitHub Actions
+  const competenciaIdEnv = process.env.FAPASS_COMPETENCIA_ID;
+  const syncIdEnv        = process.env.FAPASS_SYNC_ID;
+
+  const competencia = competenciaIdEnv
+    ? await prisma.competencia.findUnique({ where: { id: competenciaIdEnv } })
+    : await prisma.competencia.findFirst({ where: { fechada: false }, orderBy: [{ ano: "desc" }, { mes: "desc" }] });
+
   if (!competencia) { console.error("Nenhuma competência ativa."); process.exit(1); }
   console.log(`Competência: ${competencia.descricao}`);
 
@@ -48,9 +52,10 @@ async function main() {
   const iniComp = new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0));
   const fimComp = new Date(Date.UTC(competencia.ano, competencia.mes, 1, 2, 59, 59, 999));
 
-  const sync = await prisma.faPassSync.create({
-    data: { competenciaId: competencia.id, origem: "LOCAL", status: "PROCESSANDO" },
-  });
+  // Se Actions passou um syncId existente, reutiliza; senão cria novo
+  const sync = syncIdEnv
+    ? await prisma.faPassSync.update({ where: { id: syncIdEnv }, data: { status: "PROCESSANDO" } }).then(() => ({ id: syncIdEnv }))
+    : await prisma.faPassSync.create({ data: { competenciaId: competencia.id, origem: "LOCAL", status: "PROCESSANDO" } });
 
   try {
     const snapExistente = await prisma.faPassInadimplencia.count({ where: { competenciaId: competencia.id } });
