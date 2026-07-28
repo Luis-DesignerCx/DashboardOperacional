@@ -599,7 +599,7 @@ export default function ImportacaoPage() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-white">Fã Pass</h2>
-            <p className="text-xs text-slate-400 mt-0.5">Integração via QUERY — Base CAR Passaporte BC</p>
+            <p className="text-xs text-slate-400 mt-0.5">Base de inadimplência — Passaporte BC</p>
           </div>
           {fpStatus?.ultimaSync && (
             <div className="text-right">
@@ -685,7 +685,7 @@ export default function ImportacaoPage() {
                 disabled={!fpArquivo || fpCarregando}
                 className="flex-1 flex items-center justify-center gap-2 bg-gr-500 hover:bg-gr-600 disabled:bg-gr-500/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
-                {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Enviando...</> : <><RefreshCw size={15} /> Atualizar Query</>}
+                {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Processando...</> : <><RefreshCw size={15} /> Importar Fã Pass</>}
               </button>
               <button
                 onClick={handleFpFecharCiclo}
