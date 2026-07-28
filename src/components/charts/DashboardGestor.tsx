@@ -101,7 +101,7 @@ export function DashboardGestor() {
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <p className="text-slate-400 text-sm">Rec. a Parte</p>
           <p className="text-2xl font-bold text-sky-400 mt-1">{formatarMoeda(dados.recebimentoAParte ?? 0)}</p>
-          <p className="text-xs text-slate-500 mt-1">Fora da planilha oficial</p>
+          <p className="text-xs text-slate-500 mt-1">Registrado pelo consultor</p>
         </div>
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
           <p className="text-slate-400 text-sm">% da Meta</p>

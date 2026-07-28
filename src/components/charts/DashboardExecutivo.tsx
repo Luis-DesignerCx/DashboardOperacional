@@ -123,7 +123,7 @@ export function DashboardExecutivo() {
           <p className="text-slate-300 text-sm font-medium">Rec. a Parte</p>
           <p className="text-3xl font-bold text-sky-400 mt-2">{formatarMoeda(dados.recebimentoAParte ?? 0)}</p>
           <div className="mt-3 pt-3 border-t border-slate-800">
-            <span className="text-xs text-slate-500">Lançado no sistema, fora da planilha</span>
+            <span className="text-xs text-slate-500">Registrado pelo consultor no sistema</span>
           </div>
         </div>
       </div>

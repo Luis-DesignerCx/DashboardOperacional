@@ -161,10 +161,10 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       },
       _sum: { valorTotalAberto: true },
     }),
-    // Rec. a Parte: lançados no sistema mas não confirmados pela planilha oficial
+    // Rec. a Parte: soma do valorAParte registrado pelo consultor
     prisma.recebimento.aggregate({
-      where: { ...recebWhere, baixaOficial: false, divergencia: true },
-      _sum: { valor: true },
+      where: recebWhere,
+      _sum: { valorAParte: true },
     }),
   ]);
 
@@ -181,7 +181,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   // Derivar totais dos recebimentos detalhados
   const valorRecebido = recebimentosDetalhados.reduce((s, r) => s + Number(r.valor ?? 0), 0);
   const valorAParte = recebimentosDetalhados.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
-  const recebimentoAParte = Number(recAParteConsultor._sum.valor ?? 0);
+  const recebimentoAParte = Number(recAParteConsultor._sum.valorAParte ?? 0);
 
   // Valor remanejado: só parcelas remanejadas ainda não pagas
   const valorRemanejado = Number(parcelasRemanejadasAgg._sum.valorTotalAberto ?? 0);
@@ -388,16 +388,14 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
       },
       _sum: { valor: true },
     }),
-    // Rec. a Parte: lançados no sistema mas não confirmados pela planilha oficial
+    // Rec. a Parte: soma do valorAParte registrado pelos consultores
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
         contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
-        baixaOficial: false,
-        divergencia: true,
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
-      _sum: { valor: true },
+      _sum: { valorAParte: true },
     }),
   ]);
 
@@ -417,7 +415,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     inadimplenciaInicial,
     recebido,
     baixado,
-    recebimentoAParte: Number(recAParteAgg._sum.valor ?? 0),
+    recebimentoAParte: Number(recAParteAgg._sum.valorAParte ?? 0),
     percentualMeta: (meta && meta.valorAlvo && Number(meta.valorAlvo) > 0) ? Math.round((baixado / Number(meta.valorAlvo)) * 10000) / 100 : 0,
     metaAlvo: (meta && meta.valorAlvo) ? Number(meta.valorAlvo) : null,
     aprovacoesPendentes,
@@ -470,15 +468,13 @@ async function dashboardExecutivo(competenciaId: string) {
       where: { contrato: { carteiras: { some: { competenciaId } } } },
     }),
     prisma.empresa.findMany({ select: { id: true, nome: true } }),
-    // Rec. a Parte: lançados no sistema mas não confirmados pela planilha oficial
+    // Rec. a Parte: soma do campo valorAParte registrado pelos consultores
     prisma.recebimento.aggregate({
       where: {
         contrato: { carteiras: { some: { competenciaId, ativo: true } } },
-        baixaOficial: false,
-        divergencia: true,
         dataRecebimento: { gte: iniExec, lte: fimExec },
       },
-      _sum: { valor: true },
+      _sum: { valorAParte: true },
     }),
   ]);
 
@@ -519,7 +515,7 @@ async function dashboardExecutivo(competenciaId: string) {
     inadimplenciaTotal,
     recuperacaoTotal,
     percentualGeral: inadimplenciaTotal ? Math.min((recuperacaoTotal / inadimplenciaTotal) * 100, 100) : 0,
-    recebimentoAParte: Number(recAParte._sum.valor ?? 0),
+    recebimentoAParte: Number(recAParte._sum.valorAParte ?? 0),
     totalClientes,
     totalContratos,
     totalParcelas: parcelasCount,
