@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
         prisma.recebimento.findMany({
           where: {
             consultorId: consultor.id,
-            contrato: { carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
+            contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
             dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: { valor: true, valorAParte: true },
