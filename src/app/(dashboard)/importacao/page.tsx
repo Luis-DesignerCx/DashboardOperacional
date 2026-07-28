@@ -698,11 +698,11 @@ export default function ImportacaoPage() {
                   </div>
                   <button
                     onClick={() => setBxAberto(bxAberto === "naoLancados" ? null : "naoLancados")}
-                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoLancados > 0 ? "bg-red-500/10 border border-red-500/20 hover:bg-red-500/15" : "bg-slate-800/60"}`}
+                    className={`rounded-xl p-3 text-left transition-colors ${(bxResultado.naoLancados + bxResultado.semMovimento) > 0 ? "bg-red-500/10 border border-red-500/20 hover:bg-red-500/15" : "bg-slate-800/60"}`}
                   >
                     <p className="text-xs text-slate-400">Não recebido</p>
-                    <p className="text-xs text-slate-500">Baixou na planilha, sem lançamento</p>
-                    <p className={`text-sm font-bold mt-1 ${bxResultado.naoLancados > 0 ? "text-red-400" : "text-slate-400"}`}>{bxResultado.naoLancados}</p>
+                    <p className="text-xs text-slate-500">Sem confirmação de pagamento</p>
+                    <p className={`text-sm font-bold mt-1 ${(bxResultado.naoLancados + bxResultado.semMovimento) > 0 ? "text-red-400" : "text-slate-400"}`}>{bxResultado.naoLancados + bxResultado.semMovimento}</p>
                   </button>
                   <button
                     onClick={() => setBxAberto(bxAberto === "divergencias" ? null : "divergencias")}
@@ -752,7 +752,7 @@ export default function ImportacaoPage() {
 
                 {bxAberto === "naoLancados" && bxResultado.detalhes.naoLancados.length > 0 && (
                   <div className="bg-red-500/5 border border-red-500/20 rounded-xl overflow-hidden">
-                    <p className="text-xs font-medium text-red-400 px-4 py-2 border-b border-red-500/20">Não recebido — baixou na planilha, sem lançamento no sistema (máx 50)</p>
+                    <p className="text-xs font-medium text-red-400 px-4 py-2 border-b border-red-500/20">Baixou na planilha, sem lançamento no sistema (máx 50)</p>
                     <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
                       {bxResultado.detalhes.naoLancados.map((d: any, i: number) => (
                         <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
