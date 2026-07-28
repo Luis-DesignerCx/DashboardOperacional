@@ -693,30 +693,32 @@ export default function ImportacaoPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
                     <p className="text-xs text-slate-400">Confirmados</p>
-                    <p className="text-sm font-bold text-emerald-400 mt-0.5">{bxResultado.confirmados}</p>
+                    <p className="text-xs text-slate-500">Planilha e sistema coincidem</p>
+                    <p className="text-sm font-bold text-emerald-400 mt-1">{bxResultado.confirmados}</p>
                   </div>
-                  <button
-                    onClick={() => setBxAberto(bxAberto === "divergencias" ? null : "divergencias")}
-                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.divergencias > 0 ? "bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15" : "bg-slate-800/60"}`}
-                  >
-                    <p className="text-xs text-slate-400">Divergências de valor</p>
-                    <p className={`text-sm font-bold mt-0.5 ${bxResultado.divergencias > 0 ? "text-amber-400" : "text-slate-400"}`}>{bxResultado.divergencias}</p>
-                  </button>
                   <button
                     onClick={() => setBxAberto(bxAberto === "naoLancados" ? null : "naoLancados")}
                     className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoLancados > 0 ? "bg-red-500/10 border border-red-500/20 hover:bg-red-500/15" : "bg-slate-800/60"}`}
                   >
-                    <p className="text-xs text-slate-400">Não lançados no sistema</p>
-                    <p className="text-xs text-slate-500">Baixa na planilha, sem registro</p>
+                    <p className="text-xs text-slate-400">Não recebido</p>
+                    <p className="text-xs text-slate-500">Baixou na planilha, sem lançamento</p>
                     <p className={`text-sm font-bold mt-1 ${bxResultado.naoLancados > 0 ? "text-red-400" : "text-slate-400"}`}>{bxResultado.naoLancados}</p>
                   </button>
                   <button
-                    onClick={() => setBxAberto(bxAberto === "naoConfirmados" ? null : "naoConfirmados")}
-                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoConfirmados > 0 ? "bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/15" : "bg-slate-800/60"}`}
+                    onClick={() => setBxAberto(bxAberto === "divergencias" ? null : "divergencias")}
+                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.divergencias > 0 ? "bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15" : "bg-slate-800/60"}`}
                   >
-                    <p className="text-xs text-slate-400">Recebimento a parte</p>
-                    <p className="text-xs text-slate-500">Lançado no sistema, não na planilha</p>
-                    <p className={`text-sm font-bold mt-1 ${bxResultado.naoConfirmados > 0 ? "text-orange-400" : "text-slate-400"}`}>{bxResultado.naoConfirmados}</p>
+                    <p className="text-xs text-slate-400">Divergência</p>
+                    <p className="text-xs text-slate-500">Valores diferentes entre si</p>
+                    <p className={`text-sm font-bold mt-1 ${bxResultado.divergencias > 0 ? "text-amber-400" : "text-slate-400"}`}>{bxResultado.divergencias}</p>
+                  </button>
+                  <button
+                    onClick={() => setBxAberto(bxAberto === "naoConfirmados" ? null : "naoConfirmados")}
+                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoConfirmados > 0 ? "bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/15" : "bg-slate-800/60"}`}
+                  >
+                    <p className="text-xs text-slate-400">Rec. a Parte</p>
+                    <p className="text-xs text-slate-500">Lançado no sistema, fora da planilha</p>
+                    <p className={`text-sm font-bold mt-1 ${bxResultado.naoConfirmados > 0 ? "text-sky-400" : "text-slate-400"}`}>{bxResultado.naoConfirmados}</p>
                   </button>
                   {bxResultado.foraCarteira > 0 && (
                     <div className="bg-slate-800/60 rounded-xl p-3">
@@ -750,7 +752,7 @@ export default function ImportacaoPage() {
 
                 {bxAberto === "naoLancados" && bxResultado.detalhes.naoLancados.length > 0 && (
                   <div className="bg-red-500/5 border border-red-500/20 rounded-xl overflow-hidden">
-                    <p className="text-xs font-medium text-red-400 px-4 py-2 border-b border-red-500/20">Baixados na planilha mas não registrados no sistema (máx 50)</p>
+                    <p className="text-xs font-medium text-red-400 px-4 py-2 border-b border-red-500/20">Não recebido — baixou na planilha, sem lançamento no sistema (máx 50)</p>
                     <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
                       {bxResultado.detalhes.naoLancados.map((d: any, i: number) => (
                         <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
