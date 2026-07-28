@@ -46,6 +46,13 @@ export async function GET(req: NextRequest) {
 
   const equipeId = equipeIdParam ?? (session.user as any).equipeId ?? consultores[0].equipeId;
 
+  const competencia = await prisma.competencia.findUnique({
+    where: { id: competenciaId },
+    select: { mes: true, ano: true },
+  });
+  const iniComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+  const fimComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes,    1, 2, 59, 59, 999)) : new Date();
+
   const [equipe, metas] = await Promise.all([
     equipeId ? prisma.equipe.findUnique({ where: { id: equipeId }, select: { comissaoBase: true } }) : null,
     equipeId ? prisma.meta.findMany({ where: { equipeId, competenciaId }, orderBy: { criadoEm: "asc" } }) : [],
@@ -74,6 +81,7 @@ export async function GET(req: NextRequest) {
           where: {
             consultorId: consultor.id,
             contrato: { carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
+            dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: { valor: true, valorAParte: true },
         }),

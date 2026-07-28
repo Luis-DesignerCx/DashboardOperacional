@@ -59,6 +59,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "Nenhum consultor ativo na equipe" }, { status: 400 });
   }
 
+  const competencia = await prisma.competencia.findUnique({
+    where: { id: competenciaId },
+    select: { mes: true, ano: true },
+  });
+  const iniComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+  const fimComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes,    1, 2, 59, 59, 999)) : new Date();
+
   const resultados = await Promise.all(
     consultores.map(async (consultor) => {
       // Saldo da carteira individual do consultor (para metas com percentualAlvo)
@@ -80,6 +87,7 @@ export async function POST(req: NextRequest) {
           where: {
             consultorId: consultor.id,
             contrato: { carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
+            dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: { valor: true, valorAParte: true },
         }),
