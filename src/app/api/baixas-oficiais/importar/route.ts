@@ -158,13 +158,12 @@ export async function POST(req: NextRequest) {
   const confirmados:    (ItemBase & { valorPlanilha: number; valorSistema: number })[] = [];
   const divergencias:   (ItemBase & { valorPlanilha: number; valorSistema: number; diff: number })[] = [];
   const naoLancados:    (ItemBase & { valorPlanilha: number; dataLiquidacao: string })[] = [];
+  const semMovimentoItens: ItemBase[] = [];
   const naoConfirmados: (ItemBase & { valorSistema: number; dataRecebimento: string })[] = [];
-  // sem movimento = inadimplentes sem planilha e sem recebimento — contado mas sem detalhe
 
   const recIdsConfirmados: string[] = [];
   const recIdsDivergentes: string[] = [];
   const recIdsNaoConfirmados: string[] = [];
-  let semMovimento = 0;
 
   for (const contrato of todosContratos) {
     const naPlanilha = planilhaMap.get(contrato.numero);
@@ -190,10 +189,12 @@ export async function POST(req: NextRequest) {
       naoConfirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorSistema: rec.valorTotal, dataRecebimento: rec.ids[0] ? recebimentosDB.find(r => r.id === rec.ids[0])?.dataRecebimento.toISOString().split("T")[0] ?? "" : "" });
       recIdsNaoConfirmados.push(...rec.ids);
     } else {
-      // Sem planilha, sem recebimento — inadimplente normal
-      semMovimento++;
+      // Sem planilha, sem recebimento — inadimplente sem movimento
+      semMovimentoItens.push({ contrato: contrato.numero, cliente: contrato.cliente.nome });
     }
   }
+
+  const semMovimento = semMovimentoItens.length;
 
   // Contratos da planilha que NÃO estão na carteira desta competência (informativo)
   const contratoNumerosCarteira = new Set(todosContratos.map((c) => c.numero));
@@ -234,7 +235,8 @@ export async function POST(req: NextRequest) {
     foraCarteira,
     detalhes: {
       divergencias: divergencias.slice(0, 50),
-      naoLancados: naoLancados.slice(0, 50),
+      // naoLancados (baixou na planilha, sem lançamento) + semMovimento (zero atividade) juntos
+      naoLancados: [...naoLancados, ...semMovimentoItens].slice(0, 50),
       naoConfirmados: naoConfirmados.slice(0, 50),
     },
   });
