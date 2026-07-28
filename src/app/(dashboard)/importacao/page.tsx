@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle, ArrowDownToLine } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 
 interface Competencia {
@@ -59,6 +59,13 @@ export default function ImportacaoPage() {
   const [fpErro, setFpErro] = useState("");
   const [fpStatus, setFpStatus] = useState<any | null>(null);
   const [fpFechando, setFpFechando] = useState(false);
+
+  // Baixas confirmadas (empreendimentos gerais)
+  const [bxArquivo, setBxArquivo] = useState<File | null>(null);
+  const [bxCarregando, setBxCarregando] = useState(false);
+  const [bxResultado, setBxResultado] = useState<any | null>(null);
+  const [bxErro, setBxErro] = useState("");
+  const [bxAberto, setBxAberto] = useState<"divergencias" | "naoLancados" | "naoConfirmados" | null>(null);
 
   // Férias
   const [ferias, setFerias] = useState<FeriasEntry[]>([]);
@@ -210,6 +217,22 @@ export default function ImportacaoPage() {
           : item
       ));
     }
+  }
+
+  async function handleBxImportar() {
+    if (!bxArquivo || !competenciaId) return;
+    setBxCarregando(true);
+    setBxErro("");
+    setBxResultado(null);
+    setBxAberto(null);
+    const form = new FormData();
+    form.append("arquivo", bxArquivo);
+    form.append("competenciaId", competenciaId);
+    const res = await fetch("/api/baixas-oficiais/importar", { method: "POST", body: form });
+    const data = await res.json();
+    setBxCarregando(false);
+    if (!res.ok) setBxErro(data.erro || "Erro ao importar baixas.");
+    else setBxResultado(data);
   }
 
   async function handleImportar() {
@@ -631,6 +654,150 @@ export default function ImportacaoPage() {
 
         {!competenciaId && (
           <p className="text-xs text-slate-500">Selecione uma competência acima para usar o Fã Pass.</p>
+        )}
+      </div>
+
+      {/* ── Seção Baixas Confirmadas ────────────────────────────────────────── */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold text-white">Baixas Confirmadas</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Importe a planilha oficial de baixados para cruzar com os recebimentos registrados pelos consultores.</p>
+        </div>
+
+        {competenciaId ? (
+          <>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1.5">Planilha de Baixados — Empreendimentos Gerais</label>
+              <label className="flex items-center gap-3 w-full border border-dashed border-slate-700 rounded-xl px-4 py-3 cursor-pointer hover:border-sky-500 hover:bg-sky-500/5 transition-colors">
+                <FileSpreadsheet size={18} className="text-slate-500 flex-shrink-0" />
+                <span className="text-sm text-slate-400 truncate">
+                  {bxArquivo ? bxArquivo.name : "Baixado [mês] multi e mydest.xls"}
+                </span>
+                <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { setBxArquivo(e.target.files?.[0] || null); setBxResultado(null); setBxErro(""); }} />
+              </label>
+            </div>
+
+            {bxErro && (
+              <div className="flex items-center gap-2 text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3 text-sm">
+                <XCircle size={16} /> {bxErro}
+              </div>
+            )}
+
+            {bxResultado && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-800/60 rounded-xl p-3">
+                    <p className="text-xs text-slate-400">Na planilha</p>
+                    <p className="text-sm font-bold text-white mt-0.5">{bxResultado.totalPlanilha} contratos</p>
+                  </div>
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
+                    <p className="text-xs text-slate-400">Confirmados</p>
+                    <p className="text-sm font-bold text-emerald-400 mt-0.5">{bxResultado.confirmados}</p>
+                  </div>
+                  <button
+                    onClick={() => setBxAberto(bxAberto === "divergencias" ? null : "divergencias")}
+                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.divergencias > 0 ? "bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15" : "bg-slate-800/60"}`}
+                  >
+                    <p className="text-xs text-slate-400">Divergências de valor</p>
+                    <p className={`text-sm font-bold mt-0.5 ${bxResultado.divergencias > 0 ? "text-amber-400" : "text-slate-400"}`}>{bxResultado.divergencias}</p>
+                  </button>
+                  <button
+                    onClick={() => setBxAberto(bxAberto === "naoLancados" ? null : "naoLancados")}
+                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoLancados > 0 ? "bg-red-500/10 border border-red-500/20 hover:bg-red-500/15" : "bg-slate-800/60"}`}
+                  >
+                    <p className="text-xs text-slate-400">Não lançados (planilha sem sistema)</p>
+                    <p className={`text-sm font-bold mt-0.5 ${bxResultado.naoLancados > 0 ? "text-red-400" : "text-slate-400"}`}>{bxResultado.naoLancados}</p>
+                  </button>
+                  <button
+                    onClick={() => setBxAberto(bxAberto === "naoConfirmados" ? null : "naoConfirmados")}
+                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoConfirmados > 0 ? "bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/15" : "bg-slate-800/60"}`}
+                  >
+                    <p className="text-xs text-slate-400">Não confirmados (sistema sem planilha)</p>
+                    <p className={`text-sm font-bold mt-0.5 ${bxResultado.naoConfirmados > 0 ? "text-orange-400" : "text-slate-400"}`}>{bxResultado.naoConfirmados}</p>
+                  </button>
+                  {bxResultado.naoEncontrados > 0 && (
+                    <div className="bg-slate-800/60 rounded-xl p-3">
+                      <p className="text-xs text-slate-400">Não cadastrados no sistema</p>
+                      <p className="text-sm font-bold text-slate-400 mt-0.5">{bxResultado.naoEncontrados}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Detalhe expandido */}
+                {bxAberto === "divergencias" && bxResultado.detalhes.divergencias.length > 0 && (
+                  <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl overflow-hidden">
+                    <p className="text-xs font-medium text-amber-400 px-4 py-2 border-b border-amber-500/20">Divergências de valor (máx 50)</p>
+                    <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
+                      {bxResultado.detalhes.divergencias.map((d: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
+                          <div>
+                            <span className="text-white font-medium">{d.contrato}</span>
+                            <span className="text-slate-400 ml-2">{d.cliente}</span>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-4">
+                            <p className="text-slate-300">Planilha: {formatarMoeda(d.valorPlanilha)}</p>
+                            <p className="text-amber-400">Sistema: {formatarMoeda(d.valorSistema)} <span className="text-slate-500">(Δ {formatarMoeda(d.diff)})</span></p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {bxAberto === "naoLancados" && bxResultado.detalhes.naoLancados.length > 0 && (
+                  <div className="bg-red-500/5 border border-red-500/20 rounded-xl overflow-hidden">
+                    <p className="text-xs font-medium text-red-400 px-4 py-2 border-b border-red-500/20">Baixados na planilha mas não registrados no sistema (máx 50)</p>
+                    <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
+                      {bxResultado.detalhes.naoLancados.map((d: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
+                          <div>
+                            <span className="text-white font-medium">{d.contrato}</span>
+                            <span className="text-slate-400 ml-2">{d.cliente}</span>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-4">
+                            <p className="text-emerald-400">{formatarMoeda(d.valorPlanilha)}</p>
+                            <p className="text-slate-500">{d.dataLiquidacao}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {bxAberto === "naoConfirmados" && bxResultado.detalhes.naoConfirmados.length > 0 && (
+                  <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl overflow-hidden">
+                    <p className="text-xs font-medium text-orange-400 px-4 py-2 border-b border-orange-500/20">Registrados no sistema mas ausentes na planilha (máx 50)</p>
+                    <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
+                      {bxResultado.detalhes.naoConfirmados.map((d: any, i: number) => (
+                        <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
+                          <div>
+                            <span className="text-white font-medium">{d.contrato}</span>
+                            <span className="text-slate-400 ml-2">{d.cliente}</span>
+                          </div>
+                          <div className="text-right flex-shrink-0 ml-4">
+                            <p className="text-orange-400">{formatarMoeda(d.valorSistema)}</p>
+                            <p className="text-slate-500">{d.dataRecebimento}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
+              onClick={handleBxImportar}
+              disabled={!bxArquivo || bxCarregando}
+              className="w-full flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 disabled:bg-sky-600/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
+            >
+              {bxCarregando
+                ? <><Loader2 size={16} className="animate-spin" /> Cruzando dados...</>
+                : <><ArrowDownToLine size={16} /> Importar e Cruzar Baixas</>}
+            </button>
+          </>
+        ) : (
+          <p className="text-xs text-slate-500">Selecione uma competência acima para importar baixas.</p>
         )}
       </div>
     </div>
