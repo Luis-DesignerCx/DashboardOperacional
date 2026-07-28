@@ -23,8 +23,17 @@ def parsear_data(val):
 def parsear_valor(val):
     if val is None:
         return 0
+    # openpyxl retorna células numéricas como int/float direto — usar sem conversão
+    if isinstance(val, (int, float)):
+        return abs(float(val))
+    # String em formato europeu: "1.234,56" ou "1234,56"
+    s = str(val).strip().replace("R$", "").replace(" ", "")
+    if "," in s and "." in s:
+        s = s.replace(".", "").replace(",", ".")
+    elif "," in s:
+        s = s.replace(",", ".")
     try:
-        return abs(float(str(val).replace(".", "").replace(",", ".")))
+        return abs(float(s))
     except:
         return 0
 
