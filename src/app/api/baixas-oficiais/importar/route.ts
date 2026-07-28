@@ -9,21 +9,16 @@ import * as XLSX from "xlsx";
 
 // ─── Índices de coluna (0-based) ─────────────────────────────────────────────
 const C = {
-  contrato:        2,
-  cliente:         3,
-  dataLiquidacao:  4,
-  origem:          5,
-  meioPagamento:   6,
+  contrato:       2,
+  cliente:        3,
+  dataLiquidacao: 4,
+  origem:         5,
+  meioPagamento:  6,
   valorAReceber:  16,
 } as const;
 
-// Origens que representam recebimentos reais
 const ORIGENS_VALIDAS = new Set([
-  "SALDO",
-  "SALDO ALOCADO",
-  "ENTRADA",
-  "ENTRADA ALOCADA",
-  "ENTRADA EFETIVA",
+  "SALDO", "SALDO ALOCADO", "ENTRADA", "ENTRADA ALOCADA", "ENTRADA EFETIVA",
 ]);
 
 function ehPIXouBoleto(meio: string): boolean {
@@ -74,19 +69,17 @@ export async function POST(req: NextRequest) {
   const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
   if (!competencia) return NextResponse.json({ erro: "Competência não encontrada" }, { status: 404 });
 
-  // Janela da competência (mês inteiro)
   const iniComp = new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1));
   const fimComp = new Date(Date.UTC(competencia.ano, competencia.mes, 1));
 
-  // Parse xlsx
+  // ── 1. Parse planilha → mapa por número de contrato ──────────────────────────
   const buffer = Buffer.from(await arquivo.arrayBuffer());
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
   const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
   const linhas = (rows as unknown[][]).slice(1).filter((r) => r && r.length > C.valorAReceber);
 
-  // ── Agrupa por contrato: soma valores válidos no mês da competência ──────────
-  const planiha = new Map<string, { cliente: string; valor: number; dataLiquidacao: Date }>();
+  const planilhaMap = new Map<string, { cliente: string; valor: number; dataLiquidacao: Date }>();
 
   for (const row of linhas) {
     const contrato = String(row[C.contrato] ?? "").trim();
@@ -105,46 +98,39 @@ export async function POST(req: NextRequest) {
     if (valor === 0) continue;
 
     const cliente = String(row[C.cliente] ?? "").trim();
-    const entry = planiha.get(contrato);
+    const entry = planilhaMap.get(contrato);
     if (entry) {
       entry.valor += valor;
       if (dataLiq > entry.dataLiquidacao) entry.dataLiquidacao = dataLiq;
     } else {
-      planiha.set(contrato, { cliente, valor, dataLiquidacao: dataLiq });
+      planilhaMap.set(contrato, { cliente, valor, dataLiquidacao: dataLiq });
     }
   }
 
-  const numerosContratos = [...planiha.keys()];
-
-  if (numerosContratos.length === 0) {
-    return NextResponse.json({ erro: "Nenhuma baixa válida encontrada para a competência selecionada." }, { status: 422 });
-  }
-
-  // ── Busca APENAS contratos ativos na carteira desta competência ──────────────
-  // Somente contratos com CarteiraParcela nesta competência são relevantes para o cruzamento
+  // ── 2. Todos os contratos ativos na carteira desta competência ───────────────
   const carteiras = await prisma.carteiraParcela.findMany({
-    where: {
-      competenciaId,
-      ativo: true,
-      contrato: { numero: { in: numerosContratos } },
+    where: { competenciaId, ativo: true },
+    select: {
+      contratoId: true,
+      contrato: {
+        select: { id: true, numero: true, clienteId: true, cliente: { select: { nome: true } } },
+      },
     },
-    select: { contratoId: true, contrato: { select: { id: true, numero: true, clienteId: true, cliente: { select: { nome: true } } } } },
   });
 
-  const contratosDB = carteiras.map((k) => k.contrato);
-  const contratoMap = new Map(contratosDB.map((c) => [c.numero, c]));
+  // Desduplicar por contratoId (pode haver múltiplas parcelas por contrato)
+  const contratosPorId = new Map<string, { id: string; numero: string; clienteId: string; cliente: { nome: string } }>();
+  for (const k of carteiras) contratosPorId.set(k.contrato.id, k.contrato);
+  const todosContratos = [...contratosPorId.values()];
+  const todosIds = todosContratos.map((c) => c.id);
 
-  // ── Busca recebimentos na competência para esses contratos ───────────────────
-  const contratoIds = contratosDB.map((c) => c.id);
+  // ── 3. Recebimentos de todos os contratos da carteira no mês ─────────────────
   const recebimentosDB = await prisma.recebimento.findMany({
-    where: {
-      contratoId: { in: contratoIds },
-      dataRecebimento: { gte: iniComp, lt: fimComp },
-    },
-    select: { id: true, contratoId: true, valor: true, dataRecebimento: true, formaPagamento: true },
+    where: { contratoId: { in: todosIds }, dataRecebimento: { gte: iniComp, lt: fimComp } },
+    select: { id: true, contratoId: true, valor: true, dataRecebimento: true },
   });
 
-  // Agrupa recebimentos por contratoId (soma)
+  // Agrupa recebimentos por contratoId
   const recMap = new Map<string, { ids: string[]; valorTotal: number }>();
   for (const r of recebimentosDB) {
     const e = recMap.get(r.contratoId);
@@ -152,108 +138,84 @@ export async function POST(req: NextRequest) {
     else recMap.set(r.contratoId, { ids: [r.id], valorTotal: Number(r.valor) });
   }
 
-  // ── Cruzamento ────────────────────────────────────────────────────────────────
-  const TOLERANCIA = 0.02; // 2 centavos de tolerância para arredondamentos
+  // ── 4. Cruzamento: base = todos os contratos da carteira ─────────────────────
+  const TOLERANCIA = 0.02;
 
-  const confirmados: { contrato: string; cliente: string; valorPlanilha: number; valorSistema: number }[] = [];
-  const divergencias: { contrato: string; cliente: string; valorPlanilha: number; valorSistema: number; diff: number }[] = [];
-  const naoLancados: { contrato: string; cliente: string; valorPlanilha: number; dataLiquidacao: string }[] = [];
-  const naoEncontrados: { contrato: string; cliente: string; valorPlanilha: number }[] = [];
+  type ItemBase = { contrato: string; cliente: string };
+  const confirmados:    (ItemBase & { valorPlanilha: number; valorSistema: number })[] = [];
+  const divergencias:   (ItemBase & { valorPlanilha: number; valorSistema: number; diff: number })[] = [];
+  const naoLancados:    (ItemBase & { valorPlanilha: number; dataLiquidacao: string })[] = [];
+  const naoConfirmados: (ItemBase & { valorSistema: number; dataRecebimento: string })[] = [];
+  // sem movimento = inadimplentes sem planilha e sem recebimento — contado mas sem detalhe
 
   const recIdsConfirmados: string[] = [];
   const recIdsDivergentes: string[] = [];
+  const recIdsNaoConfirmados: string[] = [];
+  let semMovimento = 0;
 
-  for (const [numContrato, dado] of planiha) {
-    const contratoDB = contratoMap.get(numContrato);
+  for (const contrato of todosContratos) {
+    const naPlanilha = planilhaMap.get(contrato.numero);
+    const rec = recMap.get(contrato.id);
 
-    if (!contratoDB) {
-      // Não está na carteira desta competência — ignorar para cruzamento
-      naoEncontrados.push({ contrato: numContrato, cliente: dado.cliente, valorPlanilha: dado.valor });
-      continue;
-    }
-
-    const rec = recMap.get(contratoDB.id);
-    if (!rec) {
-      naoLancados.push({
-        contrato: numContrato,
-        cliente: contratoDB.cliente.nome || dado.cliente,
-        valorPlanilha: dado.valor,
-        dataLiquidacao: dado.dataLiquidacao.toISOString().split("T")[0],
-      });
-      continue;
-    }
-
-    const diff = Math.abs(rec.valorTotal - dado.valor);
-    if (diff <= TOLERANCIA) {
-      confirmados.push({ contrato: numContrato, cliente: contratoDB.cliente.nome, valorPlanilha: dado.valor, valorSistema: rec.valorTotal });
-      recIdsConfirmados.push(...rec.ids);
+    if (naPlanilha && rec) {
+      const diff = Math.abs(rec.valorTotal - naPlanilha.valor);
+      if (diff <= TOLERANCIA) {
+        confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
+        recIdsConfirmados.push(...rec.ids);
+      } else {
+        divergencias.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal, diff });
+        recIdsDivergentes.push(...rec.ids);
+      }
+    } else if (naPlanilha && !rec) {
+      // Baixado na planilha mas consultor não registrou
+      naoLancados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, dataLiquidacao: naPlanilha.dataLiquidacao.toISOString().split("T")[0] });
+    } else if (!naPlanilha && rec) {
+      // Consultor registrou recebimento mas planilha não confirma
+      naoConfirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorSistema: rec.valorTotal, dataRecebimento: rec.ids[0] ? recebimentosDB.find(r => r.id === rec.ids[0])?.dataRecebimento.toISOString().split("T")[0] ?? "" : "" });
+      recIdsNaoConfirmados.push(...rec.ids);
     } else {
-      divergencias.push({ contrato: numContrato, cliente: contratoDB.cliente.nome, valorPlanilha: dado.valor, valorSistema: rec.valorTotal, diff });
-      recIdsDivergentes.push(...rec.ids);
+      // Sem planilha, sem recebimento — inadimplente normal
+      semMovimento++;
     }
   }
 
-  // Recebimentos no sistema para contratos NÃO presentes na planilha
-  const idsConfirmadosEDivergentes = new Set([...recIdsConfirmados, ...recIdsDivergentes]);
-  const naoConfirmados = recebimentosDB
-    .filter((r) => !idsConfirmadosEDivergentes.has(r.id))
-    .map((r) => {
-      const c = contratosDB.find((x) => x.id === r.contratoId);
-      return {
-        contrato: c?.numero ?? "?",
-        cliente: c?.cliente.nome ?? "?",
-        valorSistema: Number(r.valor),
-        dataRecebimento: r.dataRecebimento.toISOString().split("T")[0],
-      };
-    });
+  // Contratos da planilha que NÃO estão na carteira desta competência (informativo)
+  const contratoNumerosCarteira = new Set(todosContratos.map((c) => c.numero));
+  const foraCarteira = [...planilhaMap.keys()].filter((n) => !contratoNumerosCarteira.has(n)).length;
 
-  // ── Atualiza recebimentos no banco ────────────────────────────────────────────
+  // ── 5. Atualiza recebimentos no banco ─────────────────────────────────────────
+  const atualizacoes: Promise<unknown>[] = [];
+
   if (recIdsConfirmados.length > 0) {
-    await prisma.recebimento.updateMany({
-      where: { id: { in: recIdsConfirmados } },
-      data: { baixaOficial: true, divergencia: false },
-    });
-    // Atualiza valorBaixado individualmente (valor proporcional ou total)
+    atualizacoes.push(prisma.recebimento.updateMany({ where: { id: { in: recIdsConfirmados } }, data: { baixaOficial: true, divergencia: false } }));
     for (const id of recIdsConfirmados) {
-      const rec = recebimentosDB.find((r) => r.id === id)!;
-      const contratoNum = contratosDB.find((c) => c.id === rec.contratoId)?.numero;
-      const dado = contratoNum ? planiha.get(contratoNum) : null;
-      if (dado) await prisma.recebimento.update({ where: { id }, data: { valorBaixado: dado.valor } });
+      const r = recebimentosDB.find((x) => x.id === id);
+      const dado = r ? planilhaMap.get(todosContratos.find((c) => c.id === r.contratoId)?.numero ?? "") : null;
+      if (dado) atualizacoes.push(prisma.recebimento.update({ where: { id }, data: { valorBaixado: dado.valor } }));
     }
   }
-
   if (recIdsDivergentes.length > 0) {
-    await prisma.recebimento.updateMany({
-      where: { id: { in: recIdsDivergentes } },
-      data: { baixaOficial: true, divergencia: true },
-    });
+    atualizacoes.push(prisma.recebimento.updateMany({ where: { id: { in: recIdsDivergentes } }, data: { baixaOficial: true, divergencia: true } }));
     for (const id of recIdsDivergentes) {
-      const rec = recebimentosDB.find((r) => r.id === id)!;
-      const contratoNum = contratosDB.find((c) => c.id === rec.contratoId)?.numero;
-      const dado = contratoNum ? planiha.get(contratoNum) : null;
-      if (dado) await prisma.recebimento.update({ where: { id }, data: { valorBaixado: dado.valor } });
+      const r = recebimentosDB.find((x) => x.id === id);
+      const dado = r ? planilhaMap.get(todosContratos.find((c) => c.id === r.contratoId)?.numero ?? "") : null;
+      if (dado) atualizacoes.push(prisma.recebimento.update({ where: { id }, data: { valorBaixado: dado.valor } }));
     }
   }
-
-  // Reseta baixaOficial para recebimentos que não constam na planilha
-  const idsNaoConfirmados = naoConfirmados
-    .map((nc) => recebimentosDB.find((r) => contratosDB.find((c) => c.id === r.contratoId)?.numero === nc.contrato)?.id)
-    .filter((id): id is string => Boolean(id));
-
-  if (idsNaoConfirmados.length > 0) {
-    await prisma.recebimento.updateMany({
-      where: { id: { in: idsNaoConfirmados } },
-      data: { baixaOficial: false, divergencia: true },
-    });
+  if (recIdsNaoConfirmados.length > 0) {
+    atualizacoes.push(prisma.recebimento.updateMany({ where: { id: { in: recIdsNaoConfirmados } }, data: { baixaOficial: false, divergencia: true } }));
   }
+
+  await Promise.all(atualizacoes);
 
   return NextResponse.json({
-    totalPlanilha: planiha.size,
+    totalCarteira: todosContratos.length,
     confirmados: confirmados.length,
     divergencias: divergencias.length,
     naoLancados: naoLancados.length,
-    naoEncontrados: naoEncontrados.length,
     naoConfirmados: naoConfirmados.length,
+    semMovimento,
+    foraCarteira,
     detalhes: {
       divergencias: divergencias.slice(0, 50),
       naoLancados: naoLancados.slice(0, 50),

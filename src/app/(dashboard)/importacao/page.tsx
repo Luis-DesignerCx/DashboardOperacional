@@ -685,11 +685,12 @@ export default function ImportacaoPage() {
 
             {bxResultado && (
               <div className="space-y-3">
+                {/* Linha de totais */}
+                <div className="bg-slate-800/40 rounded-xl px-4 py-2.5 flex items-center justify-between text-xs">
+                  <span className="text-slate-400">Total na carteira</span>
+                  <span className="text-white font-bold">{bxResultado.totalCarteira} contratos</span>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-slate-800/60 rounded-xl p-3">
-                    <p className="text-xs text-slate-400">Na planilha</p>
-                    <p className="text-sm font-bold text-white mt-0.5">{bxResultado.totalPlanilha} contratos</p>
-                  </div>
                   <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">
                     <p className="text-xs text-slate-400">Confirmados</p>
                     <p className="text-sm font-bold text-emerald-400 mt-0.5">{bxResultado.confirmados}</p>
@@ -705,20 +706,28 @@ export default function ImportacaoPage() {
                     onClick={() => setBxAberto(bxAberto === "naoLancados" ? null : "naoLancados")}
                     className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoLancados > 0 ? "bg-red-500/10 border border-red-500/20 hover:bg-red-500/15" : "bg-slate-800/60"}`}
                   >
-                    <p className="text-xs text-slate-400">Não lançados (planilha sem sistema)</p>
-                    <p className={`text-sm font-bold mt-0.5 ${bxResultado.naoLancados > 0 ? "text-red-400" : "text-slate-400"}`}>{bxResultado.naoLancados}</p>
+                    <p className="text-xs text-slate-400">Não lançados no sistema</p>
+                    <p className="text-xs text-slate-500">Baixa na planilha, sem registro</p>
+                    <p className={`text-sm font-bold mt-1 ${bxResultado.naoLancados > 0 ? "text-red-400" : "text-slate-400"}`}>{bxResultado.naoLancados}</p>
                   </button>
                   <button
                     onClick={() => setBxAberto(bxAberto === "naoConfirmados" ? null : "naoConfirmados")}
                     className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoConfirmados > 0 ? "bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/15" : "bg-slate-800/60"}`}
                   >
-                    <p className="text-xs text-slate-400">Não confirmados (sistema sem planilha)</p>
-                    <p className={`text-sm font-bold mt-0.5 ${bxResultado.naoConfirmados > 0 ? "text-orange-400" : "text-slate-400"}`}>{bxResultado.naoConfirmados}</p>
+                    <p className="text-xs text-slate-400">Recebimento a parte</p>
+                    <p className="text-xs text-slate-500">Lançado no sistema, não na planilha</p>
+                    <p className={`text-sm font-bold mt-1 ${bxResultado.naoConfirmados > 0 ? "text-orange-400" : "text-slate-400"}`}>{bxResultado.naoConfirmados}</p>
                   </button>
-                  {bxResultado.naoEncontrados > 0 && (
+                  <div className="bg-slate-800/60 rounded-xl p-3">
+                    <p className="text-xs text-slate-400">Sem movimento</p>
+                    <p className="text-xs text-slate-500">Inadimplentes sem recebimento</p>
+                    <p className="text-sm font-bold text-slate-400 mt-1">{bxResultado.semMovimento}</p>
+                  </div>
+                  {bxResultado.foraCarteira > 0 && (
                     <div className="bg-slate-800/60 rounded-xl p-3">
-                      <p className="text-xs text-slate-400">Fora da carteira desta competência</p>
-                      <p className="text-sm font-bold text-slate-400 mt-0.5">{bxResultado.naoEncontrados}</p>
+                      <p className="text-xs text-slate-400">Fora desta carteira</p>
+                      <p className="text-xs text-slate-500">Na planilha, não na competência</p>
+                      <p className="text-sm font-bold text-slate-500 mt-1">{bxResultado.foraCarteira}</p>
                     </div>
                   )}
                 </div>
@@ -766,7 +775,7 @@ export default function ImportacaoPage() {
 
                 {bxAberto === "naoConfirmados" && bxResultado.detalhes.naoConfirmados.length > 0 && (
                   <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl overflow-hidden">
-                    <p className="text-xs font-medium text-orange-400 px-4 py-2 border-b border-orange-500/20">Registrados no sistema mas ausentes na planilha (máx 50)</p>
+                    <p className="text-xs font-medium text-orange-400 px-4 py-2 border-b border-orange-500/20">Recebimento a parte — lançado no sistema, não consta na planilha (máx 50)</p>
                     <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
                       {bxResultado.detalhes.naoConfirmados.map((d: any, i: number) => (
                         <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
