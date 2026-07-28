@@ -36,6 +36,7 @@ interface ConsultorResult {
   id: string;
   nome: string;
   totalRecebido: number;
+  totalAParte: number;
   totalComissao: number;
   comissaoBase: number;
   breakdown: MetaBreakdown[];
@@ -534,11 +535,16 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
       ) : (
         <>
           {/* Cards de resumo */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Total Recebido</p>
               <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.totalRecebido)}</p>
               <p className="text-slate-500 text-[10px] mt-1">inclui valores a parte</p>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <p className="text-slate-400 text-xs mb-1">À Parte</p>
+              <p className="text-sky-400 text-xl font-bold tabular-nums">{formatarMoeda(preview.totalAParte ?? 0)}</p>
+              <p className="text-slate-500 text-[10px] mt-1">incluído no total recebido</p>
             </div>
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Base (100%)</p>

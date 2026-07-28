@@ -93,6 +93,7 @@ export async function GET(req: NextRequest) {
         }),
       ]);
 
+      const totalAParte = recebimentos.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0);
       const totalRecebido = recebimentos.reduce(
         (s, r) => s + Number(r.valor) + Number(r.valorAParte ?? 0),
         0
@@ -135,6 +136,7 @@ export async function GET(req: NextRequest) {
         id: consultor.id,
         nome: consultor.nome,
         totalRecebido,
+        totalAParte,
         totalComissao,
         comissaoBase,
         breakdown,
