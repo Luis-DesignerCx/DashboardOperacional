@@ -52,6 +52,21 @@ function parsearValor(val: unknown): number {
   return isNaN(n) ? 0 : Math.abs(n);
 }
 
+// Verifica se o excesso (sistema - planilha) corresponde à soma de algum subconjunto
+// das parcelas ativas do contrato. Contratos têm tipicamente 1-10 parcelas.
+function excessoCorrespondeAParcelas(excesso: number, parcelas: number[]): boolean {
+  const n = parcelas.length;
+  if (n === 0) return false;
+  for (let mask = 1; mask < (1 << n); mask++) {
+    let soma = 0;
+    for (let i = 0; i < n; i++) {
+      if (mask & (1 << i)) soma += parcelas[i];
+    }
+    if (Math.abs(soma - excesso) < 0.05) return true;
+  }
+  return false;
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user?.perfil ?? "")) {
@@ -118,42 +133,36 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  // Desduplicar por contratoId (pode haver múltiplas parcelas por contrato)
+  // Desduplicar por contratoId
   const contratosPorId = new Map<string, { id: string; numero: string; clienteId: string; cliente: { nome: string } }>();
   for (const k of carteiras) contratosPorId.set(k.contrato.id, k.contrato);
   const todosContratos = [...contratosPorId.values()];
   const todosIds = todosContratos.map((c) => c.id);
 
+  // Busca parcelas ativas por contrato (para detectar pagamento parcial)
+  const parcelasAtivas = await prisma.parcela.findMany({
+    where: { contratoId: { in: todosIds }, paga: false, equivocada: false },
+    select: { contratoId: true, valorTotalAberto: true },
+  });
+  const parcelasPorContrato = new Map<string, number[]>();
+  for (const p of parcelasAtivas) {
+    const vals = parcelasPorContrato.get(p.contratoId) ?? [];
+    vals.push(Number(p.valorTotalAberto));
+    parcelasPorContrato.set(p.contratoId, vals);
+  }
+
   // ── 3. Recebimentos de todos os contratos da carteira no mês ─────────────────
   const recebimentosDB = await prisma.recebimento.findMany({
     where: { contratoId: { in: todosIds }, dataRecebimento: { gte: iniComp, lt: fimComp } },
-    select: { id: true, contratoId: true, valor: true, dataRecebimento: true, parcelasIds: true },
+    select: { id: true, contratoId: true, valor: true, dataRecebimento: true },
   });
 
-  // Busca valores das parcelas flagadas
-  const todosParcIds = [...new Set(recebimentosDB.flatMap((r) => r.parcelasIds))];
-  const parcelasValores = todosParcIds.length > 0
-    ? await prisma.parcela.findMany({ where: { id: { in: todosParcIds } }, select: { id: true, valorTotalAberto: true } })
-    : [];
-  const parcelaValorMap = new Map(parcelasValores.map((p) => [p.id, Number(p.valorTotalAberto)]));
-
   // Agrupa recebimentos por contratoId
-  // hasParcelasIds = true somente se TODOS os recebimentos do contrato têm parcelas flagadas
-  const recMap = new Map<string, { ids: string[]; valorTotal: number; valorFlagado: number; hasParcelasIds: boolean }>();
+  const recMap = new Map<string, { ids: string[]; valorTotal: number }>();
   for (const r of recebimentosDB) {
-    const hasPids = r.parcelasIds.length > 0;
-    const valorFlagado = hasPids
-      ? r.parcelasIds.reduce((s, pid) => s + (parcelaValorMap.get(pid) ?? 0), 0)
-      : 0;
     const e = recMap.get(r.contratoId);
-    if (e) {
-      e.ids.push(r.id);
-      e.valorTotal += Number(r.valor);
-      e.valorFlagado += valorFlagado;
-      e.hasParcelasIds = e.hasParcelasIds && hasPids;
-    } else {
-      recMap.set(r.contratoId, { ids: [r.id], valorTotal: Number(r.valor), valorFlagado, hasParcelasIds: hasPids });
-    }
+    if (e) { e.ids.push(r.id); e.valorTotal += Number(r.valor); }
+    else recMap.set(r.contratoId, { ids: [r.id], valorTotal: Number(r.valor) });
   }
 
   // ── 4. Cruzamento: base = todos os contratos da carteira ─────────────────────
@@ -176,11 +185,11 @@ export async function POST(req: NextRequest) {
 
     if (naPlanilha && rec) {
       const absDiff = Math.abs(rec.valorTotal - naPlanilha.valor);
-      // Sistema > Planilha: confirmado SE o valor registrado bate com as parcelas flagadas
-      // (consultor registrou N parcelas, banco confirmou M < N — restante volta como inadimplente no mês seguinte)
-      const parcialExplicado = rec.hasParcelasIds
-        && rec.valorTotal > naPlanilha.valor
-        && Math.abs(rec.valorFlagado - rec.valorTotal) <= TOLERANCIA;
+      // Sistema > Planilha: verificar se o excesso corresponde a parcelas ativas do contrato
+      // (consultor registrou N parcelas, banco confirmou M<N — restante reaparece como inadimplente)
+      const excesso = rec.valorTotal - naPlanilha.valor;
+      const parcialExplicado = excesso > TOLERANCIA
+        && excessoCorrespondeAParcelas(excesso, parcelasPorContrato.get(contrato.id) ?? []);
 
       if (absDiff <= TOLERANCIA || parcialExplicado) {
         confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
