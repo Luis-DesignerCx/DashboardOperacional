@@ -783,23 +783,15 @@ export default function ImportacaoPage() {
                     className={`rounded-xl p-3 text-left transition-colors ${bxResultado.divergencias > 0 ? "bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/15" : "bg-slate-800/60"}`}
                   >
                     <p className="text-xs text-slate-400">Divergência</p>
-                    <p className="text-xs text-slate-500">Valores diferentes entre si</p>
+                    <p className="text-xs text-slate-500">No sistema, sem baixa no banco</p>
                     <p className={`text-sm font-bold mt-1 ${bxResultado.divergencias > 0 ? "text-amber-400" : "text-slate-400"}`}>{bxResultado.divergencias}</p>
-                  </button>
-                  <button
-                    onClick={() => setBxAberto(bxAberto === "naoConfirmados" ? null : "naoConfirmados")}
-                    className={`rounded-xl p-3 text-left transition-colors ${bxResultado.naoConfirmados > 0 ? "bg-sky-500/10 border border-sky-500/20 hover:bg-sky-500/15" : "bg-slate-800/60"}`}
-                  >
-                    <p className="text-xs text-slate-400">Rec. a Parte</p>
-                    <p className="text-xs text-slate-500">Lançado no sistema, fora da planilha</p>
-                    <p className={`text-sm font-bold mt-1 ${bxResultado.naoConfirmados > 0 ? "text-sky-400" : "text-slate-400"}`}>{bxResultado.naoConfirmados}</p>
                   </button>
                 </div>
 
                 {/* Detalhe expandido */}
                 {bxAberto === "divergencias" && bxResultado.detalhes.divergencias.length > 0 && (
                   <div className="bg-amber-500/5 border border-amber-500/20 rounded-xl overflow-hidden">
-                    <p className="text-xs font-medium text-amber-400 px-4 py-2 border-b border-amber-500/20">Divergências de valor (máx 50)</p>
+                    <p className="text-xs font-medium text-amber-400 px-4 py-2 border-b border-amber-500/20">No sistema, sem baixa no banco (máx 50)</p>
                     <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
                       {bxResultado.detalhes.divergencias.map((d: any, i: number) => (
                         <div key={i} className="flex items-center justify-between px-4 py-2 text-xs gap-3">
@@ -808,8 +800,7 @@ export default function ImportacaoPage() {
                             <span className="text-slate-400 ml-2">{d.cliente}</span>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="text-slate-300">Planilha: {formatarMoeda(d.valorPlanilha)}</p>
-                            <p className="text-amber-400">Sistema: {formatarMoeda(d.valorSistema)} <span className="text-slate-500">(Δ {formatarMoeda(d.diff)})</span></p>
+                            <p className="text-amber-400">Sistema: {formatarMoeda(d.valorSistema)}</p>
                           </div>
                           {d.recebimentoIds?.length > 0 && (
                             <button
@@ -845,25 +836,6 @@ export default function ImportacaoPage() {
                   </div>
                 )}
 
-                {bxAberto === "naoConfirmados" && bxResultado.detalhes.naoConfirmados.length > 0 && (
-                  <div className="bg-orange-500/5 border border-orange-500/20 rounded-xl overflow-hidden">
-                    <p className="text-xs font-medium text-orange-400 px-4 py-2 border-b border-orange-500/20">Recebimento a parte — lançado no sistema, não consta na planilha (máx 50)</p>
-                    <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
-                      {bxResultado.detalhes.naoConfirmados.map((d: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
-                          <div>
-                            <span className="text-white font-medium">{d.contrato}</span>
-                            <span className="text-slate-400 ml-2">{d.cliente}</span>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-4">
-                            <p className="text-orange-400">{formatarMoeda(d.valorSistema)}</p>
-                            <p className="text-slate-500">{d.dataRecebimento}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 

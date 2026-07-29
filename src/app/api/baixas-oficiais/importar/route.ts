@@ -147,51 +147,33 @@ export async function POST(req: NextRequest) {
   }
 
   // ── 4. Cruzamento: base = todos os contratos da carteira ─────────────────────
-  const TOLERANCIA = 0.02;
-
   type ItemBase = { contrato: string; cliente: string };
   const confirmados:    (ItemBase & { valorPlanilha: number; valorSistema: number })[] = [];
   const divergencias:   (ItemBase & { valorPlanilha: number; valorSistema: number; diff: number; recebimentoIds: string[] })[] = [];
   const naoLancados:    (ItemBase & { valorPlanilha: number; dataLiquidacao: string })[] = [];
   const semMovimentoItens: ItemBase[] = [];
-  const naoConfirmados: (ItemBase & { valorSistema: number; dataRecebimento: string })[] = [];
 
   const recIdsConfirmados: string[] = [];
   const recIdsDivergentes: string[] = [];
-  const recIdsNaoConfirmados: string[] = [];
 
   for (const contrato of todosContratos) {
     const naPlanilha = planilhaMap.get(contrato.numero);
     const rec = recMap.get(contrato.id);
 
     if (naPlanilha && rec && rec.resolvidoManualmente) {
-      // Gestor já resolveu manualmente — mantém como confirmado sem sobrescrever
+      // Gestor já resolveu manualmente — mantém como confirmado
       confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
     } else if (naPlanilha && rec) {
-      const absDiff = Math.abs(rec.valorTotal - naPlanilha.valor);
-      // Sistema > Planilha: confirmado se o excesso é múltiplo inteiro do valor da planilha.
-      // Ex: planilha=721,51 sistema=1443,02 → excesso/planilha=1,0 → cliente pagou 1 de 2 parcelas
-      // Ex: planilha=1000   sistema=1002    → excesso/planilha=0,002 → não é múltiplo → divergência
-      const excesso = rec.valorTotal - naPlanilha.valor;
-      const ratio = naPlanilha.valor > 0 ? excesso / naPlanilha.valor : 0;
-      const parcialExplicado = excesso > TOLERANCIA
-        && Math.round(ratio) >= 1
-        && Math.abs(ratio - Math.round(ratio)) < 0.01;
-
-      if (absDiff <= TOLERANCIA || parcialExplicado) {
-        confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
-        recIdsConfirmados.push(...rec.ids);
-      } else {
-        divergencias.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal, diff: absDiff, recebimentoIds: rec.ids });
-        recIdsDivergentes.push(...rec.ids);
-      }
+      // Banco confirmou E consultor registrou → Confirmado independente do valor
+      confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
+      recIdsConfirmados.push(...rec.ids);
     } else if (naPlanilha && !rec) {
-      // Baixado na planilha mas consultor não registrou
+      // Banco confirmou mas consultor não registrou → Não lançado
       naoLancados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, dataLiquidacao: naPlanilha.dataLiquidacao.toISOString().split("T")[0] });
     } else if (!naPlanilha && rec) {
-      // Consultor registrou recebimento mas planilha não confirma
-      naoConfirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorSistema: rec.valorTotal, dataRecebimento: rec.ids[0] ? recebimentosDB.find(r => r.id === rec.ids[0])?.dataRecebimento.toISOString().split("T")[0] ?? "" : "" });
-      recIdsNaoConfirmados.push(...rec.ids);
+      // Consultor registrou mas banco não confirmou → Divergência
+      divergencias.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: 0, valorSistema: rec.valorTotal, diff: rec.valorTotal, recebimentoIds: rec.ids });
+      recIdsDivergentes.push(...rec.ids);
     } else {
       // Sem planilha, sem recebimento — inadimplente sem movimento
       semMovimentoItens.push({ contrato: contrato.numero, cliente: contrato.cliente.nome });
@@ -216,15 +198,7 @@ export async function POST(req: NextRequest) {
     }
   }
   if (recIdsDivergentes.length > 0) {
-    atualizacoes.push(prisma.recebimento.updateMany({ where: { id: { in: recIdsDivergentes } }, data: { baixaOficial: true, divergencia: true } }));
-    for (const id of recIdsDivergentes) {
-      const r = recebimentosDB.find((x) => x.id === id);
-      const dado = r ? planilhaMap.get(todosContratos.find((c) => c.id === r.contratoId)?.numero ?? "") : null;
-      if (dado) atualizacoes.push(prisma.recebimento.update({ where: { id }, data: { valorBaixado: dado.valor } }));
-    }
-  }
-  if (recIdsNaoConfirmados.length > 0) {
-    atualizacoes.push(prisma.recebimento.updateMany({ where: { id: { in: recIdsNaoConfirmados } }, data: { baixaOficial: false, divergencia: true } }));
+    atualizacoes.push(prisma.recebimento.updateMany({ where: { id: { in: recIdsDivergentes } }, data: { baixaOficial: false, divergencia: true } }));
   }
 
   await Promise.all(atualizacoes);
@@ -234,14 +208,11 @@ export async function POST(req: NextRequest) {
     confirmados: confirmados.length,
     divergencias: divergencias.length,
     naoLancados: naoLancados.length,
-    naoConfirmados: naoConfirmados.length,
     semMovimento,
     foraCarteira,
     detalhes: {
       divergencias: divergencias.slice(0, 50),
-      // naoLancados (baixou na planilha, sem lançamento) + semMovimento (zero atividade) juntos
       naoLancados: [...naoLancados, ...semMovimentoItens].slice(0, 50),
-      naoConfirmados: naoConfirmados.slice(0, 50),
     },
   });
 }
