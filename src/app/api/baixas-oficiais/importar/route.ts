@@ -52,20 +52,6 @@ function parsearValor(val: unknown): number {
   return isNaN(n) ? 0 : Math.abs(n);
 }
 
-// Verifica se o excesso (sistema - planilha) corresponde à soma de algum subconjunto
-// das parcelas ativas do contrato. Contratos têm tipicamente 1-10 parcelas.
-function excessoCorrespondeAParcelas(excesso: number, parcelas: number[]): boolean {
-  const n = parcelas.length;
-  if (n === 0) return false;
-  for (let mask = 1; mask < (1 << n); mask++) {
-    let soma = 0;
-    for (let i = 0; i < n; i++) {
-      if (mask & (1 << i)) soma += parcelas[i];
-    }
-    if (Math.abs(soma - excesso) < 0.05) return true;
-  }
-  return false;
-}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -139,17 +125,6 @@ export async function POST(req: NextRequest) {
   const todosContratos = [...contratosPorId.values()];
   const todosIds = todosContratos.map((c) => c.id);
 
-  // Busca parcelas ativas por contrato (para detectar pagamento parcial)
-  const parcelasAtivas = await prisma.parcela.findMany({
-    where: { contratoId: { in: todosIds }, paga: false, equivocada: false },
-    select: { contratoId: true, valorTotalAberto: true },
-  });
-  const parcelasPorContrato = new Map<string, number[]>();
-  for (const p of parcelasAtivas) {
-    const vals = parcelasPorContrato.get(p.contratoId) ?? [];
-    vals.push(Number(p.valorTotalAberto));
-    parcelasPorContrato.set(p.contratoId, vals);
-  }
 
   // ── 3. Recebimentos de todos os contratos da carteira no mês ─────────────────
   const recebimentosDB = await prisma.recebimento.findMany({
@@ -185,11 +160,14 @@ export async function POST(req: NextRequest) {
 
     if (naPlanilha && rec) {
       const absDiff = Math.abs(rec.valorTotal - naPlanilha.valor);
-      // Sistema > Planilha: verificar se o excesso corresponde a parcelas ativas do contrato
-      // (consultor registrou N parcelas, banco confirmou M<N — restante reaparece como inadimplente)
+      // Sistema > Planilha: confirmado se o excesso é múltiplo inteiro do valor da planilha.
+      // Ex: planilha=721,51 sistema=1443,02 → excesso/planilha=1,0 → cliente pagou 1 de 2 parcelas
+      // Ex: planilha=1000   sistema=1002    → excesso/planilha=0,002 → não é múltiplo → divergência
       const excesso = rec.valorTotal - naPlanilha.valor;
+      const ratio = naPlanilha.valor > 0 ? excesso / naPlanilha.valor : 0;
       const parcialExplicado = excesso > TOLERANCIA
-        && excessoCorrespondeAParcelas(excesso, parcelasPorContrato.get(contrato.id) ?? []);
+        && Math.round(ratio) >= 1
+        && Math.abs(ratio - Math.round(ratio)) < 0.01;
 
       if (absDiff <= TOLERANCIA || parcialExplicado) {
         confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
