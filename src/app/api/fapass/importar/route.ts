@@ -8,16 +8,19 @@ import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { randomUUID } from "crypto";
 
-// ─── Índices de coluna (0-based) — mesmos do fapass-extrair.py ───────────────
+// ─── Índices de coluna (0-based) ─────────────────────────────────────────────
+// Passaporte | Fornecedor | Id | Vencimento | Tipo | Valor | Status | TiposBaixa
+// | Dias Venc. Ant. | Status Lote | Consultor | Meta | Faixa | StatusAc.
+// | Data Rec. | Valor Rec. | MeioPag. | Valor EmDia | Observação
 const C = {
   documento:  0,
-  tipo:       5,
-  fornecedor: 6,
-  valor:      7,
-  status:     15,
-  vencimento: 16,
-  dataBaixa:  17,
-  tiposBaixa: 18,
+  fornecedor: 1,
+  vencimento: 3,
+  tipo:       4,
+  valor:      5,
+  status:     6,
+  tiposBaixa: 7,
+  dataBaixa:  14,
 } as const;
 
 function parsearValor(val: unknown): number {
