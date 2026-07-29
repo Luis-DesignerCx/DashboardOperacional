@@ -377,10 +377,12 @@ model Recebimento {
   formaPagamento  FormaPagamento
   justificativa   String
   parcelasIds     String[]       @default([])
-  baixaOficial    Boolean        @default(false)
-  valorBaixado    Decimal?       @db.Decimal(15, 2)
-  divergencia     Boolean        @default(false)
-  aprovado        Boolean        @default(false)
+  baixaOficial        Boolean        @default(false)
+  valorBaixado        Decimal?       @db.Decimal(15, 2)
+  divergencia         Boolean        @default(false)
+  resolvidoManualmente Boolean       @default(false)
+  resolucaoMotivo     String?
+  aprovado            Boolean        @default(false)
   criadoEm        DateTime       @default(now())
   atualizadoEm    DateTime       @updatedAt
 

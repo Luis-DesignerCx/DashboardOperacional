@@ -129,15 +129,21 @@ export async function POST(req: NextRequest) {
   // ── 3. Recebimentos de todos os contratos da carteira no mês ─────────────────
   const recebimentosDB = await prisma.recebimento.findMany({
     where: { contratoId: { in: todosIds }, dataRecebimento: { gte: iniComp, lt: fimComp } },
-    select: { id: true, contratoId: true, valor: true, dataRecebimento: true },
+    select: { id: true, contratoId: true, valor: true, dataRecebimento: true, resolvidoManualmente: true },
   });
 
   // Agrupa recebimentos por contratoId
-  const recMap = new Map<string, { ids: string[]; valorTotal: number }>();
+  // resolvidoManualmente: true se ALGUM recebimento do contrato foi resolvido pelo gestor
+  const recMap = new Map<string, { ids: string[]; valorTotal: number; resolvidoManualmente: boolean }>();
   for (const r of recebimentosDB) {
     const e = recMap.get(r.contratoId);
-    if (e) { e.ids.push(r.id); e.valorTotal += Number(r.valor); }
-    else recMap.set(r.contratoId, { ids: [r.id], valorTotal: Number(r.valor) });
+    if (e) {
+      e.ids.push(r.id);
+      e.valorTotal += Number(r.valor);
+      if (r.resolvidoManualmente) e.resolvidoManualmente = true;
+    } else {
+      recMap.set(r.contratoId, { ids: [r.id], valorTotal: Number(r.valor), resolvidoManualmente: r.resolvidoManualmente });
+    }
   }
 
   // ── 4. Cruzamento: base = todos os contratos da carteira ─────────────────────
@@ -145,7 +151,7 @@ export async function POST(req: NextRequest) {
 
   type ItemBase = { contrato: string; cliente: string };
   const confirmados:    (ItemBase & { valorPlanilha: number; valorSistema: number })[] = [];
-  const divergencias:   (ItemBase & { valorPlanilha: number; valorSistema: number; diff: number })[] = [];
+  const divergencias:   (ItemBase & { valorPlanilha: number; valorSistema: number; diff: number; recebimentoIds: string[] })[] = [];
   const naoLancados:    (ItemBase & { valorPlanilha: number; dataLiquidacao: string })[] = [];
   const semMovimentoItens: ItemBase[] = [];
   const naoConfirmados: (ItemBase & { valorSistema: number; dataRecebimento: string })[] = [];
@@ -158,7 +164,10 @@ export async function POST(req: NextRequest) {
     const naPlanilha = planilhaMap.get(contrato.numero);
     const rec = recMap.get(contrato.id);
 
-    if (naPlanilha && rec) {
+    if (naPlanilha && rec && rec.resolvidoManualmente) {
+      // Gestor já resolveu manualmente — mantém como confirmado sem sobrescrever
+      confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
+    } else if (naPlanilha && rec) {
       const absDiff = Math.abs(rec.valorTotal - naPlanilha.valor);
       // Sistema > Planilha: confirmado se o excesso é múltiplo inteiro do valor da planilha.
       // Ex: planilha=721,51 sistema=1443,02 → excesso/planilha=1,0 → cliente pagou 1 de 2 parcelas
@@ -173,7 +182,7 @@ export async function POST(req: NextRequest) {
         confirmados.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal });
         recIdsConfirmados.push(...rec.ids);
       } else {
-        divergencias.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal, diff: absDiff });
+        divergencias.push({ contrato: contrato.numero, cliente: contrato.cliente.nome, valorPlanilha: naPlanilha.valor, valorSistema: rec.valorTotal, diff: absDiff, recebimentoIds: rec.ids });
         recIdsDivergentes.push(...rec.ids);
       }
     } else if (naPlanilha && !rec) {

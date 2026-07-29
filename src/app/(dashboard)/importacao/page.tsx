@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle, ArrowDownToLine } from "lucide-react";
+import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle, ArrowDownToLine, CheckCheck } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 
 interface Competencia {
@@ -66,6 +66,11 @@ export default function ImportacaoPage() {
   const [bxResultado, setBxResultado] = useState<any | null>(null);
   const [bxErro, setBxErro] = useState("");
   const [bxAberto, setBxAberto] = useState<"divergencias" | "naoLancados" | "naoConfirmados" | null>(null);
+
+  // Resolução de divergência
+  const [resolverModal, setResolverModal] = useState<{ ids: string[]; contrato: string; cliente: string } | null>(null);
+  const [resolverMotivo, setResolverMotivo] = useState("Juros e encargos");
+  const [resolverCarregando, setResolverCarregando] = useState(false);
 
   // Férias
   const [ferias, setFerias] = useState<FeriasEntry[]>([]);
@@ -219,6 +224,33 @@ export default function ImportacaoPage() {
     }
   }
 
+  async function handleResolver() {
+    if (!resolverModal) return;
+    setResolverCarregando(true);
+    const res = await fetch("/api/baixas-oficiais/resolver", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recebimentoIds: resolverModal.ids, motivo: resolverMotivo }),
+    });
+    setResolverCarregando(false);
+    if (res.ok) {
+      setBxResultado((prev: any) => {
+        if (!prev) return prev;
+        const novasDivs = prev.detalhes.divergencias.filter((d: any) =>
+          !d.recebimentoIds?.some((id: string) => resolverModal.ids.includes(id))
+        );
+        return {
+          ...prev,
+          divergencias: prev.divergencias - 1,
+          confirmados: prev.confirmados + 1,
+          detalhes: { ...prev.detalhes, divergencias: novasDivs },
+        };
+      });
+      setResolverModal(null);
+      setResolverMotivo("Juros e encargos");
+    }
+  }
+
   async function handleBxImportar() {
     if (!bxArquivo || !competenciaId) return;
     setBxCarregando(true);
@@ -263,6 +295,48 @@ export default function ImportacaoPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
+
+      {/* Modal de resolução de divergência */}
+      {resolverModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm space-y-4">
+            <div>
+              <h3 className="text-white font-semibold text-base">Resolver divergência</h3>
+              <p className="text-slate-400 text-xs mt-1">{resolverModal.contrato} · {resolverModal.cliente}</p>
+            </div>
+            <p className="text-slate-400 text-sm">O recebimento será marcado como <span className="text-emerald-400 font-medium">Confirmado</span> e não será sobrescrito em próximas importações.</p>
+            <div>
+              <label className="text-xs text-slate-400 block mb-1.5">Motivo</label>
+              <select
+                value={resolverMotivo}
+                onChange={(e) => setResolverMotivo(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+              >
+                <option>Juros e encargos</option>
+                <option>Valor verificado com o banco</option>
+                <option>Acordo negociado</option>
+                <option>Outro</option>
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => { setResolverModal(null); setResolverMotivo("Juros e encargos"); }}
+                className="flex-1 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleResolver}
+                disabled={resolverCarregando}
+                className="flex-1 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white text-sm font-medium transition-colors flex items-center justify-center gap-2"
+              >
+                {resolverCarregando ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div>
         <h1 className="text-2xl font-bold text-white">Importação de Planilha</h1>
         <p className="text-slate-400 text-sm mt-1">
@@ -728,15 +802,23 @@ export default function ImportacaoPage() {
                     <p className="text-xs font-medium text-amber-400 px-4 py-2 border-b border-amber-500/20">Divergências de valor (máx 50)</p>
                     <div className="max-h-56 overflow-y-auto divide-y divide-slate-800">
                       {bxResultado.detalhes.divergencias.map((d: any, i: number) => (
-                        <div key={i} className="flex items-center justify-between px-4 py-2 text-xs">
-                          <div>
+                        <div key={i} className="flex items-center justify-between px-4 py-2 text-xs gap-3">
+                          <div className="min-w-0 flex-1">
                             <span className="text-white font-medium">{d.contrato}</span>
                             <span className="text-slate-400 ml-2">{d.cliente}</span>
                           </div>
-                          <div className="text-right flex-shrink-0 ml-4">
+                          <div className="text-right flex-shrink-0">
                             <p className="text-slate-300">Planilha: {formatarMoeda(d.valorPlanilha)}</p>
                             <p className="text-amber-400">Sistema: {formatarMoeda(d.valorSistema)} <span className="text-slate-500">(Δ {formatarMoeda(d.diff)})</span></p>
                           </div>
+                          {d.recebimentoIds?.length > 0 && (
+                            <button
+                              onClick={() => setResolverModal({ ids: d.recebimentoIds, contrato: d.contrato, cliente: d.cliente })}
+                              className="flex-shrink-0 flex items-center gap-1 px-2 py-1 bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-400 rounded-lg transition-colors text-[11px]"
+                            >
+                              <CheckCheck size={11} /> Resolver
+                            </button>
+                          )}
                         </div>
                       ))}
                     </div>
