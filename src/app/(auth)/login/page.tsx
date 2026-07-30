@@ -91,9 +91,9 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Watermark fingerprint — versão branca, grande, posicionada à direita */}
-        <div className="absolute right-[-60px] bottom-[-60px] opacity-[0.07] pointer-events-none select-none">
-          <Image src="/logo-gr-icon-branco.png" alt="" width={560} height={560} />
+        {/* Watermark fingerprint — centrado, cobre todo o painel */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.09]">
+          <Image src="/logo-gr-icon-branco.png" alt="" width={720} height={720} className="object-contain" />
         </div>
       </div>
 
