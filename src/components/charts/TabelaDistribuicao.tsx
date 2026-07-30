@@ -6,40 +6,24 @@ import { Building2, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const FRENTE_STYLE: Record<string, { dot: string; bar: string; badge: string }> = {
-  "eq-flash":  { dot: "bg-sky-400",     bar: "bg-sky-500",     badge: "bg-sky-500/15 text-sky-300 border border-sky-500/25" },
-  "eq-1-30":   { dot: "bg-emerald-400", bar: "bg-emerald-500", badge: "bg-emerald-500/15 text-emerald-300 border border-emerald-500/25" },
-  "eq-31-90":  { dot: "bg-amber-400",   bar: "bg-amber-500",   badge: "bg-amber-500/15 text-amber-300 border border-amber-500/25" },
-  "eq-91-180": { dot: "bg-orange-400",  bar: "bg-orange-500",  badge: "bg-orange-500/15 text-orange-300 border border-orange-500/25" },
+  "eq-flash":  { dot: "bg-sky-400",     bar: "from-sky-600 to-sky-400",         badge: "bg-sky-500/10 text-sky-300 border border-sky-500/20" },
+  "eq-1-30":   { dot: "bg-emerald-400", bar: "from-emerald-600 to-emerald-400",  badge: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20" },
+  "eq-31-90":  { dot: "bg-amber-400",   bar: "from-amber-600 to-amber-400",      badge: "bg-amber-500/10 text-amber-300 border border-amber-500/20" },
+  "eq-91-180": { dot: "bg-orange-400",  bar: "from-orange-600 to-orange-400",    badge: "bg-orange-500/10 text-orange-300 border border-orange-500/20" },
 };
 
 interface ConsultorDist {
-  consultorId: string;
-  nome: string;
-  saldoAberto: number;
-  recebido: number;
-  contratos: number;
+  consultorId: string; nome: string; saldoAberto: number; recebido: number; contratos: number;
 }
-
 interface FrenteDist {
-  equipeId: string;
-  label: string;
-  consultores: ConsultorDist[];
+  equipeId: string; label: string; consultores: ConsultorDist[];
   total: { saldoAberto: number; recebido: number; contratos: number };
 }
-
 interface EmpresaDist {
-  empresaId: string;
-  nome: string;
-  saldoAberto: number;
-  recebido: number;
-  contratos: number;
-  percentual: number;
+  empresaId: string; nome: string; saldoAberto: number; recebido: number; contratos: number; percentual: number;
 }
-
 interface Props {
-  competenciaId: string;
-  equipeIds: string[];
-  unificar91Plus?: boolean;
+  competenciaId: string; equipeIds: string[]; unificar91Plus?: boolean;
 }
 
 export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }: Props) {
@@ -56,7 +40,7 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
     fetch(`/api/dashboard/distribuicao?${params}`)
       .then((r) => r.json())
       .then((d) => {
-        if (d.frentes) setFrente(d.frentes);
+        if (d.frentes)   setFrente(d.frentes);
         if (d.porEmpresa) setPorEmpresa(d.porEmpresa);
       })
       .catch(() => {})
@@ -64,37 +48,32 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [competenciaId, equipeIds.join(",")]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-24">
-        <div className="w-5 h-5 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center h-20">
+      <div className="w-5 h-5 border-2 border-gr-500/60 border-t-gr-400 rounded-full animate-spin" />
+    </div>
+  );
 
-  const frentesProcessadas = frentes;
-
-  const frentesComDados = frentesProcessadas.filter((f) => f.consultores.length > 0);
-
-  const totalEmpresa = porEmpresa.reduce(
+  const frentesComDados = frentes.filter((f) => f.consultores.length > 0);
+  const totalEmpresa    = porEmpresa.reduce(
     (acc, e) => ({ saldoAberto: acc.saldoAberto + e.saldoAberto, recebido: acc.recebido + e.recebido, contratos: acc.contratos + e.contratos }),
     { saldoAberto: 0, recebido: 0, contratos: 0 }
   );
 
   return (
-    <div className="space-y-6">
-      {/* Cabeçalho com toggle */}
+    <div className="space-y-5">
+      {/* Toggle */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Layers size={16} className="text-slate-400" />
-          <h2 className="text-sm font-semibold text-white">Distribuição por Frente e Consultor</h2>
+          <Layers size={14} className="text-slate-500" />
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Distribuição por Frente e Consultor</h2>
         </div>
-        <div className="flex bg-slate-800 rounded-lg p-0.5 border border-slate-700">
+        <div className="flex bg-white/[0.04] rounded-xl p-0.5 border border-white/[0.06]">
           <button
             onClick={() => setModo("saldo")}
             className={cn(
-              "px-3 py-1 rounded-md text-xs font-medium transition-colors",
-              modo === "saldo" ? "bg-gr-500/20 text-gr-300" : "text-slate-400 hover:text-white"
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+              modo === "saldo" ? "bg-gr-500/20 text-gr-300 shadow-sm" : "text-slate-500 hover:text-slate-300"
             )}
           >
             Saldo em aberto
@@ -102,8 +81,8 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
           <button
             onClick={() => setModo("recebido")}
             className={cn(
-              "px-3 py-1 rounded-md text-xs font-medium transition-colors",
-              modo === "recebido" ? "bg-emerald-500/20 text-emerald-300" : "text-slate-400 hover:text-white"
+              "px-3 py-1.5 rounded-lg text-xs font-medium transition-all",
+              modo === "recebido" ? "bg-emerald-500/20 text-emerald-300 shadow-sm" : "text-slate-500 hover:text-slate-300"
             )}
           >
             Recebido no mês
@@ -113,21 +92,20 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
 
       {/* Cards por frente */}
       {frentesComDados.length === 0 ? (
-        <p className="text-slate-500 text-sm text-center py-8">Nenhum dado para exibir.</p>
+        <p className="text-slate-600 text-xs text-center py-8">Nenhum dado para exibir.</p>
       ) : (
-        <div
-          className={cn(
-            "grid gap-4",
-            frentesComDados.length === 1 ? "grid-cols-1" :
-            frentesComDados.length === 2 ? "grid-cols-1 lg:grid-cols-2" :
-            frentesComDados.length <= 4  ? "grid-cols-1 lg:grid-cols-2" :
-            "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3"
-          )}
-        >
+        <div className={cn(
+          "grid gap-3",
+          frentesComDados.length === 1 ? "grid-cols-1" :
+          frentesComDados.length <= 2  ? "grid-cols-1 lg:grid-cols-2" :
+          frentesComDados.length <= 4  ? "grid-cols-1 lg:grid-cols-2" :
+          "grid-cols-1 lg:grid-cols-2 xl:grid-cols-3"
+        )}>
           {frentesComDados.map((frente) => {
             const style = FRENTE_STYLE[frente.equipeId] ?? {
-              dot: "bg-slate-400", bar: "bg-slate-500",
-              badge: "bg-slate-700 text-slate-300 border border-slate-600",
+              dot: "bg-slate-400",
+              bar: "from-slate-600 to-slate-400",
+              badge: "bg-white/[0.06] text-slate-400 border border-white/[0.08]",
             };
             const valorTotal = modo === "saldo" ? frente.total.saldoAberto : frente.total.recebido;
             const consultoresOrdenados = [...frente.consultores].sort((a, b) => {
@@ -137,54 +115,46 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
             });
 
             return (
-              <div key={frente.equipeId} className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <div key={frente.equipeId} className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <span className={cn("w-2 h-2 rounded-full flex-shrink-0", style.dot)} />
-                    <span className={cn("text-xs font-semibold px-2.5 py-0.5 rounded-full", style.badge)}>
+                    <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", style.dot)} />
+                    <span className={cn("text-xs font-semibold px-2.5 py-0.5 rounded-lg", style.badge)}>
                       {frente.label}
                     </span>
                   </div>
-                  <span className="text-xs text-slate-500 tabular-nums">{frente.total.contratos} contratos</span>
+                  <span className="text-[10px] text-slate-600 tabular-nums">{frente.total.contratos} contratos</span>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="text-[10px] text-slate-500 uppercase tracking-wider">
-                        <th className="text-left pb-2.5 font-medium">Consultor</th>
-                        <th className="text-right pb-2.5 font-medium">Valor</th>
-                        <th className="text-right pb-2.5 font-medium">Contr.</th>
-                        <th className="text-right pb-2.5 font-medium w-20">Part. %</th>
+                      <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.05]">
+                        <th className="text-left pb-2.5 font-semibold">Consultor</th>
+                        <th className="text-right pb-2.5 font-semibold">Valor</th>
+                        <th className="text-right pb-2.5 font-semibold">Contr.</th>
+                        <th className="text-right pb-2.5 font-semibold w-20">Part.</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-white/[0.04]">
                       {consultoresOrdenados.map((c) => {
                         const valor = modo === "saldo" ? c.saldoAberto : c.recebido;
                         const pct = valorTotal > 0 ? (valor / valorTotal) * 100 : 0;
                         const primeiroNome = c.nome.split(" ").slice(0, 2).join(" ");
                         return (
-                          <tr key={c.consultorId} className="group hover:bg-slate-800/40 transition-colors">
-                            <td className="py-2.5 text-slate-200 font-medium truncate max-w-[110px] pr-2">
-                              {primeiroNome}
-                            </td>
-                            <td className="py-2.5 text-right text-slate-300 tabular-nums">
-                              {formatarMoeda(valor)}
-                            </td>
-                            <td className="py-2.5 text-right text-slate-500 tabular-nums">
-                              {c.contratos}
-                            </td>
+                          <tr key={c.consultorId} className="hover:bg-white/[0.02] transition-colors">
+                            <td className="py-2.5 text-slate-200 font-medium truncate max-w-[110px] pr-2">{primeiroNome}</td>
+                            <td className="py-2.5 text-right text-slate-300 tabular-nums">{formatarMoeda(valor)}</td>
+                            <td className="py-2.5 text-right text-slate-500 tabular-nums">{c.contratos}</td>
                             <td className="py-2.5 text-right">
                               <div className="flex items-center justify-end gap-1.5">
-                                <div className="w-12 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div className="w-12 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
                                   <div
-                                    className={cn("h-full rounded-full transition-all", style.bar)}
+                                    className={cn(`h-full rounded-full bg-gradient-to-r transition-all`, style.bar)}
                                     style={{ width: `${Math.min(pct, 100)}%` }}
                                   />
                                 </div>
-                                <span className="text-slate-500 w-7 text-right tabular-nums">
-                                  {pct.toFixed(0)}%
-                                </span>
+                                <span className="text-slate-600 w-6 text-right tabular-nums text-[10px]">{pct.toFixed(0)}%</span>
                               </div>
                             </td>
                           </tr>
@@ -192,15 +162,11 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
                       })}
                     </tbody>
                     <tfoot>
-                      <tr className="border-t border-slate-700">
-                        <td className="pt-3 pb-0.5 text-white font-semibold">Total</td>
-                        <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">
-                          {formatarMoeda(valorTotal)}
-                        </td>
-                        <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">
-                          {frente.total.contratos}
-                        </td>
-                        <td className="pt-3 pb-0.5 text-right text-slate-400 text-[10px]">100%</td>
+                      <tr className="border-t border-white/[0.07]">
+                        <td className="pt-3 pb-0.5 text-white font-semibold text-xs">Total</td>
+                        <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(valorTotal)}</td>
+                        <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{frente.total.contratos}</td>
+                        <td className="pt-3 pb-0.5 text-right text-slate-600 text-[10px]">100%</td>
                       </tr>
                     </tfoot>
                   </table>
@@ -213,37 +179,34 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
 
       {/* Tabela por empresa */}
       {porEmpresa.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Building2 size={16} className="text-slate-400" />
-            <h2 className="text-sm font-semibold text-white">Distribuição por Empresa</h2>
+            <Building2 size={14} className="text-slate-500" />
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Distribuição por Empresa</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="text-[10px] text-slate-500 uppercase tracking-wider border-b border-slate-800">
-                  <th className="text-left pb-2.5 font-medium">Empresa</th>
-                  <th className="text-right pb-2.5 font-medium">Saldo Aberto</th>
-                  <th className="text-right pb-2.5 font-medium">Recebido</th>
-                  <th className="text-right pb-2.5 font-medium">Contratos</th>
-                  <th className="text-right pb-2.5 font-medium">% Recup.</th>
+                <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.05]">
+                  <th className="text-left pb-2.5 font-semibold">Empresa</th>
+                  <th className="text-right pb-2.5 font-semibold">Saldo Aberto</th>
+                  <th className="text-right pb-2.5 font-semibold">Recebido</th>
+                  <th className="text-right pb-2.5 font-semibold">Contratos</th>
+                  <th className="text-right pb-2.5 font-semibold">% Recup.</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-white/[0.04]">
                 {porEmpresa.map((e) => (
-                  <tr key={e.empresaId} className="hover:bg-slate-800/40 transition-colors">
+                  <tr key={e.empresaId} className="hover:bg-white/[0.02] transition-colors">
                     <td className="py-2.5 text-slate-200 font-medium">{e.nome}</td>
-                    <td className="py-2.5 text-right text-slate-300 tabular-nums">{formatarMoeda(e.saldoAberto)}</td>
-                    <td className="py-2.5 text-right text-emerald-400 tabular-nums">{formatarMoeda(e.recebido)}</td>
-                    <td className="py-2.5 text-right text-slate-400 tabular-nums">{e.contratos}</td>
+                    <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.saldoAberto)}</td>
+                    <td className="py-2.5 text-right text-emerald-400 tabular-nums font-medium">{formatarMoeda(e.recebido)}</td>
+                    <td className="py-2.5 text-right text-slate-500 tabular-nums">{e.contratos}</td>
                     <td className="py-2.5 text-right">
-                      <span
-                        className={cn(
-                          "font-semibold",
-                          e.percentual >= 10 ? "text-emerald-400" :
-                          e.percentual >= 5  ? "text-amber-400"   : "text-slate-400"
-                        )}
-                      >
+                      <span className={cn(
+                        "font-semibold tabular-nums",
+                        e.percentual >= 10 ? "text-emerald-400" : e.percentual >= 5 ? "text-amber-400" : "text-slate-500"
+                      )}>
                         {e.percentual.toFixed(1)}%
                       </span>
                     </td>
@@ -251,12 +214,12 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t border-slate-700">
+                <tr className="border-t border-white/[0.07]">
                   <td className="pt-3 pb-0.5 text-white font-semibold">Total</td>
                   <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(totalEmpresa.saldoAberto)}</td>
                   <td className="pt-3 pb-0.5 text-right text-emerald-400 font-semibold tabular-nums">{formatarMoeda(totalEmpresa.recebido)}</td>
                   <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{totalEmpresa.contratos}</td>
-                  <td className="pt-3 pb-0.5 text-right text-slate-400 tabular-nums">
+                  <td className="pt-3 pb-0.5 text-right text-slate-500 tabular-nums text-[10px]">
                     {totalEmpresa.saldoAberto > 0
                       ? ((totalEmpresa.recebido / totalEmpresa.saldoAberto) * 100).toFixed(1) + "%"
                       : "—"}

@@ -6,7 +6,9 @@ import { usePathname } from "next/navigation";
 import { Perfil } from "@prisma/client";
 import {
   LayoutDashboard, Users, FolderOpen, Upload, Target, DollarSign,
-  BarChart3, ClipboardList, Settings, Shield, Bell, ChevronLeft, ChevronRight, History, Layers, UserCog, PieChart, Search, Filter,
+  BarChart3, ClipboardList, Settings, Shield, Bell, ChevronLeft,
+  ChevronRight, History, Layers, UserCog, PieChart, Search,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -20,28 +22,28 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",            href: "/dashboard",   icon: LayoutDashboard, perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
-  { label: "Consulta",             href: "/consulta",    icon: Search,          perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
-  { label: "Minha Carteira",       href: "/carteira",    icon: FolderOpen,      perfis: ["CONSULTOR"] },
-  { label: "Clientes",             href: "/clientes",    icon: Users,           perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Minhas Tarefas",       href: "/pendencias",  icon: Bell,            perfis: ["CONSULTOR", "GESTOR"] },
-  { label: "Importação",           href: "/importacao",  icon: Upload,          perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Histórico",            href: "/historico",   icon: History,         perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Usuários",              href: "/usuarios",    icon: UserCog,         perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Gestão de Carteiras",  href: "/gestao",      icon: PieChart,        perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Frentes",              href: "/equipes",     icon: Layers,          perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Metas",                href: "/metas",       icon: Target,          perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Comissão",             href: "/comissao",    icon: DollarSign,      perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
-  { label: "Relatórios",           href: "/relatorios",  icon: BarChart3,       perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Solicitações",         href: "/solicitacoes",icon: ClipboardList,   perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Auditoria",            href: "/auditoria",   icon: Shield,          perfis: ["ADMINISTRADOR"] },
-  { label: "Configurações",        href: "/configuracoes",icon: Settings,       perfis: ["ADMINISTRADOR"] },
+  { label: "Dashboard",           href: "/dashboard",    icon: LayoutDashboard, perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
+  { label: "Consulta",            href: "/consulta",     icon: Search,          perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
+  { label: "Minha Carteira",      href: "/carteira",     icon: FolderOpen,      perfis: ["CONSULTOR"] },
+  { label: "Clientes",            href: "/clientes",     icon: Users,           perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Minhas Tarefas",      href: "/pendencias",   icon: Bell,            perfis: ["CONSULTOR", "GESTOR"] },
+  { label: "Importação",          href: "/importacao",   icon: Upload,          perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Histórico",           href: "/historico",    icon: History,         perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Usuários",            href: "/usuarios",     icon: UserCog,         perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Gestão de Carteiras", href: "/gestao",       icon: PieChart,        perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Frentes",             href: "/equipes",      icon: Layers,          perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Metas",               href: "/metas",        icon: Target,          perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Comissão",            href: "/comissao",     icon: DollarSign,      perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
+  { label: "Relatórios",          href: "/relatorios",   icon: BarChart3,       perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Solicitações",        href: "/solicitacoes", icon: ClipboardList,   perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Auditoria",           href: "/auditoria",    icon: Shield,          perfis: ["ADMINISTRADOR"] },
+  { label: "Configurações",       href: "/configuracoes",icon: Settings,        perfis: ["ADMINISTRADOR"] },
 ];
 
 const FRENTE_CHIPS = [
   { id: "eq-flash",  label: "Flash" },
-  { id: "eq-1-30",   label: "1-30" },
-  { id: "eq-31-90",  label: "31-90" },
+  { id: "eq-1-30",   label: "1–30" },
+  { id: "eq-31-90",  label: "31–90" },
   { id: "eq-91-180", label: "91+" },
 ];
 
@@ -49,140 +51,166 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [pendentes, setPendentes] = useState(0);
-  // Total real retornado pela API
   const [totalTarefasHoje, setTotalTarefasHoje] = useState(0);
   const { equipeIds, toggleEquipe, clearFilter } = useFrente();
 
-  // Chave de "visto" baseada no dia — zera automaticamente no próximo dia
-  const seenKey = `pendencias_seen_${new Date().toISOString().slice(0, 10)}`;
-  const seenCount = (): number => parseInt(typeof window !== "undefined" ? (localStorage.getItem(seenKey) ?? "0") : "0", 10);
-  const markSeen = (n: number) => { if (typeof window !== "undefined") localStorage.setItem(seenKey, String(n)); };
-
-  // Badge só aparece quando o total atual supera o que o usuário já viu
+  const seenKey    = `pendencias_seen_${new Date().toISOString().slice(0, 10)}`;
+  const seenCount  = (): number => parseInt(typeof window !== "undefined" ? (localStorage.getItem(seenKey) ?? "0") : "0", 10);
+  const markSeen   = (n: number) => { if (typeof window !== "undefined") localStorage.setItem(seenKey, String(n)); };
   const promessasHoje = Math.max(0, totalTarefasHoje - seenCount());
 
   useEffect(() => {
     if (!["ADMINISTRADOR", "GESTOR"].includes(perfil)) return;
-    const fetchPendentes = () => {
+    const fetch_ = () => {
       fetch("/api/solicitacoes")
         .then((r) => r.json())
-        .then((data) => {
-          if (Array.isArray(data)) setPendentes(data.filter((s: any) => s.status === "PENDENTE").length);
-        })
+        .then((d) => { if (Array.isArray(d)) setPendentes(d.filter((s: any) => s.status === "PENDENTE").length); })
         .catch(() => {});
     };
-    fetchPendentes();
-    const interval = setInterval(fetchPendentes, 60_000);
-    return () => clearInterval(interval);
+    fetch_();
+    const t = setInterval(fetch_, 60_000);
+    return () => clearInterval(t);
   }, [perfil]);
 
   useEffect(() => {
     if (!["CONSULTOR", "GESTOR"].includes(perfil)) return;
-    const fetchTarefas = () => {
+    const fetch_ = () => {
       Promise.all([
         fetch("/api/promessas?vencendoHoje=true").then((r) => r.json()).catch(() => []),
         fetch("/api/contatos?agendadosHoje=true").then((r) => r.json()).catch(() => []),
-      ]).then(([promessas, agendados]) => {
-        const total = (Array.isArray(promessas) ? promessas.length : 0)
-                    + (Array.isArray(agendados)  ? agendados.length  : 0);
+      ]).then(([p, a]) => {
+        const total = (Array.isArray(p) ? p.length : 0) + (Array.isArray(a) ? a.length : 0);
         setTotalTarefasHoje(total);
-        // Se o usuário já está na página de tarefas, marca como visto imediatamente
-        if (typeof window !== "undefined" && window.location.pathname === "/pendencias") {
-          markSeen(total);
-        }
+        if (typeof window !== "undefined" && window.location.pathname === "/pendencias") markSeen(total);
       });
     };
-    fetchTarefas();
-    const interval = setInterval(fetchTarefas, 60_000);
-    return () => clearInterval(interval);
+    fetch_();
+    const t = setInterval(fetch_, 60_000);
+    return () => clearInterval(t);
   }, [perfil]);
 
-  // Ao entrar na página de tarefas: marca o total atual como "visto"
   useEffect(() => {
     if (pathname === "/pendencias") {
       markSeen(totalTarefasHoje);
-      // Força re-render para ocultar o badge imediatamente
       setTotalTarefasHoje((t) => t);
     }
   }, [pathname]);
 
-  const itensVisiveis = NAV_ITEMS.filter((item) => item.perfis.includes(perfil));
+  const itensVisiveis = NAV_ITEMS.filter((i) => i.perfis.includes(perfil));
 
   return (
     <aside
       className={cn(
-        "flex flex-col border-r border-gr-900/60 transition-all duration-300",
-        "bg-[#0f0f24]",
-        collapsed ? "w-16" : "w-64"
+        "relative flex flex-col transition-all duration-300 ease-in-out flex-shrink-0",
+        "bg-[#06080e] border-r border-white/[0.05]",
+        collapsed ? "w-[60px]" : "w-60"
       )}
     >
-      {/* Logo */}
-      <div className="flex items-center justify-between h-16 px-4 border-b border-gr-900/60">
-        {!collapsed ? (
-          <div className="flex items-center gap-2.5">
-            <Image
-              src="/logo-gr-icon.png"
-              alt="GR Group"
-              width={32}
-              height={32}
-              className="rounded-lg"
-            />
-            <div className="leading-tight">
-              <p className="text-white font-semibold text-sm">DASH CR</p>
-              <p className="text-gr-400 text-[10px] font-medium">GR Group</p>
-            </div>
-          </div>
-        ) : (
+      {/* Ambient top glow */}
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-gr-500/[0.06] to-transparent" />
+
+      {/* Logo ──────────────────────────────────────────────────── */}
+      <div className={cn(
+        "relative flex items-center h-16 border-b border-white/[0.05] flex-shrink-0",
+        collapsed ? "justify-center px-0" : "px-4 gap-2.5"
+      )}>
+        <div className="relative flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden ring-1 ring-gr-500/20">
+          <div className="absolute inset-0 bg-gradient-to-br from-gr-500/20 to-gr-900/40" />
           <Image
             src="/logo-gr-icon.png"
-            alt="GR"
-            width={28}
-            height={28}
-            className="rounded-md"
+            alt="GR Group"
+            width={32} height={32}
+            className="relative z-10 w-full h-full object-contain"
           />
+        </div>
+
+        {!collapsed && (
+          <div className="flex-1 min-w-0 leading-tight">
+            <p className="text-white font-bold text-sm tracking-tight">DASH CR</p>
+            <p className="text-gr-400/60 text-[9px] font-semibold tracking-[0.18em] uppercase">GR Group</p>
+          </div>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-md text-slate-500 hover:text-white hover:bg-gr-900/40 transition-colors ml-auto"
-        >
-          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-        </button>
+
+        {!collapsed && (
+          <button
+            onClick={() => setCollapsed(true)}
+            className="p-1.5 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/[0.04] transition-all"
+            aria-label="Recolher sidebar"
+          >
+            <ChevronLeft size={14} />
+          </button>
+        )}
+
+        {collapsed && (
+          <button
+            onClick={() => setCollapsed(false)}
+            className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#0b0f1c] border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-gr-500/40 transition-all shadow-card z-10"
+            aria-label="Expandir sidebar"
+          >
+            <ChevronRight size={11} />
+          </button>
+        )}
       </div>
 
-      {/* Navegação */}
-      <nav className="flex-1 py-4 overflow-y-auto">
-        <ul className="space-y-0.5 px-2">
+      {/* Nav ────────────────────────────────────────────────────── */}
+      <nav className="relative flex-1 py-3 overflow-y-auto overflow-x-hidden">
+        <ul className={cn("space-y-0.5", collapsed ? "px-2" : "px-2.5")}>
           {itensVisiveis.map((item) => {
             const ativo = pathname === item.href || pathname.startsWith(item.href + "/");
+            const hasBadge =
+              (item.href === "/solicitacoes" && pendentes > 0) ||
+              (item.href === "/pendencias"   && promessasHoje > 0);
+            const badgeCount = item.href === "/solicitacoes" ? pendentes : promessasHoje;
+            const badgeColor = item.href === "/solicitacoes" ? "bg-amber-500" : "bg-red-500";
+
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={cn(
-                    "relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
-                    ativo
-                      ? "bg-gr-500/15 text-gr-300 font-medium border border-gr-500/20"
-                      : "text-slate-200 hover:text-white hover:bg-white/5"
-                  )}
                   title={collapsed ? item.label : undefined}
+                  className={cn(
+                    "relative flex items-center rounded-xl text-sm transition-all duration-200 group",
+                    collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
+                    ativo
+                      ? "bg-gr-500/[0.12] text-white font-medium"
+                      : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
+                  )}
                 >
-                  <item.icon size={17} className="flex-shrink-0" />
-                  {!collapsed && <span className="flex-1">{item.label}</span>}
-                  {!collapsed && item.href === "/solicitacoes" && pendentes > 0 && (
-                    <span className="ml-auto text-[10px] font-bold bg-amber-500 text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
-                      {pendentes > 99 ? "99+" : pendentes}
+                  {/* Left accent line on active */}
+                  {ativo && !collapsed && (
+                    <span className="absolute left-0 inset-y-2 w-[2px] rounded-full bg-gr-400 shadow-[0_0_8px_rgba(100,96,228,0.6)]" />
+                  )}
+
+                  <item.icon
+                    size={15}
+                    className={cn(
+                      "flex-shrink-0 transition-all duration-200",
+                      ativo
+                        ? "text-gr-400"
+                        : "text-slate-500 group-hover:text-slate-300"
+                    )}
+                  />
+
+                  {!collapsed && (
+                    <span className="flex-1 truncate">{item.label}</span>
+                  )}
+
+                  {/* Badge expanded */}
+                  {!collapsed && hasBadge && (
+                    <span className={cn(
+                      "ml-auto text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none",
+                      badgeColor
+                    )}>
+                      {badgeCount > 99 ? "99+" : badgeCount}
                     </span>
                   )}
-                  {collapsed && item.href === "/solicitacoes" && pendentes > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-amber-500 rounded-full" />
-                  )}
-                  {!collapsed && item.href === "/pendencias" && promessasHoje > 0 && (
-                    <span className="ml-auto text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none">
-                      {promessasHoje > 99 ? "99+" : promessasHoje}
-                    </span>
-                  )}
-                  {collapsed && item.href === "/pendencias" && promessasHoje > 0 && (
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+
+                  {/* Badge collapsed dot */}
+                  {collapsed && hasBadge && (
+                    <span className={cn(
+                      "absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full",
+                      badgeColor
+                    )} />
                   )}
                 </Link>
               </li>
@@ -191,20 +219,20 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
         </ul>
       </nav>
 
-      {/* Filtro de frente — visível só para GESTOR e ADMIN */}
+      {/* Frente filter ─────────────────────────────────────────── */}
       {["ADMINISTRADOR", "GESTOR"].includes(perfil) && (
-        <div className={cn("border-t border-gr-900/60", collapsed ? "p-2" : "p-3")}>
+        <div className={cn(
+          "border-t border-white/[0.04]",
+          collapsed ? "p-2" : "p-3"
+        )}>
           {!collapsed ? (
             <div>
               <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-1.5">
-                  <Filter size={11} className="text-slate-500" />
-                  <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Filtrar frente</span>
-                </div>
+                <span className="text-[9px] text-slate-600 font-semibold uppercase tracking-[0.15em]">Frente</span>
                 {equipeIds.length > 0 && (
                   <button
                     onClick={clearFilter}
-                    className="text-[9px] text-slate-500 hover:text-slate-300 transition-colors"
+                    className="text-[9px] text-slate-600 hover:text-gr-400 transition-colors"
                   >
                     limpar
                   </button>
@@ -218,10 +246,10 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                       key={chip.id}
                       onClick={() => toggleEquipe(chip.id)}
                       className={cn(
-                        "px-2 py-0.5 rounded-full text-[10px] font-medium transition-colors border",
+                        "px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all border",
                         ativo
-                          ? "bg-gr-500/20 text-gr-300 border-gr-500/40"
-                          : "bg-slate-800 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-slate-300"
+                          ? "bg-gr-500/15 text-gr-300 border-gr-500/30 shadow-[0_0_8px_rgba(100,96,228,0.15)]"
+                          : "bg-white/[0.02] text-slate-500 border-white/[0.05] hover:text-slate-300 hover:border-white/[0.09] hover:bg-white/[0.04]"
                       )}
                     >
                       {chip.label}
@@ -230,18 +258,24 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                 })}
               </div>
               {equipeIds.length === 0 && (
-                <p className="text-[9px] text-slate-400 mt-1.5">Nenhum selecionado = todas</p>
+                <p className="text-[9px] text-slate-600 mt-1.5">Todas as frentes</p>
               )}
             </div>
           ) : (
             <button
-              title={equipeIds.length > 0 ? equipeIds.map(id => FRENTE_CHIPS.find(c => c.id === id)?.label).join(", ") : "Todas as frentes"}
+              title={
+                equipeIds.length > 0
+                  ? equipeIds.map((id) => FRENTE_CHIPS.find((c) => c.id === id)?.label).join(", ")
+                  : "Todas as frentes"
+              }
               className={cn(
-                "relative w-full flex justify-center p-1.5 rounded-lg transition-colors",
-                equipeIds.length > 0 ? "text-gr-400 bg-gr-500/10" : "text-slate-500 hover:text-slate-300"
+                "relative w-full flex justify-center p-2 rounded-lg transition-all",
+                equipeIds.length > 0
+                  ? "text-gr-400 bg-gr-500/10"
+                  : "text-slate-600 hover:text-slate-300 hover:bg-white/[0.04]"
               )}
             >
-              <Filter size={14} />
+              <SlidersHorizontal size={14} />
               {equipeIds.length > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-gr-500 rounded-full text-[8px] text-white flex items-center justify-center font-bold leading-none">
                   {equipeIds.length}
@@ -252,19 +286,27 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
         </div>
       )}
 
-      {/* Badge de perfil */}
+      {/* Profile badge ──────────────────────────────────────────── */}
       {!collapsed && (
-        <div className="p-4 border-t border-gr-900/60">
-          <span className={cn(
-            "text-xs px-2.5 py-1 rounded-full font-medium",
-            perfil === "ADMINISTRADOR" && "bg-gr-500/15 text-gr-300 border border-gr-500/20",
-            perfil === "GESTOR"        && "bg-amber-500/10 text-amber-400",
-            perfil === "CONSULTOR"     && "bg-teal-500/10 text-teal-400",
-          )}>
-            {perfil === "ADMINISTRADOR" && "Administrador"}
-            {perfil === "GESTOR"        && "Gestor"}
-            {perfil === "CONSULTOR"     && "Consultor"}
-          </span>
+        <div className="p-3 border-t border-white/[0.04]">
+          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-white/[0.025] border border-white/[0.05]">
+            <div className={cn(
+              "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0",
+              perfil === "ADMINISTRADOR" && "bg-gr-500/20 text-gr-300",
+              perfil === "GESTOR"        && "bg-amber-500/20 text-amber-400",
+              perfil === "CONSULTOR"     && "bg-teal-500/20 text-teal-400",
+            )}>
+              {perfil === "ADMINISTRADOR" ? "A" : perfil === "GESTOR" ? "G" : "C"}
+            </div>
+            <span className={cn(
+              "text-xs font-medium",
+              perfil === "ADMINISTRADOR" && "text-gr-300",
+              perfil === "GESTOR"        && "text-amber-400",
+              perfil === "CONSULTOR"     && "text-teal-400",
+            )}>
+              {perfil === "ADMINISTRADOR" ? "Administrador" : perfil === "GESTOR" ? "Gestor" : "Consultor"}
+            </span>
+          </div>
         </div>
       )}
     </aside>
