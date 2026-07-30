@@ -25,35 +25,42 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row overflow-hidden bg-[#070b14]">
+    /* ── Wrapper global — gradiente e glows cobrem TODA a tela ── */
+    <div className="relative min-h-screen flex flex-col lg:flex-row overflow-hidden"
+      style={{ background: "linear-gradient(145deg, #1a1438 0%, #0f0c24 40%, #16102e 100%)" }}>
 
-      {/* ── Painel esquerdo — Brand ────────────────────────────────── */}
-      <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16 overflow-hidden"
-        style={{ background: "linear-gradient(145deg, #1a1438 0%, #0f0c24 40%, #16102e 100%)" }}>
+      {/* Ambient glows — espalham por toda a tela */}
+      <div className="absolute inset-0 pointer-events-none">
+        {/* Roxo violeta oficial — canto superior esquerdo */}
+        <div className="absolute top-0 left-0 w-[700px] h-[700px] rounded-full opacity-35"
+          style={{ background: "radial-gradient(circle, rgba(76,61,141,0.5) 0%, transparent 65%)", transform: "translate(-30%, -30%)" }} />
+        {/* Laranja oficial — canto inferior esquerdo */}
+        <div className="absolute bottom-0 left-[20%] w-[500px] h-[500px] rounded-full opacity-20"
+          style={{ background: "radial-gradient(circle, rgba(219,130,78,0.4) 0%, transparent 65%)", transform: "translateY(30%)" }} />
+        {/* Rosa oficial — centro */}
+        <div className="absolute top-1/2 left-1/2 w-[400px] h-[400px] rounded-full opacity-10"
+          style={{ background: "radial-gradient(circle, rgba(209,81,122,0.35) 0%, transparent 65%)", transform: "translate(-50%, -50%)" }} />
+        {/* Teal — canto inferior direito */}
+        <div className="absolute bottom-0 right-0 w-[450px] h-[450px] rounded-full opacity-12"
+          style={{ background: "radial-gradient(circle, rgba(106,176,160,0.3) 0%, transparent 65%)", transform: "translate(20%, 30%)" }} />
+      </div>
 
-        {/* Ambient gradients — usando cores oficiais GR */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Roxo violeta oficial #4c3d8d */}
-          <div className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full opacity-40"
-            style={{ background: "radial-gradient(circle, rgba(76,61,141,0.5) 0%, transparent 65%)", transform: "translate(-30%, -30%)" }} />
-          {/* Laranja oficial #db824e */}
-          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-25"
-            style={{ background: "radial-gradient(circle, rgba(219,130,78,0.45) 0%, transparent 65%)", transform: "translate(30%, 30%)" }} />
-          {/* Rosa oficial #d1517a */}
-          <div className="absolute top-1/2 right-0 w-[350px] h-[350px] rounded-full opacity-15"
-            style={{ background: "radial-gradient(circle, rgba(209,81,122,0.4) 0%, transparent 65%)", transform: "translate(20%, -50%)" }} />
-          {/* Teal oficial #6ab0a0 */}
-          <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[300px] rounded-full opacity-10"
-            style={{ background: "radial-gradient(circle, rgba(106,176,160,0.4) 0%, transparent 65%)" }} />
-        </div>
+      {/* Grid sutil sobre toda a tela */}
+      <div className="absolute inset-0 opacity-[0.025] pointer-events-none"
+        style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
 
-        {/* Grid sutil */}
-        <div className="absolute inset-0 opacity-[0.03]"
-          style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
+      {/* Fingerprint watermark — centralizado no painel esquerdo, atrás de tudo */}
+      <div className="absolute pointer-events-none select-none opacity-[0.055]"
+        style={{ top: "50%", left: "28%", transform: "translate(-50%, -50%)" }}>
+        <Image src="/logo-gr-icon-branco.png" alt="" width={1100} height={1100} className="object-contain flex-shrink-0" />
+      </div>
+
+      {/* ── Painel esquerdo — Brand (transparente) ──────────────── */}
+      <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16">
 
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
-          {/* Logo em card com leve glassmorphism */}
+          {/* Logo */}
           <div className="mb-10 px-8 py-5 rounded-3xl inline-block"
             style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 8px 40px rgba(76,61,141,0.35), 0 2px 8px rgba(0,0,0,0.3)" }}>
             <Image src="/logo-gr.png" alt="GR Group" width={220} height={64} className="block" priority />
@@ -83,27 +90,21 @@ export default function LoginPage() {
             ))}
           </div>
 
-          {/* Linha separadora com cor brand */}
+          {/* Barra de cores da marca */}
           <div className="mt-8 flex items-center gap-1 opacity-40">
             {["#db824e","#d1517a","#9f5697","#4c3d8d","#516cb1","#6ab0a0"].map((c) => (
               <div key={c} className="h-0.5 w-6 rounded-full" style={{ background: c }} />
             ))}
           </div>
         </div>
-
-        {/* Watermark fingerprint — centrado, cobre todo o painel */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.09]">
-          <Image src="/logo-gr-icon-branco.png" alt="" width={720} height={720} className="object-contain" />
-        </div>
       </div>
 
-      {/* ── Painel direito — Formulário ────────────────────────────── */}
-      <div className="relative flex-1 flex flex-col items-center justify-center p-8 bg-[#070b14]"
-        style={{ borderLeft: "1px solid rgba(76,61,141,0.15)" }}>
+      {/* ── Painel direito — Formulário (transparente) ───────────── */}
+      <div className="relative flex-1 flex flex-col items-center justify-center p-8">
 
-        {/* Subtle brand glow top */}
-        <div className="absolute top-0 left-0 right-0 h-48 pointer-events-none"
-          style={{ background: "linear-gradient(180deg, rgba(76,61,141,0.06) 0%, transparent 100%)" }} />
+        {/* Divisor vertical sutil */}
+        <div className="hidden lg:block absolute left-0 top-[10%] bottom-[10%] w-px"
+          style={{ background: "linear-gradient(180deg, transparent, rgba(76,61,141,0.25) 30%, rgba(76,61,141,0.25) 70%, transparent)" }} />
 
         {/* Logo mobile */}
         <div className="lg:hidden mb-8">
@@ -130,11 +131,8 @@ export default function LoginPage() {
           <p className="text-slate-500 text-sm mb-8">Entre com suas credenciais para continuar.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
             <div>
-              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">
-                Email
-              </label>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
@@ -142,18 +140,15 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 placeholder="seu@grgroup.org"
-                className="w-full bg-[#0b0f1c] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all"
-                style={{ border: "1px solid rgba(76,61,141,0.2)" }}
-                onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.55)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.08)"; }}
-                onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.2)"; e.target.style.boxShadow = "none"; }}
+                className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all"
+                style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(76,61,141,0.25)", backdropFilter: "blur(8px)" }}
+                onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.6)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.1)"; }}
+                onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.25)"; e.target.style.boxShadow = "none"; }}
               />
             </div>
 
-            {/* Senha */}
             <div>
-              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">
-                Senha
-              </label>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Senha</label>
               <div className="relative">
                 <input
                   type={mostrar ? "text" : "password"}
@@ -162,17 +157,13 @@ export default function LoginPage() {
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full bg-[#0b0f1c] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all pr-10"
-                  style={{ border: "1px solid rgba(76,61,141,0.2)" }}
-                  onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.55)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.08)"; }}
-                  onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.2)"; e.target.style.boxShadow = "none"; }}
+                  className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all pr-10"
+                  style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(76,61,141,0.25)", backdropFilter: "blur(8px)" }}
+                  onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.6)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.1)"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.25)"; e.target.style.boxShadow = "none"; }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setMostrar((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors"
-                  tabIndex={-1}
-                >
+                <button type="button" onClick={() => setMostrar((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300 transition-colors" tabIndex={-1}>
                   {mostrar ? <EyeOff size={15} /> : <Eye size={15} />}
                 </button>
               </div>
@@ -198,11 +189,6 @@ export default function LoginPage() {
           <p className="text-center text-slate-700 text-[10px] mt-10 tracking-wide">
             © {new Date().getFullYear()} GR Group · Todos os direitos reservados
           </p>
-        </div>
-
-        {/* Watermark fingerprint */}
-        <div className="absolute bottom-0 right-0 opacity-[0.04] pointer-events-none overflow-hidden">
-          <Image src="/logo-gr-icon.png" alt="" width={220} height={220} />
         </div>
       </div>
     </div>
