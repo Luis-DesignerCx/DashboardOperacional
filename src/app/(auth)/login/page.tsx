@@ -8,10 +8,10 @@ import { Eye, EyeOff } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail]         = useState("");
-  const [senha, setSenha]         = useState("");
-  const [mostrar, setMostrar]     = useState(false);
-  const [erro, setErro]           = useState("");
+  const [email, setEmail]           = useState("");
+  const [senha, setSenha]           = useState("");
+  const [mostrar, setMostrar]       = useState(false);
+  const [erro, setErro]             = useState("");
   const [carregando, setCarregando] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -28,31 +28,40 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col lg:flex-row overflow-hidden bg-[#070b14]">
 
       {/* ── Painel esquerdo — Brand ────────────────────────────────── */}
-      <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16 overflow-hidden bg-[#06080e]">
+      <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16 overflow-hidden"
+        style={{ background: "linear-gradient(145deg, #1a1438 0%, #0f0c24 40%, #16102e 100%)" }}>
 
-        {/* Ambient gradients */}
+        {/* Ambient gradients — usando cores oficiais GR */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full opacity-30"
-            style={{ background: "radial-gradient(circle, rgba(100,96,228,0.35) 0%, transparent 65%)", transform: "translate(-30%, -30%)" }} />
-          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-20"
-            style={{ background: "radial-gradient(circle, rgba(56,189,248,0.3) 0%, transparent 65%)", transform: "translate(30%, 30%)" }} />
-          <div className="absolute top-1/2 right-0 w-[400px] h-[400px] rounded-full opacity-15"
-            style={{ background: "radial-gradient(circle, rgba(155,77,184,0.35) 0%, transparent 65%)", transform: "translate(20%, -50%)" }} />
+          {/* Roxo violeta oficial #4c3d8d */}
+          <div className="absolute top-0 left-0 w-[600px] h-[600px] rounded-full opacity-40"
+            style={{ background: "radial-gradient(circle, rgba(76,61,141,0.5) 0%, transparent 65%)", transform: "translate(-30%, -30%)" }} />
+          {/* Laranja oficial #db824e */}
+          <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full opacity-25"
+            style={{ background: "radial-gradient(circle, rgba(219,130,78,0.45) 0%, transparent 65%)", transform: "translate(30%, 30%)" }} />
+          {/* Rosa oficial #d1517a */}
+          <div className="absolute top-1/2 right-0 w-[350px] h-[350px] rounded-full opacity-15"
+            style={{ background: "radial-gradient(circle, rgba(209,81,122,0.4) 0%, transparent 65%)", transform: "translate(20%, -50%)" }} />
+          {/* Teal oficial #6ab0a0 */}
+          <div className="absolute bottom-1/4 left-1/4 w-[300px] h-[300px] rounded-full opacity-10"
+            style={{ background: "radial-gradient(circle, rgba(106,176,160,0.4) 0%, transparent 65%)" }} />
         </div>
 
         {/* Grid sutil */}
-        <div className="absolute inset-0 opacity-[0.025]"
-          style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
+        <div className="absolute inset-0 opacity-[0.03]"
+          style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
 
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
-          <div className="bg-white rounded-3xl p-5 shadow-2xl shadow-black/50 mb-10 inline-block">
-            <Image src="/logo-gr.png" alt="GR Group" width={240} height={70} className="block" priority />
+          {/* Logo em card com leve glassmorphism */}
+          <div className="mb-10 px-8 py-5 rounded-3xl inline-block"
+            style={{ background: "rgba(255,255,255,0.92)", boxShadow: "0 8px 40px rgba(76,61,141,0.35), 0 2px 8px rgba(0,0,0,0.3)" }}>
+            <Image src="/logo-gr.png" alt="GR Group" width={220} height={64} className="block" priority />
           </div>
 
           <h1 className="text-4xl font-bold text-white leading-tight tracking-tight mb-4">
             Gestão de Cobrança<br />
-            <span className="bg-gradient-to-r from-gr-400 via-gr-300 to-sky-300 bg-clip-text text-transparent">
+            <span style={{ background: "linear-gradient(90deg, #db824e, #9f5697, #516cb1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
               em tempo real
             </span>
           </h1>
@@ -73,19 +82,28 @@ export default function LoginPage() {
               </div>
             ))}
           </div>
+
+          {/* Linha separadora com cor brand */}
+          <div className="mt-8 flex items-center gap-1 opacity-40">
+            {["#db824e","#d1517a","#9f5697","#4c3d8d","#516cb1","#6ab0a0"].map((c) => (
+              <div key={c} className="h-0.5 w-6 rounded-full" style={{ background: c }} />
+            ))}
+          </div>
         </div>
 
-        {/* Watermark */}
-        <div className="absolute bottom-[-30px] left-[-30px] opacity-[0.04] pointer-events-none">
-          <Image src="/logo-gr-icon-branco.png" alt="" width={280} height={280} />
+        {/* Watermark fingerprint */}
+        <div className="absolute bottom-[-20px] left-[-20px] opacity-[0.06] pointer-events-none">
+          <Image src="/logo-gr-icon.png" alt="" width={260} height={260} />
         </div>
       </div>
 
       {/* ── Painel direito — Formulário ────────────────────────────── */}
-      <div className="relative flex-1 flex flex-col items-center justify-center p-8 bg-[#070b14] border-l border-white/[0.05]">
+      <div className="relative flex-1 flex flex-col items-center justify-center p-8 bg-[#070b14]"
+        style={{ borderLeft: "1px solid rgba(76,61,141,0.15)" }}>
 
-        {/* Subtle top glow */}
-        <div className="absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-gr-500/[0.04] to-transparent pointer-events-none" />
+        {/* Subtle brand glow top */}
+        <div className="absolute top-0 left-0 right-0 h-48 pointer-events-none"
+          style={{ background: "linear-gradient(180deg, rgba(76,61,141,0.06) 0%, transparent 100%)" }} />
 
         {/* Logo mobile */}
         <div className="lg:hidden mb-8">
@@ -95,10 +113,11 @@ export default function LoginPage() {
         </div>
 
         <div className="relative z-10 w-full max-w-sm">
-          {/* Ícone + título */}
+          {/* Badge */}
           <div className="flex items-center gap-3 mb-8">
-            <div className="relative w-10 h-10 rounded-xl overflow-hidden ring-1 ring-gr-500/25 flex-shrink-0">
-              <div className="absolute inset-0 bg-gradient-to-br from-gr-500/20 to-gr-900/40" />
+            <div className="relative w-10 h-10 rounded-xl overflow-hidden flex-shrink-0"
+              style={{ boxShadow: "0 0 0 1px rgba(76,61,141,0.3)" }}>
+              <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(76,61,141,0.25), rgba(40,37,82,0.5))" }} />
               <Image src="/logo-gr-icon.png" alt="" width={40} height={40} className="relative z-10 w-full h-full object-contain" />
             </div>
             <div>
@@ -123,7 +142,10 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 placeholder="seu@grgroup.org"
-                className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all"
+                className="w-full bg-[#0b0f1c] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all"
+                style={{ border: "1px solid rgba(76,61,141,0.2)" }}
+                onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.55)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.08)"; }}
+                onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.2)"; e.target.style.boxShadow = "none"; }}
               />
             </div>
 
@@ -140,7 +162,10 @@ export default function LoginPage() {
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all pr-10"
+                  className="w-full bg-[#0b0f1c] rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all pr-10"
+                  style={{ border: "1px solid rgba(76,61,141,0.2)" }}
+                  onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.55)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.08)"; }}
+                  onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.2)"; e.target.style.boxShadow = "none"; }}
                 />
                 <button
                   type="button"
@@ -154,7 +179,8 @@ export default function LoginPage() {
             </div>
 
             {erro && (
-              <div className="text-red-400 text-xs bg-red-500/[0.08] border border-red-500/20 rounded-xl px-4 py-3">
+              <div className="text-red-400 text-xs rounded-xl px-4 py-3"
+                style={{ background: "rgba(209,81,122,0.07)", border: "1px solid rgba(209,81,122,0.2)" }}>
                 {erro}
               </div>
             )}
@@ -162,7 +188,8 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={carregando}
-              className="w-full bg-gradient-to-r from-gr-600 to-gr-500 hover:from-gr-500 hover:to-gr-400 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all text-sm shadow-glow-gr-sm mt-2 active:scale-[0.99]"
+              className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all text-sm mt-2 active:scale-[0.99]"
+              style={{ background: "linear-gradient(135deg, #4c3d8d, #6460e4)", boxShadow: "0 4px 20px rgba(76,61,141,0.35)" }}
             >
               {carregando ? "Entrando..." : "Entrar na plataforma"}
             </button>
@@ -173,9 +200,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Watermark */}
+        {/* Watermark fingerprint */}
         <div className="absolute bottom-0 right-0 opacity-[0.04] pointer-events-none overflow-hidden">
-          <Image src="/logo-gr-icon-branco.png" alt="" width={240} height={240} />
+          <Image src="/logo-gr-icon.png" alt="" width={220} height={220} />
         </div>
       </div>
     </div>

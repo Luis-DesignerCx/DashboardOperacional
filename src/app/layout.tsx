@@ -19,6 +19,12 @@ const sora = localFont({
 export const metadata: Metadata = {
   title: "DASH CR — GR Group",
   description: "Plataforma de Gestão de Cobrança, Carteira e Performance",
+  icons: {
+    icon: [
+      { url: "/logo-gr-icon.png", type: "image/png" },
+    ],
+    apple: "/logo-gr-icon.png",
+  },
 };
 
 export default function RootLayout({

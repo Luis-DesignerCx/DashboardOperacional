@@ -106,16 +106,16 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
         collapsed ? "w-[60px]" : "w-60"
       )}
     >
-      {/* Ambient top glow */}
-      <div className="pointer-events-none absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-gr-500/[0.06] to-transparent" />
+      {/* Ambient top glow — roxo brand #4c3d8d */}
+      <div className="pointer-events-none absolute top-0 left-0 right-0 h-64 bg-gradient-to-b from-brand-purple/[0.08] to-transparent" />
 
       {/* Logo ──────────────────────────────────────────────────── */}
       <div className={cn(
         "relative flex items-center h-16 border-b border-white/[0.05] flex-shrink-0",
         collapsed ? "justify-center px-0" : "px-4 gap-2.5"
       )}>
-        <div className="relative flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden ring-1 ring-gr-500/20">
-          <div className="absolute inset-0 bg-gradient-to-br from-gr-500/20 to-gr-900/40" />
+        <div className="relative flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden ring-1 ring-brand-purple/30">
+          <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(76,61,141,0.3), rgba(40,37,82,0.5))" }} />
           <Image
             src="/logo-gr-icon.png"
             alt="GR Group"
@@ -127,7 +127,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
         {!collapsed && (
           <div className="flex-1 min-w-0 leading-tight">
             <p className="text-white font-bold text-sm tracking-tight">DASH CR</p>
-            <p className="text-gr-400/60 text-[9px] font-semibold tracking-[0.18em] uppercase">GR Group</p>
+            <p className="text-brand-violet/70 text-[9px] font-semibold tracking-[0.18em] uppercase">GR Group</p>
           </div>
         )}
 
@@ -248,7 +248,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                       className={cn(
                         "px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all border",
                         ativo
-                          ? "bg-gr-500/15 text-gr-300 border-gr-500/30 shadow-[0_0_8px_rgba(100,96,228,0.15)]"
+                          ? "bg-brand-purple/15 text-brand-violet border-brand-purple/30 shadow-[0_0_8px_rgba(76,61,141,0.2)]"
                           : "bg-white/[0.02] text-slate-500 border-white/[0.05] hover:text-slate-300 hover:border-white/[0.09] hover:bg-white/[0.04]"
                       )}
                     >
@@ -292,7 +292,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
           <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-white/[0.025] border border-white/[0.05]">
             <div className={cn(
               "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0",
-              perfil === "ADMINISTRADOR" && "bg-gr-500/20 text-gr-300",
+              perfil === "ADMINISTRADOR" && "bg-brand-purple/20 text-brand-violet",
               perfil === "GESTOR"        && "bg-amber-500/20 text-amber-400",
               perfil === "CONSULTOR"     && "bg-teal-500/20 text-teal-400",
             )}>
@@ -300,7 +300,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
             </div>
             <span className={cn(
               "text-xs font-medium",
-              perfil === "ADMINISTRADOR" && "text-gr-300",
+              perfil === "ADMINISTRADOR" && "text-brand-violet",
               perfil === "GESTOR"        && "text-amber-400",
               perfil === "CONSULTOR"     && "text-teal-400",
             )}>
