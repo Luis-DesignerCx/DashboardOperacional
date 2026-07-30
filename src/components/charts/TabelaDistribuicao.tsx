@@ -115,7 +115,7 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
             });
 
             return (
-              <div key={frente.equipeId} className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+              <div key={frente.equipeId} className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <span className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", style.dot)} />
@@ -179,7 +179,7 @@ export function TabelaDistribuicao({ competenciaId, equipeIds, unificar91Plus }:
 
       {/* Tabela por empresa */}
       {porEmpresa.length > 0 && (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-4">
             <Building2 size={14} className="text-slate-500" />
             <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Distribuição por Empresa</h2>

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -64,7 +64,7 @@ function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; fre
   );
 }
 
-const inputCls = "w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
+const inputCls = "w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
 
 export default function UsuariosPage() {
   const { data: session } = useSession();
@@ -200,7 +200,7 @@ export default function UsuariosPage() {
       </div>
 
       {/* Tabela */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-white/[0.06]">
@@ -282,7 +282,7 @@ export default function UsuariosPage() {
       {/* Modal criar / editar */}
       {(modal === "criar" || modal === "editar") && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">{modal === "criar" ? "Novo Usuário" : "Editar Usuário"}</h2>
@@ -319,7 +319,7 @@ export default function UsuariosPage() {
               {(meuPerfil === "ADMINISTRADOR" || meuPerfil === "GESTOR") && (
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Frentes de cobrança</label>
-                  <div className="space-y-1.5 bg-[#0b0f1c]/50 border border-white/[0.08]/50 rounded-xl p-3">
+                  <div className="space-y-1.5 bg-surface-1/50 border border-white/[0.08]/50 rounded-xl p-3">
                     {frentesDisponiveis.length === 0 && (
                       <p className="text-slate-500 text-xs text-center py-1">Nenhuma frente cadastrada</p>
                     )}
@@ -350,7 +350,7 @@ export default function UsuariosPage() {
             </div>
             <div className="flex gap-3 px-5 pb-5">
               <button onClick={() => setModal(null)}
-                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={salvar} disabled={carregando || !form.nome || !form.email}
@@ -365,7 +365,7 @@ export default function UsuariosPage() {
       {/* Modal redefinir senha */}
       {modal === "senha" && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Redefinir senha</h2>
@@ -392,7 +392,7 @@ export default function UsuariosPage() {
               {erro && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{erro}</p>}
               <div className="flex gap-3">
                 <button onClick={() => setModal(null)}
-                  className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                  className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                   Cancelar
                 </button>
                 <button onClick={redefinirSenha} disabled={carregando || !novaSenha}
@@ -408,12 +408,12 @@ export default function UsuariosPage() {
       {/* Confirmação exclusão */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             <h2 className="text-white font-semibold">Excluir usuário?</h2>
             <p className="text-slate-400 text-sm">O usuário será desativado e não conseguirá mais acessar o sistema.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(null)}
-                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={() => excluir(confirmDelete)}

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -109,13 +109,13 @@ export default function HistoricoPage() {
       </div>
 
       {dados.length === 0 ? (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-12 text-center">
           <FileSpreadsheet size={40} className="text-slate-700 mx-auto mb-3" />
           <p className="text-slate-400 font-medium">Nenhuma competência encontrada</p>
           <p className="text-slate-400 text-sm mt-1">Importe uma planilha para começar.</p>
         </div>
       ) : (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">

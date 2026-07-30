@@ -33,8 +33,8 @@ export function AlterarSenhaModal() {
   }
 
   return (
-    <div className="fixed inset-0 bg-[#070b14]/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-      <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-card-lg animate-fade-in-up">
+    <div className="fixed inset-0 bg-surface-0/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+      <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-md shadow-card-lg animate-fade-in-up">
         {/* Header */}
         <div className="p-6 border-b border-white/[0.06] text-center">
           <div className="w-12 h-12 bg-gr-500/10 border border-gr-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -58,7 +58,7 @@ export function AlterarSenhaModal() {
                 value={novaSenha}
                 onChange={(e) => setNovaSenha(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
-                className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm pr-10 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all placeholder:text-slate-600"
+                className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm pr-10 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all placeholder:text-slate-600"
               />
               <button
                 type="button"
@@ -79,7 +79,7 @@ export function AlterarSenhaModal() {
               value={confirmar}
               onChange={(e) => setConfirmar(e.target.value)}
               placeholder="Repita a senha"
-              className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all placeholder:text-slate-600"
+              className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all placeholder:text-slate-600"
             />
           </div>
 

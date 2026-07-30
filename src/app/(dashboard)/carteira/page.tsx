@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
@@ -131,7 +131,7 @@ function diasAtrasoColor(dias: number | null) {
   return "text-red-400";
 }
 
-const inputCls = "w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
+const inputCls = "w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
 
 export default function CarteiraPage() {
   const { data: session } = useSession();
@@ -673,7 +673,7 @@ export default function CarteiraPage() {
           <select
             value={competenciaId}
             onChange={(e) => setCompetenciaId(e.target.value)}
-            className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+            className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           >
             {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
           </select>
@@ -689,13 +689,13 @@ export default function CarteiraPage() {
             placeholder="Buscar por cliente ou contrato..."
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            className="w-full bg-[#0f1525] border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+            className="w-full bg-surface-2 border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           />
         </div>
         <select
           value={statusRecupFiltro ?? ""}
           onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
-          className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+          className="bg-surface-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
         >
           <option value="">Recuperação — todas</option>
           <option value="RECUPERADO_INTEGRALMENTE">Recebido</option>
@@ -705,7 +705,7 @@ export default function CarteiraPage() {
         <select
           value={situacaoFiltro ?? ""}
           onChange={(e) => setSituacaoFiltro(e.target.value || null)}
-          className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+          className="bg-surface-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
         >
           <option value="">Situação — todas</option>
           <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
@@ -718,7 +718,7 @@ export default function CarteiraPage() {
           <select
             value={sort}
             onChange={(e) => setSort(e.target.value)}
-            className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+            className="bg-surface-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           >
             <option value="diasAtraso">Dias em atraso</option>
             <option value="parcelasAtraso">Parcelas em atraso</option>
@@ -760,7 +760,7 @@ export default function CarteiraPage() {
           <div className="w-8 h-8 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtrados.length === 0 ? (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-12 text-center">
           <AlertCircle size={32} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-500 text-sm">{busca ? "Nenhum resultado para a busca" : "Nenhum contrato na carteira"}</p>
           <p className="text-slate-400 text-xs mt-1">Use os botões acima para adicionar clientes manualmente</p>
@@ -774,7 +774,7 @@ export default function CarteiraPage() {
                 <div className="flex items-center gap-2 mb-2">
                   <span className={`text-xs font-bold uppercase tracking-wider ${faixaInfo.cor}`}>{faixaLabel}</span>
                   <span className="text-xs text-slate-400">· {porFaixa[faixaLabel].length} contrato{porFaixa[faixaLabel].length !== 1 ? "s" : ""}</span>
-                  <div className="flex-1 h-px bg-[#0b0f1c] ml-1" />
+                  <div className="flex-1 h-px bg-surface-1 ml-1" />
                 </div>
                 <div className="space-y-2">
                   {porFaixa[faixaLabel].map((item) => {
@@ -788,7 +788,7 @@ export default function CarteiraPage() {
                     const temRemanejada = c.parcelas.some((p) => p.remanejada);
 
                     return (
-                      <div key={item.id} className="bg-[#0f1525] border border-white/[0.06] hover:border-white/[0.08] rounded-xl p-4 transition-colors group">
+                      <div key={item.id} className="bg-surface-2 border border-white/[0.06] hover:border-white/[0.08] rounded-xl p-4 transition-colors group">
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -930,7 +930,7 @@ export default function CarteiraPage() {
           <button
             onClick={() => carregarPagina(competenciaId, pagina + 1, true, busca, sort)}
             disabled={carregandoMais}
-            className="flex items-center gap-2 bg-[#0b0f1c] hover:bg-white/[0.04] disabled:opacity-50 text-slate-300 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
+            className="flex items-center gap-2 bg-surface-1 hover:bg-white/[0.04] disabled:opacity-50 text-slate-300 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
           >
             {carregandoMais
               ? <><Loader2 size={14} className="animate-spin" /> Carregando...</>
@@ -943,7 +943,7 @@ export default function CarteiraPage() {
       {/* Modal: Receber de outra carteira */}
       {modal === "externo" && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Receber de outra carteira</h2>
@@ -961,7 +961,7 @@ export default function CarteiraPage() {
                 <p className="text-slate-400 text-sm">O gestor receberá a solicitação de transferência. Após aprovação, o cliente entrará na sua carteira.</p>
                 <button
                   onClick={() => setModal(null)}
-                  className="mt-2 w-full bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+                  className="mt-2 w-full bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
                 >
                   Fechar
                 </button>
@@ -997,7 +997,7 @@ export default function CarteiraPage() {
                             <button
                               key={ct.id}
                               onClick={() => setExternoContrato(ct)}
-                              className="w-full bg-[#0b0f1c] hover:bg-white/[0.04] rounded-xl px-4 py-3 text-left transition-colors"
+                              className="w-full bg-surface-1 hover:bg-white/[0.04] rounded-xl px-4 py-3 text-left transition-colors"
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div>
@@ -1069,7 +1069,7 @@ export default function CarteiraPage() {
                   <div className="flex gap-3">
                     <button
                       onClick={() => setModal(null)}
-                      className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+                      className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
                     >
                       Cancelar
                     </button>
@@ -1095,7 +1095,7 @@ export default function CarteiraPage() {
       {/* Modal: Detalhes A Parte */}
       {modalAParte && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Recebimentos A Parte</h2>
@@ -1188,7 +1188,7 @@ export default function CarteiraPage() {
               </div>
             </div>
             <div className="px-5 pb-5">
-              <button onClick={() => { setModalAParte(null); setEditandoAParte(null); }} className="w-full bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+              <button onClick={() => { setModalAParte(null); setEditandoAParte(null); }} className="w-full bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
             </div>
@@ -1199,7 +1199,7 @@ export default function CarteiraPage() {
       {/* Modal: Registrar recebimento */}
       {modal === "recebimento" && contratoRecebimento && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Registrar recebimento</h2>
@@ -1235,7 +1235,7 @@ export default function CarteiraPage() {
                               ? "bg-emerald-500/10 border-emerald-500/40 text-emerald-300"
                               : remanejada
                               ? "bg-amber-500/10 border-amber-500/40 text-amber-300"
-                              : "bg-[#0b0f1c] border-white/[0.08] text-slate-300"
+                              : "bg-surface-1 border-white/[0.08] text-slate-300"
                           }`}
                         >
                           <div className="flex items-center gap-2.5 flex-1 min-w-0">
@@ -1339,7 +1339,7 @@ export default function CarteiraPage() {
             <div className="flex gap-3 px-5 pb-5">
               <button
                 onClick={() => setModal(null)}
-                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+                className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
               >
                 Cancelar
               </button>
@@ -1361,7 +1361,7 @@ export default function CarteiraPage() {
       {/* Modal: Atendimento (histórico + novo contato) */}
       {modalAtend && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06] flex-shrink-0">
               <div>
                 <h2 className="text-white font-semibold flex items-center gap-2"><History size={16} className="text-sky-400" /> Atendimento</h2>
@@ -1457,7 +1457,7 @@ export default function CarteiraPage() {
 
             <div className="flex gap-3 p-5 border-t border-white/[0.06] flex-shrink-0">
               <button onClick={() => setModalAtend(null)}
-                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
               <button onClick={salvarAtendimento} disabled={salvandoAtend}
@@ -1472,7 +1472,7 @@ export default function CarteiraPage() {
       {/* Modal: Promessa rápida */}
       {modalPromRap && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold flex items-center gap-2"><Calendar size={16} className="text-purple-400" /> {promRapModo === "LINK" ? "Link de Pagamento Enviado" : "Promessa de Pagamento"}</h2>
@@ -1494,7 +1494,7 @@ export default function CarteiraPage() {
                       const vencLabel = `${String(venc.getUTCDate()).padStart(2,"0")}/${String(venc.getUTCMonth()+1).padStart(2,"0")}/${venc.getUTCFullYear()}`;
                       return (
                         <button key={p.id} type="button" onClick={() => toggleParcelaPromRap(p)}
-                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors ${checked ? "bg-purple-500/10 border-purple-500/40 text-purple-300" : "bg-[#0b0f1c] border-white/[0.08] text-slate-300 hover:border-white/[0.12]"}`}>
+                          className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border text-sm transition-colors ${checked ? "bg-purple-500/10 border-purple-500/40 text-purple-300" : "bg-surface-1 border-white/[0.08] text-slate-300 hover:border-white/[0.12]"}`}>
                           <div className="flex items-center gap-2.5">
                             <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${checked ? "bg-purple-500 border-purple-500" : "border-white/[0.12]"}`}>
                               {checked && <CheckCircle2 size={10} className="text-white" />}
@@ -1544,7 +1544,7 @@ export default function CarteiraPage() {
             </div>
             <div className="flex gap-3 px-5 pb-5">
               <button onClick={() => setModalPromRap(null)}
-                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={salvarPromessaRapida} disabled={salvandoPromRap}
@@ -1559,7 +1559,7 @@ export default function CarteiraPage() {
       {/* Modal: Novo cadastro */}
       {modal === "novo" && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Cadastrar novo cliente</h2>
@@ -1581,7 +1581,7 @@ export default function CarteiraPage() {
                     className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
                       novoForm.tipo === "inadimplencia"
                         ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
-                        : "bg-[#0b0f1c] border-white/[0.08] text-slate-400 hover:text-slate-300"
+                        : "bg-surface-1 border-white/[0.08] text-slate-400 hover:text-slate-300"
                     }`}
                   >
                     Inadimplência
@@ -1592,7 +1592,7 @@ export default function CarteiraPage() {
                     className={`py-2.5 rounded-xl text-sm font-medium border transition-all ${
                       novoForm.tipo === "a_parte"
                         ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
-                        : "bg-[#0b0f1c] border-white/[0.08] text-slate-400 hover:text-slate-300"
+                        : "bg-surface-1 border-white/[0.08] text-slate-400 hover:text-slate-300"
                     }`}
                   >
                     Recebimento a Parte
@@ -1787,7 +1787,7 @@ export default function CarteiraPage() {
             </div>
             <div className="flex gap-3 px-5 pb-5">
               <button onClick={() => { setModal(null); setNovoForm(NOVO_FORM_VAZIO); setNovoClienteEncontrado(false); }}
-                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={salvarNovoCliente} disabled={salvandoNovo}

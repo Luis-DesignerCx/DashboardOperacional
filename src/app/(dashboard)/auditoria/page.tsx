@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { formatarDataHora } from "@/lib/utils";
@@ -56,7 +56,7 @@ export default function AuditoriaPage() {
           placeholder="Filtrar por usuário, tabela ou ação..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          className="w-full bg-[#0f1525] border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className="w-full bg-surface-2 border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
         />
       </div>
 
@@ -65,7 +65,7 @@ export default function AuditoriaPage() {
           <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

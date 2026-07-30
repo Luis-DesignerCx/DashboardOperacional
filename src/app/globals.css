@@ -115,6 +115,66 @@ body {
   }
 }
 
+/* ── Tema claro ───────────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --background:    #f5f4ff;
+  --foreground:    #0f172a;
+  --surface-0:     #f5f4ff;
+  --surface-1:     #ffffff;
+  --surface-2:     #fafafe;
+  --surface-3:     #f0effc;
+  --border-subtle: rgba(76,61,141,0.1);
+  --border-mid:    rgba(76,61,141,0.2);
+  --gr-glow:       rgba(76,61,141,0.15);
+  --gr-glow-sm:    rgba(76,61,141,0.1);
+  --gr-glow-xs:    rgba(76,61,141,0.05);
+}
+
+/* Sidebar e Header */
+[data-theme="light"] aside {
+  background: var(--surface-3) !important;
+  border-right-color: var(--border-subtle) !important;
+}
+[data-theme="light"] header {
+  background: rgba(248,247,255,0.9) !important;
+  border-bottom-color: var(--border-subtle) !important;
+}
+
+/* Bordas brancas/opacas → roxo brand */
+[data-theme="light"] [class*="border-white"] {
+  border-color: var(--border-subtle) !important;
+}
+
+/* Fundos brancos/opacas → tinte roxo suave */
+[data-theme="light"] [class*="bg-white\/"] {
+  background-color: rgba(76,61,141,0.05) !important;
+}
+
+/* Texto: mapeamento equivalente de hierarquia dark→light */
+[data-theme="light"] .text-white   { color: #0f172a !important; }
+[data-theme="light"] .text-slate-200 { color: #1e293b !important; }
+[data-theme="light"] .text-slate-400 { color: #475569 !important; }
+[data-theme="light"] .text-slate-500 { color: #64748b !important; }
+[data-theme="light"] .text-slate-600 { color: #94a3b8 !important; }
+[data-theme="light"] .text-slate-700 { color: #cbd5e1 !important; }
+
+/* Botões com gradiente preservam texto branco */
+[data-theme="light"] button[style*="gradient"]     { color: #ffffff !important; }
+[data-theme="light"] a[style*="gradient"]          { color: #ffffff !important; }
+
+/* Placeholder */
+[data-theme="light"] ::placeholder { color: rgba(76,61,141,0.35) !important; }
+
+/* Scrollbar */
+[data-theme="light"] ::-webkit-scrollbar-thumb       { background: rgba(76,61,141,0.2); }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(76,61,141,0.4); }
+
+/* Select options */
+[data-theme="light"] select option {
+  background: #ffffff;
+  color: #0f172a;
+}
+
 /* ── Autofill fix ─────────────────────────────────────────────────────────── */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
@@ -124,6 +184,16 @@ input:-webkit-autofill:focus {
   caret-color:             var(--foreground);
   border-color:            rgba(100,96,228,0.35) !important;
   transition:              none;
+}
+
+/* Autofill no tema claro */
+[data-theme="light"] input:-webkit-autofill,
+[data-theme="light"] input:-webkit-autofill:hover,
+[data-theme="light"] input:-webkit-autofill:focus {
+  -webkit-box-shadow:      0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  caret-color:             #0f172a;
+  border-color:            rgba(76,61,141,0.35) !important;
 }
 
 /* ── Scrollbar ────────────────────────────────────────────────────────────── */

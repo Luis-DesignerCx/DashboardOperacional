@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
@@ -75,7 +75,7 @@ export function DashboardGestor() {
           <select
             value={competenciaId}
             onChange={(e) => { setCompetenciaId(e.target.value); carregarDashboard(e.target.value, equipeIds); }}
-            className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all"
+            className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all"
           >
             {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
           </select>
@@ -91,7 +91,7 @@ export function DashboardGestor() {
           { label: "Rec. a Parte",          valor: formatarMoeda(dados.recebimentoAParte ?? 0), cor: "text-sky-400" },
           { label: "% da Meta",             valor: `${pctMeta.toFixed(1)}%`,                   cor: pctMeta >= 100 ? "text-emerald-400" : pctMeta >= 70 ? "text-gr-400" : "text-slate-400" },
         ].map((kpi) => (
-          <div key={kpi.label} className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.09] transition-colors">
+          <div key={kpi.label} className="bg-surface-2 border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.09] transition-colors">
             <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide leading-tight">{kpi.label}</p>
             <p className={`text-lg font-bold mt-1.5 tabular-nums leading-none ${kpi.cor}`}>{kpi.valor}</p>
             {kpi.label === "Rec. a Parte" && <p className="text-xs text-slate-600 mt-1">pelo consultor</p>}
@@ -102,7 +102,7 @@ export function DashboardGestor() {
 
       {/* KPIs operacionais */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-[#0f1525] border border-emerald-500/20 rounded-2xl p-4">
+        <div className="bg-surface-2 border border-emerald-500/20 rounded-2xl p-4">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Regularizados</p>
@@ -115,7 +115,7 @@ export function DashboardGestor() {
           </div>
         </div>
 
-        <div className="bg-[#0f1525] border border-amber-500/20 rounded-2xl p-4">
+        <div className="bg-surface-2 border border-amber-500/20 rounded-2xl p-4">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Promessas Hoje</p>
@@ -128,7 +128,7 @@ export function DashboardGestor() {
           </div>
         </div>
 
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-4">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-4">
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Valor Agendado</p>
@@ -141,7 +141,7 @@ export function DashboardGestor() {
           </div>
         </div>
 
-        <div className={`bg-[#0f1525] rounded-2xl p-4 border ${dados.eficienciaHoje >= 80 ? "border-emerald-500/20" : dados.eficienciaHoje >= 50 ? "border-amber-500/20" : "border-white/[0.06]"}`}>
+        <div className={`bg-surface-2 rounded-2xl p-4 border ${dados.eficienciaHoje >= 80 ? "border-emerald-500/20" : dados.eficienciaHoje >= 50 ? "border-amber-500/20" : "border-white/[0.06]"}`}>
           <div className="flex items-start justify-between gap-2">
             <div>
               <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Eficiência do Dia</p>
@@ -159,7 +159,7 @@ export function DashboardGestor() {
 
       {/* Barra de meta */}
       {dados.metaAlvo && (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
           <div className="flex justify-between items-center mb-3">
             <p className="text-sm font-semibold text-white">Meta da Equipe</p>
             <span className={`text-sm font-bold tabular-nums ${pctMeta >= 100 ? "text-emerald-400" : "text-gr-400"}`}>{pctMeta.toFixed(1)}%</span>
@@ -174,7 +174,7 @@ export function DashboardGestor() {
       )}
 
       {/* Tarefas diárias */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Tarefas Diárias</h2>
         <div className="space-y-2">
           <Link href="/pendencias" className="flex items-center justify-between p-3.5 bg-amber-500/[0.07] border border-amber-500/20 rounded-xl hover:bg-amber-500/[0.11] transition-colors">
@@ -209,7 +209,7 @@ export function DashboardGestor() {
       </div>
 
       {/* Ranking consultores */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-4">
           <Award size={14} className="text-amber-400" />
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Ranking de Consultores</h2>

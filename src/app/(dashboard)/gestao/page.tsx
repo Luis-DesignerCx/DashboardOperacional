@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useFrente } from "@/contexts/FrenteContext";
@@ -139,14 +139,14 @@ export default function GestaoPage() {
   return (
     <div className="flex gap-0 h-[calc(100vh-4rem)] -m-6 overflow-hidden">
       {/* ── Sidebar: Frentes ── */}
-      <aside className="w-52 flex-shrink-0 border-r border-white/[0.06] bg-[#070b14]/50 flex flex-col">
+      <aside className="w-52 flex-shrink-0 border-r border-white/[0.06] bg-surface-0/50 flex flex-col">
         <div className="p-4 border-b border-white/[0.06]">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Frentes</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {visiveis.map((eq) => {
             const ativo = eq.id === equipeId;
-            const cor = FAIXA_COR[eq.tipo] ?? "text-slate-400 bg-[#0b0f1c] border-white/[0.08]";
+            const cor = FAIXA_COR[eq.tipo] ?? "text-slate-400 bg-surface-1 border-white/[0.08]";
             const qtd = eq.usuarios.filter((u) => u.perfil === "CONSULTOR").length;
             return (
               <button
@@ -191,7 +191,7 @@ export default function GestaoPage() {
           <select
             value={competenciaId}
             onChange={(e) => setCompetenciaId(e.target.value)}
-            className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+            className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           >
             {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
           </select>
@@ -219,22 +219,22 @@ export default function GestaoPage() {
         {/* Cards de totais */}
         {!carregando && filtrados.length > 0 && (
           <div className="grid grid-cols-4 gap-3 px-6 py-3 border-b border-white/[0.06] flex-shrink-0">
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-4 py-3">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Inadimplência total</p>
               <p className="text-lg font-bold text-white mt-0.5">{formatarMoeda(totalInad)}</p>
             </div>
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-4 py-3">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Total recebido</p>
               <p className="text-lg font-bold text-emerald-400 mt-0.5">{formatarMoeda(totalRec)}</p>
             </div>
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-4 py-3">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Total a parte</p>
               <p className="text-lg font-bold text-sky-400 mt-0.5">{formatarMoeda(totalAP)}</p>
             </div>
             <div className={`border rounded-xl px-4 py-3 ${
               eficiencia >= 80 ? "bg-emerald-500/10 border-emerald-500/20"
               : eficiencia >= 40 ? "bg-amber-500/10 border-amber-500/20"
-              : "bg-[#0f1525] border-white/[0.06]"
+              : "bg-surface-2 border-white/[0.06]"
             }`}>
               <div className="flex items-center gap-1.5">
                 <Activity size={12} className={eficiencia >= 80 ? "text-emerald-400" : eficiencia >= 40 ? "text-amber-400" : "text-slate-500"} />
@@ -258,7 +258,7 @@ export default function GestaoPage() {
               placeholder="Buscar consultor..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full bg-[#0f1525] border border-white/[0.06] rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+              className="w-full bg-surface-2 border border-white/[0.06] rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
             />
           </div>
         </div>
@@ -321,7 +321,7 @@ export default function GestaoPage() {
                       </button>
 
                       {expandido && (
-                        <div className="bg-[#070b14]/60 border-t border-white/[0.06]/50">
+                        <div className="bg-surface-0/60 border-t border-white/[0.06]/50">
                           <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2 border-b border-white/[0.06]/30">
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Empresa</span>
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>

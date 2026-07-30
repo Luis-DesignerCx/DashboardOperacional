@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
@@ -31,7 +31,7 @@ export default function RelatoriosPage() {
         <select
           value={competenciaId}
           onChange={(e) => setCompetenciaId(e.target.value)}
-          className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
         >
           {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
         </select>
@@ -53,7 +53,7 @@ export default function RelatoriosPage() {
 
           {/* Ranking empresas */}
           {dados.rankingEmpresas && dados.rankingEmpresas.length > 0 && (
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6">
               <h2 className="text-white font-semibold mb-5">Recuperação por Empresa</h2>
               <div className="space-y-4">
                 {dados.rankingEmpresas.map((e: any) => (
@@ -83,7 +83,7 @@ export default function RelatoriosPage() {
 
           {/* Ranking consultores */}
           {dados.rankingConsultores && dados.rankingConsultores.length > 0 && (
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6">
               <h2 className="text-white font-semibold mb-4">Ranking de Consultores</h2>
               <div className="space-y-2">
                 {dados.rankingConsultores.map((c: any, i: number) => (
@@ -106,13 +106,13 @@ export default function RelatoriosPage() {
 
 function Kpi({ titulo, valor, icon: Icon, cor = "text-white" }: any) {
   return (
-    <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+    <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-400 text-sm">{titulo}</p>
           <p className={`text-2xl font-bold mt-1 ${cor}`}>{valor}</p>
         </div>
-        <div className="p-2.5 rounded-xl bg-[#0b0f1c]">
+        <div className="p-2.5 rounded-xl bg-surface-1">
           <Icon size={18} className="text-slate-400" />
         </div>
       </div>

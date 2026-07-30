@@ -3,7 +3,8 @@
 import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { Perfil } from "@prisma/client";
-import { LogOut } from "lucide-react";
+import { LogOut, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface HeaderProps {
   user: { name?: string | null; email?: string | null; perfil: Perfil };
@@ -30,6 +31,7 @@ const PAGE_TITLES: Record<string, string> = {
 
 export function Header({ user }: HeaderProps) {
   const pathname = usePathname();
+  const { theme, toggle } = useTheme();
 
   const pageTitle = Object.entries(PAGE_TITLES).find(
     ([key]) => pathname === key || pathname.startsWith(key + "/")
@@ -64,6 +66,16 @@ export function Header({ user }: HeaderProps) {
             <p className="text-[10px] text-slate-500 leading-tight truncate max-w-[140px]">{user.email}</p>
           </div>
         </div>
+
+        <div className="w-px h-5 bg-white/[0.07]" />
+
+        <button
+          onClick={toggle}
+          className="flex items-center justify-center w-7 h-7 rounded-lg text-slate-500 hover:text-slate-200 hover:bg-white/[0.05] transition-all"
+          aria-label={theme === "dark" ? "Mudar para modo claro" : "Mudar para modo escuro"}
+        >
+          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
 
         <div className="w-px h-5 bg-white/[0.07]" />
 

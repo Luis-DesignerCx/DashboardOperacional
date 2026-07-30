@@ -144,7 +144,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
         {collapsed && (
           <button
             onClick={() => setCollapsed(false)}
-            className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-[#0b0f1c] border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-gr-500/40 transition-all shadow-card z-10"
+            className="absolute -right-3 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-surface-1 border border-white/10 flex items-center justify-center text-slate-400 hover:text-white hover:border-gr-500/40 transition-all shadow-card z-10"
             aria-label="Expandir sidebar"
           >
             <ChevronRight size={11} />

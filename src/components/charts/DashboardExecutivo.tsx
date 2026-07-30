@@ -83,7 +83,7 @@ export function DashboardExecutivo() {
         <select
           value={competenciaId}
           onChange={(e) => { setCompetenciaId(e.target.value); carregarDashboard(e.target.value, equipeIds); }}
-          className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all"
+          className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all"
         >
           {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
         </select>
@@ -91,7 +91,7 @@ export function DashboardExecutivo() {
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
           <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Inadimplência Total</p>
           <p className="text-2xl font-bold text-white mt-2 tabular-nums leading-none">{formatarMoeda(dados.inadimplenciaTotal)}</p>
           <div className="mt-3 pt-3 border-t border-white/[0.05]">
@@ -101,7 +101,7 @@ export function DashboardExecutivo() {
           </div>
         </div>
 
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
           <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Recuperação Total</p>
           <p className="text-2xl font-bold text-emerald-400 mt-2 tabular-nums leading-none">{formatarMoeda(dados.recuperacaoTotal)}</p>
           <div className="mt-3 pt-3 border-t border-white/[0.05]">
@@ -111,7 +111,7 @@ export function DashboardExecutivo() {
           </div>
         </div>
 
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
           <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">% Recuperação</p>
           <p className={`text-2xl font-bold mt-2 tabular-nums leading-none ${pct >= 80 ? "text-emerald-400" : pct >= 50 ? "text-gr-400" : "text-amber-400"}`}>
             {pct.toFixed(1)}%
@@ -126,7 +126,7 @@ export function DashboardExecutivo() {
           </div>
         </div>
 
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
           <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Rec. a Parte</p>
           <p className="text-2xl font-bold text-sky-400 mt-2 tabular-nums leading-none">{formatarMoeda((dados as any).recebimentoAParte ?? 0)}</p>
           <div className="mt-3 pt-3 border-t border-white/[0.05]">
@@ -136,7 +136,7 @@ export function DashboardExecutivo() {
       </div>
 
       {/* Ranking por empresa */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
         <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-5">Ranking por Empresa</h2>
         <div className="space-y-4">
           {dados.rankingEmpresas.map((empresa) => {

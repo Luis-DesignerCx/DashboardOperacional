@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { Settings, Save, Trash2, AlertTriangle } from "lucide-react";
@@ -45,7 +45,7 @@ export default function ConfiguracoesPage() {
         </div>
       </div>
 
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6 space-y-5">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6 space-y-5">
         {configs.map((c) => {
           const info = LABELS[c.chave];
           if (!info) return null;
@@ -58,7 +58,7 @@ export default function ConfiguracoesPage() {
                 type={info.tipo}
                 value={valor}
                 onChange={(e) => setEditados((prev) => ({ ...prev, [c.chave]: e.target.value }))}
-                className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
             </div>
           );
@@ -75,7 +75,7 @@ export default function ConfiguracoesPage() {
       </div>
 
       {/* Competências */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6">
         <h2 className="text-white font-semibold mb-4">Nova Competência</h2>
         <NovaCompetencia />
       </div>
@@ -147,13 +147,13 @@ function ResetSistema() {
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             placeholder={CONFIRMACAO}
-            className="w-full bg-[#0b0f1c] border border-red-500/30 rounded-lg px-4 py-2.5 text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full bg-surface-1 border border-red-500/30 rounded-lg px-4 py-2.5 text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           {erro && <p className="text-red-400 text-sm">{erro}</p>}
           <div className="flex gap-3">
             <button
               onClick={() => { setConfirmando(false); setTexto(""); setErro(""); }}
-              className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+              className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
             >
               Cancelar
             </button>
@@ -195,14 +195,14 @@ function NovaCompetencia() {
       <div>
         <label className="block text-xs text-slate-400 mb-1.5">Mês</label>
         <select value={mes} onChange={(e) => setMes(Number(e.target.value))}
-          className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
+          className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500">
           {meses.map((m, i) => <option key={i} value={i + 1}>{m}</option>)}
         </select>
       </div>
       <div>
         <label className="block text-xs text-slate-400 mb-1.5">Ano</label>
         <input type="number" value={ano} onChange={(e) => setAno(Number(e.target.value))}
-          className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm w-24 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm w-24 focus:outline-none focus:ring-2 focus:ring-sky-500" />
       </div>
       <button onClick={criar} disabled={criando}
         className="bg-sky-500 hover:bg-sky-400 disabled:bg-sky-500/30 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">

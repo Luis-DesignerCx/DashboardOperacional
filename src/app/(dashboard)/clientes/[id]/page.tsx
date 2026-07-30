@@ -71,7 +71,7 @@ function labelDias(dias: number) {
   return "181+ dias";
 }
 
-const INPUT = "w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-gr-500";
+const INPUT = "w-full bg-surface-1 border border-white/[0.08] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-gr-500";
 const BTN_SAVE = "flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gr-500 text-white text-xs font-medium hover:bg-gr-600 transition-colors disabled:opacity-50";
 const BTN_CANCEL = "flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-white/[0.07] text-slate-300 text-xs hover:bg-white/[0.04] transition-colors";
 
@@ -398,19 +398,19 @@ export default function ClienteDetalhe() {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl p-4">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-xl p-4">
           <p className="text-slate-500 text-xs">Contratos</p>
           <p className="text-2xl font-bold text-white mt-1">{cliente.contratos.length}</p>
         </div>
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl p-4">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-xl p-4">
           <p className="text-slate-500 text-xs">Total em Aberto</p>
           <p className="text-xl font-bold text-red-400 mt-1">{formatarMoeda(totalAberto)}</p>
         </div>
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl p-4">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-xl p-4">
           <p className="text-slate-500 text-xs">Total Recebido</p>
           <p className="text-xl font-bold text-emerald-400 mt-1">{formatarMoeda(totalRecebido)}</p>
         </div>
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl p-4">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-xl p-4">
           <p className="text-slate-500 text-xs">Maior Atraso</p>
           <p className="text-2xl font-bold text-white mt-1">
             {Math.max(...cliente.contratos.map((c) => c.maiorDiasAtraso ?? 0))}d
@@ -440,7 +440,7 @@ export default function ClienteDetalhe() {
       {contrato && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Dados do contrato */}
-          <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+          <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                 <FileText size={15} className="text-gr-400" />
@@ -525,7 +525,7 @@ export default function ClienteDetalhe() {
           </div>
 
           {/* Parcelas */}
-          <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+          <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">
                 <Calendar size={15} className="text-gr-400" />
@@ -584,7 +584,7 @@ export default function ClienteDetalhe() {
                           {todasSelecionadas ? "Desmarcar todas" : "Selecionar todas"}
                         </button>
                       </div>
-                      <div className="space-y-0.5 max-h-36 overflow-y-auto rounded-lg bg-[#0b0f1c]/50 border border-white/[0.08]/50 p-2">
+                      <div className="space-y-0.5 max-h-36 overflow-y-auto rounded-lg bg-surface-1 border border-white/[0.08]/50 p-2">
                         {naoPageas.map((p) => {
                           const selecionada = inadEquivParcelasIds.includes(p.id);
                           return (
@@ -611,7 +611,7 @@ export default function ClienteDetalhe() {
                 <textarea
                   rows={2}
                   autoFocus
-                  className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 placeholder:text-slate-500 resize-none"
+                  className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 placeholder:text-slate-500 resize-none"
                   placeholder="Ex: O cliente solicitou cancelamento em xx/xx/xxxx..."
                   value={inadEquivJustificativa}
                   onChange={(e) => setInadEquivJustificativa(e.target.value)}
@@ -761,7 +761,7 @@ export default function ClienteDetalhe() {
 
           {/* Recebimentos */}
           {contrato.recebimentos.length > 0 && (
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
               <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <CheckCircle2 size={15} className="text-emerald-400" />
                 Recebimentos ({contrato.recebimentos.length})
@@ -852,7 +852,7 @@ export default function ClienteDetalhe() {
 
           {/* Últimos contatos */}
           {contrato.contatos.length > 0 && (
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
               <h2 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
                 <Clock size={15} className="text-gr-400" />
                 Últimos Contatos

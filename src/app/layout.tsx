@@ -28,6 +28,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      <head>
+        {/* Anti-FOUC: lê o tema antes do React hidratar */}
+        <script dangerouslySetInnerHTML={{ __html: `try{var t=localStorage.getItem('theme')||'dark';document.documentElement.setAttribute('data-theme',t);}catch(e){}` }} />
+      </head>
       <body className={`${sora.variable} font-sans antialiased`}>
         <Providers>{children}</Providers>
       </body>

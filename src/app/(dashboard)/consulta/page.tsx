@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Search, Building2, User, AlertCircle, Loader2, ArrowRight } from "lucide-react";
@@ -86,13 +86,13 @@ export default function ConsultaPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Nome do cliente, CPF, telefone ou nº do contrato..."
-          className="w-full bg-[#0f1525] border border-white/[0.08] focus:border-gr-500 rounded-2xl pl-12 pr-12 py-4 text-white text-base placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40/30 transition-all"
+          className="w-full bg-surface-2 border border-white/[0.08] focus:border-gr-500 rounded-2xl pl-12 pr-12 py-4 text-white text-base placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40/30 transition-all"
         />
       </div>
 
       {/* Estado inicial */}
       {!buscou && !buscando && query.length < 2 && (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-12 text-center">
           <Search size={40} className="mx-auto mb-3 text-slate-700" />
           <p className="text-slate-400 text-sm">Digite pelo menos 2 caracteres para pesquisar</p>
           <p className="text-slate-400 text-xs mt-1">Funciona com nome, CPF, telefone ou número do contrato</p>
@@ -101,7 +101,7 @@ export default function ConsultaPage() {
 
       {/* Sem resultados */}
       {buscou && resultados.length === 0 && (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-12 text-center">
           <AlertCircle size={36} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 text-sm">Nenhum cliente encontrado para "{query}"</p>
         </div>
@@ -115,7 +115,7 @@ export default function ConsultaPage() {
             {resultados.map((c) => {
               const carteira = c.carteiras[0];
               return (
-                <div key={c.id} className="bg-[#0f1525] border border-white/[0.06] hover:border-white/[0.08] rounded-2xl p-5 transition-colors">
+                <div key={c.id} className="bg-surface-2 border border-white/[0.06] hover:border-white/[0.08] rounded-2xl p-5 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0 space-y-2">
                       {/* Nome + status */}
@@ -182,7 +182,7 @@ export default function ConsultaPage() {
                       </div>
                       <Link
                         href={`/clientes/${c.cliente.id}`}
-                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-[#0b0f1c] hover:bg-white/[0.04] px-3 py-1.5 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-surface-1 hover:bg-white/[0.04] px-3 py-1.5 rounded-lg transition-colors"
                       >
                         Ver ficha <ArrowRight size={12} />
                       </Link>

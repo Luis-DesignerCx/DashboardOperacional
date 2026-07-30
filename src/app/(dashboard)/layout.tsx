@@ -16,11 +16,11 @@ export default async function DashboardLayout({
 
   return (
     <DashboardShell>
-      <div className="flex h-screen bg-[#070b14] overflow-hidden">
+      <div className="flex h-screen bg-surface-0 overflow-hidden">
         <Sidebar perfil={session.user.perfil} />
         <div className="flex flex-col flex-1 overflow-hidden">
           <Header user={session.user} />
-          <main className="flex-1 overflow-y-auto p-5 bg-[#070b14]">
+          <main className="flex-1 overflow-y-auto p-5 bg-surface-0">
             {children}
           </main>
         </div>

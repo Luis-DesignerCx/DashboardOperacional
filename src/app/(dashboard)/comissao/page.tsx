@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
@@ -62,7 +62,7 @@ function faixaBarCor(pct: number) {
   return "bg-emerald-500";
 }
 
-const inputCls = "bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
+const inputCls = "bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
 
 // ─────────────────────────────────────────────────────────
 // GESTOR VIEW
@@ -235,7 +235,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
       </div>
 
       {/* Configuração: base + metas */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5 space-y-4">
         <h2 className="text-sm font-semibold text-white">Configuração da Comissão</h2>
 
         {/* Valor base */}
@@ -251,7 +251,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                     value={novoBase}
                     onChange={(e) => setNovoBase(e.target.value)}
                     placeholder="1580"
-                    className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 w-40"
+                    className="bg-surface-1 border border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 w-40"
                     autoFocus
                   />
                 </div>
@@ -262,7 +262,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                 >
                   {salvandoBase ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 </button>
-                <button onClick={() => setEditandoBase(false)} className="p-2 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-400 rounded-lg transition-colors">
+                <button onClick={() => setEditandoBase(false)} className="p-2 bg-surface-1 hover:bg-white/[0.04] text-slate-400 rounded-lg transition-colors">
                   <X size={14} />
                 </button>
               </div>
@@ -345,7 +345,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
           {consultores.map((c) => {
             const exp = expandidos.has(c.id);
             return (
-              <div key={c.id} className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
+              <div key={c.id} className="bg-surface-2 border border-white/[0.06] rounded-2xl overflow-hidden">
                 {/* Row header */}
                 <button
                   onClick={() => toggleExpand(c.id)}
@@ -441,7 +441,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
         </div>
       ) : (
         !carregando && (
-          <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-10 text-center">
+          <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-10 text-center">
             <p className="text-slate-500 text-sm">Nenhum consultor ativo nesta equipe</p>
           </div>
         )
@@ -527,7 +527,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
           <div className="w-7 h-7 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : !preview ? (
-        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-12 text-center">
           <DollarSign size={36} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400">Nenhuma meta configurada para esta competência</p>
           <p className="text-slate-400 text-sm mt-1">Aguarde seu gestor configurar as metas da equipe.</p>
@@ -536,17 +536,17 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
         <>
           {/* Cards de resumo */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Total Recebido</p>
               <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.totalRecebido)}</p>
               <p className="text-slate-500 text-[10px] mt-1">inclui valores a parte</p>
             </div>
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">À Parte</p>
               <p className="text-sky-400 text-xl font-bold tabular-nums">{formatarMoeda(preview.totalAParte ?? 0)}</p>
               <p className="text-slate-500 text-[10px] mt-1">incluído no total recebido</p>
             </div>
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Base (100%)</p>
               <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.comissaoBase)}</p>
             </div>
@@ -558,7 +558,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
 
           {/* Barra de progresso financeiro */}
           {preview.percentualMeta > 0 && (
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-slate-400">Atingimento financeiro</p>
                 <p className={`text-sm font-bold tabular-nums ${faixaCor(preview.percentualMeta)}`}>{preview.percentualMeta.toFixed(1)}%</p>
@@ -574,7 +574,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
 
           {/* Breakdown por meta */}
           {preview.breakdown && preview.breakdown.length > 0 && (
-            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl overflow-hidden">
               <div className="px-5 py-4 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
                   <TrendingUp size={14} className="text-gr-400" />
@@ -684,7 +684,7 @@ export default function ComissaoPage() {
                   key={f.equipeId}
                   onClick={() => setFrenteSelecionada(f.equipeId)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-                    ativo ? style : "bg-[#0b0f1c]/50 text-slate-500 border-white/[0.08] hover:text-slate-300"
+                    ativo ? style : "bg-surface-1/50 text-slate-500 border-white/[0.08] hover:text-slate-300"
                   }`}
                 >
                   {f.label}

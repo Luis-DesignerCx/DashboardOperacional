@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle, ArrowDownToLine, CheckCheck } from "lucide-react";
@@ -299,7 +299,7 @@ export default function ImportacaoPage() {
       {/* Modal de resolução de divergência */}
       {resolverModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl p-6 w-full max-w-sm space-y-4">
+          <div className="bg-surface-2 border border-white/[0.08] rounded-2xl p-6 w-full max-w-sm space-y-4">
             <div>
               <h3 className="text-white font-semibold text-base">Resolver divergência</h3>
               <p className="text-slate-400 text-xs mt-1">{resolverModal.contrato} · {resolverModal.cliente}</p>
@@ -310,7 +310,7 @@ export default function ImportacaoPage() {
               <select
                 value={resolverMotivo}
                 onChange={(e) => setResolverMotivo(e.target.value)}
-                className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
               >
                 <option>Juros e encargos</option>
                 <option>Valor verificado com o banco</option>
@@ -321,7 +321,7 @@ export default function ImportacaoPage() {
             <div className="flex gap-2 pt-1">
               <button
                 onClick={() => { setResolverModal(null); setResolverMotivo("Juros e encargos"); }}
-                className="flex-1 py-2 rounded-lg bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm transition-colors"
+                className="flex-1 py-2 rounded-lg bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm transition-colors"
               >
                 Cancelar
               </button>
@@ -344,7 +344,7 @@ export default function ImportacaoPage() {
         </p>
       </div>
 
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6 space-y-5">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6 space-y-5">
         {/* Seleção de competência */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
@@ -359,7 +359,7 @@ export default function ImportacaoPage() {
           </div>
 
           {showNovaComp && (
-            <div className="mb-3 p-3 bg-[#0b0f1c] border border-white/[0.08] rounded-xl space-y-3">
+            <div className="mb-3 p-3 bg-surface-1 border border-white/[0.08] rounded-xl space-y-3">
               <div className="flex items-center gap-2">
                 <CalendarDays size={14} className="text-gr-400 flex-shrink-0" />
                 <span className="text-xs font-medium text-slate-300">Nova Competência</span>
@@ -398,7 +398,7 @@ export default function ImportacaoPage() {
           <select
             value={competenciaId}
             onChange={(e) => { setCompetenciaId(e.target.value); setTipoImport(null); if (e.target.value) carregarFpStatus(e.target.value); }}
-            className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+            className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           >
             <option value="">Selecione a competência</option>
             {competencias.filter((c) => !c.fechada).map((c) => (
@@ -420,7 +420,7 @@ export default function ImportacaoPage() {
                       ? tipo === "FLASH"
                         ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
                         : "bg-gr-500/15 border-gr-500/50 text-gr-300"
-                      : "bg-[#0b0f1c] border-white/[0.08] text-slate-400 hover:border-white/[0.12]"
+                      : "bg-surface-1 border-white/[0.08] text-slate-400 hover:border-white/[0.12]"
                   }`}
                 >
                   <span className="text-sm font-medium">
@@ -449,7 +449,7 @@ export default function ImportacaoPage() {
             {ferias.length > 0 && (
               <div className="space-y-1.5">
                 {ferias.map((f) => (
-                  <div key={f.id} className={`flex items-center justify-between rounded-lg px-3 py-2 ${f.congelado ? "bg-sky-500/10 border border-sky-500/20" : "bg-[#0b0f1c]"}`}>
+                  <div key={f.id} className={`flex items-center justify-between rounded-lg px-3 py-2 ${f.congelado ? "bg-sky-500/10 border border-sky-500/20" : "bg-surface-1"}`}>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-white">{f.consultor.nome}</span>
@@ -495,7 +495,7 @@ export default function ImportacaoPage() {
                   <select
                     value={novaFeriasConsultorId}
                     onChange={(e) => setNovaFeriasConsultorId(e.target.value)}
-                    className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
+                    className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
                   >
                     <option value="">Selecionar consultor</option>
                     {consultoresDisponiveis.map((c) => (
@@ -507,13 +507,13 @@ export default function ImportacaoPage() {
                   type="date"
                   value={novaFeriasInicio}
                   onChange={(e) => setNovaFeriasInicio(e.target.value)}
-                  className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
+                  className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
                 />
                 <input
                   type="date"
                   value={novaFeriasFim}
                   onChange={(e) => setNovaFeriasFim(e.target.value)}
-                  className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
+                  className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
                 />
                 <button
                   onClick={adicionarFerias}
@@ -587,7 +587,7 @@ export default function ImportacaoPage() {
       </div>
 
       {/* ── Seção Baixas Confirmadas — Empreendimentos Gerais ──────────────── */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6 space-y-5">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6 space-y-5">
         <div>
           <h2 className="text-base font-semibold text-white">Baixas Confirmadas</h2>
           <p className="text-xs text-slate-400 mt-0.5">Importe a planilha oficial de baixados para cruzar com os recebimentos registrados pelos consultores.</p>
@@ -707,7 +707,7 @@ export default function ImportacaoPage() {
       </div>
 
       {/* ── Seção Fã Pass ──────────────────────────────────────────────────── */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6 space-y-5">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6 space-y-5">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-base font-semibold text-white">Fã Pass</h2>
@@ -815,7 +815,7 @@ export default function ImportacaoPage() {
       </div>
 
       {/* ── Seção Baixas Fã Pass ───────────────────────────────────────────── */}
-      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6">
+      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-6">
         <div>
           <h2 className="text-base font-semibold text-white">Baixas Fã Pass</h2>
           <p className="text-xs text-slate-400 mt-0.5">Confirmação de pagamentos — Passaporte BC</p>
