@@ -27,10 +27,9 @@ export async function GET(req: NextRequest) {
       const ids = equipeIds.length > 0 ? equipeIds : (session.user.equipeId ? [session.user.equipeId] : []);
       return NextResponse.json(await dashboardGestor(ids, competenciaId));
     }
-    if (session.user.perfil === "ADMINISTRADOR" && equipeIds.length > 0) {
-      return NextResponse.json(await dashboardGestor(equipeIds, competenciaId));
+    if (session.user.perfil === "ADMINISTRADOR") {
+      return NextResponse.json(await dashboardExecutivo(competenciaId, equipeIds));
     }
-    return NextResponse.json(await dashboardExecutivo(competenciaId));
   } catch (err: any) {
     console.error("[dashboard]", err);
     return NextResponse.json({ erro: err.message || "Erro interno" }, { status: 500 });
@@ -430,7 +429,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
   };
 }
 
-async function dashboardExecutivo(competenciaId: string) {
+async function dashboardExecutivo(competenciaId: string, equipeIds: string[] = []) {
   const competenciaExec = await prisma.competencia.findUnique({
     where: { id: competenciaId },
     select: { mes: true, ano: true },
@@ -439,10 +438,12 @@ async function dashboardExecutivo(competenciaId: string) {
   const iniExec = competenciaExec ? new Date(Date.UTC(competenciaExec.ano, competenciaExec.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
   const fimExec = competenciaExec ? new Date(Date.UTC(competenciaExec.ano, competenciaExec.mes,    1, 2, 59, 59, 999)) : new Date();
 
+  const frente = equipeIds.length > 0 ? { consultor: { equipeId: { in: equipeIds } } } : {};
+
   const [carteiras, recebimentosPorContrato, parcelasCount, empresas, recAParte] = await Promise.all([
     // Seleção mínima — sem recebimentos
     prisma.carteiraParcela.findMany({
-      where: { competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
+      where: { competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false }, ...frente },
       select: {
         contratoId: true,
         contrato: {
@@ -459,19 +460,19 @@ async function dashboardExecutivo(competenciaId: string) {
     prisma.recebimento.groupBy({
       by: ["contratoId"],
       where: {
-        contrato: { carteiras: { some: { competenciaId, ativo: true } } },
+        contrato: { carteiras: { some: { competenciaId, ativo: true, ...frente } } },
         dataRecebimento: { gte: iniExec, lte: fimExec },
       },
       _sum: { valor: true },
     }),
     prisma.parcela.count({
-      where: { contrato: { carteiras: { some: { competenciaId } } } },
+      where: { contrato: { carteiras: { some: { competenciaId, ...frente } } } },
     }),
     prisma.empresa.findMany({ select: { id: true, nome: true } }),
     // Rec. a Parte: soma do campo valorAParte registrado pelos consultores
     prisma.recebimento.aggregate({
       where: {
-        contrato: { carteiras: { some: { competenciaId, ativo: true } } },
+        contrato: { carteiras: { some: { competenciaId, ativo: true, ...frente } } },
         dataRecebimento: { gte: iniExec, lte: fimExec },
       },
       _sum: { valorAParte: true },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
+import { useFrente } from "@/contexts/FrenteContext";
 
 interface DadosExecutivo {
   inadimplenciaTotal: number;
@@ -19,11 +20,14 @@ export function DashboardExecutivo() {
   const [erro, setErro] = useState("");
   const [competenciaId, setCompetenciaId] = useState("");
   const [competencias, setCompetencias] = useState<any[]>([]);
+  const { equipeIds } = useFrente();
 
-  async function carregarDashboard(id: string) {
+  async function carregarDashboard(id: string, eqIds: string[] = []) {
     setDados(null);
     setErro("");
-    const r = await fetch(`/api/dashboard?competenciaId=${id}`).catch(() => null);
+    const params = new URLSearchParams({ competenciaId: id });
+    if (eqIds.length > 0) params.set("equipeIds", eqIds.join(","));
+    const r = await fetch(`/api/dashboard?${params}`).catch(() => null);
     if (!r) { setErro("Erro de conexão"); return; }
     const data = await r.json();
     if (!r.ok || data.erro) { setErro(data.erro || `Erro ${r.status}`); return; }
@@ -38,10 +42,14 @@ export function DashboardExecutivo() {
         if (cs.length === 0) { setErro("VAZIO"); return; }
         setCompetencias(cs);
         setCompetenciaId(cs[0].id);
-        carregarDashboard(cs[0].id);
+        carregarDashboard(cs[0].id, equipeIds);
       })
       .catch(() => setErro("Erro de conexão ao carregar competências."));
   }, []);
+
+  useEffect(() => {
+    if (competenciaId) carregarDashboard(competenciaId, equipeIds);
+  }, [equipeIds]);
 
   if (erro === "VAZIO") return (
     <div className="flex flex-col items-center justify-center h-64 gap-4">
@@ -78,7 +86,7 @@ export function DashboardExecutivo() {
         </div>
         <select
           value={competenciaId}
-          onChange={(e) => { setCompetenciaId(e.target.value); carregarDashboard(e.target.value); }}
+          onChange={(e) => { setCompetenciaId(e.target.value); carregarDashboard(e.target.value, equipeIds); }}
           className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
         >
           {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}

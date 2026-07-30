@@ -21,6 +21,8 @@ const C = {
   status:     6,
   tiposBaixa: 7,
   dataBaixa:  14,
+  valorRec:   15,
+  meioPag:    16,
 } as const;
 
 function parsearValor(val: unknown): number {
@@ -55,11 +57,17 @@ function isInadimplencia(tipo: string): boolean {
   if (/^cart[aã]o/i.test(t)) return false;
   return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t);
 }
-function isBaixaNormal(tipo: string): boolean {
-  return /boleto|pix|dinheiro|dep[oó]sito|transfer[eê]ncia|ted/i.test(String(tipo ?? ""));
-}
-function isBaixaCartao(tipo: string): boolean {
-  return /^cart[aã]o/i.test(String(tipo ?? "").trim());
+// Determina tipo de baixa pelo MeioPag (col 16), com fallback no Tipo (col 4)
+// Para cartão: status P/B é irrelevante — depende apenas do MeioPag e DataRec
+function detectarTipoBaixa(meioPag: string, tipo: string): "CARTAO" | "BOLETO_PIX" | null {
+  const m = String(meioPag ?? "").trim();
+  if (/cart[aã]o/i.test(m)) return "CARTAO";
+  if (/boleto|pix|dinheiro|dep[oó]sito|transfer[eê]ncia|ted/i.test(m)) return "BOLETO_PIX";
+  // MeioPag vazio: fallback pelo Tipo da dívida
+  const t = String(tipo ?? "").trim();
+  if (/^rec\.\s*(master|visa|elo|amex|hipercard)/i.test(t)) return "CARTAO";
+  if (/boleto/i.test(t)) return "BOLETO_PIX";
+  return null;
 }
 
 function obterEquipe(dias: number): string {
@@ -139,7 +147,7 @@ export async function POST(req: NextRequest) {
       const vencimento = parsearData(row[C.vencimento]);
       if (!vencimento) continue;
 
-      const isFlashRow = vencimento >= iniComp && vencimento <= fimComp;
+      const isFlashRow = vencimento >= iniComp && vencimento <= ontem;
       const isInadRow  = vencimento <= ontem;
       if (!isInadRow && !isFlashRow) continue;
 
@@ -154,7 +162,7 @@ export async function POST(req: NextRequest) {
     // ── Busca contratos existentes em lote ────────────────────────────────────
     const todosDocumentos = [...gruposInad.keys()];
     const contratosExistentes = await prisma.contrato.findMany({
-      where: { numero: { in: todosDocumentos } },
+      where: { numero: { in: todosDocumentos }, empresaId: empresaFaPass.id },
       select: { id: true, numero: true, clienteId: true },
     });
     const contratoMap = new Map(contratosExistentes.map((c) => [c.numero, c]));
@@ -243,22 +251,26 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Processa baixas ───────────────────────────────────────────────────────
+    // Detecta pelo MeioPag (col 16) e DataRec (col 14) — status P/B é irrelevante
     await prisma.faPassBaixa.deleteMany({ where: { competenciaId } });
     const baixas: { id: string; competenciaId: string; contratoNumero: string; valor: number; tipoPagamento: string; dataBaixa: Date | null; syncId: string }[] = [];
 
     for (const row of linhas) {
-      const tipo = String(row[C.tipo] ?? "").trim();
-      const status = String(row[C.status] ?? "").trim().toUpperCase();
-      const dataBaixa = parsearData(row[C.dataBaixa]);
-      const valor = parsearValor(row[C.valor]);
       const doc = String(row[C.documento] ?? "").trim();
+      if (!doc) continue;
 
-      let tipoPagamento: string | null = null;
-      if (status === "B" && isBaixaNormal(tipo) && dataBaixa && dataBaixa >= iniComp && dataBaixa <= fimComp) tipoPagamento = "BOLETO_PIX";
-      if (isBaixaCartao(tipo) && dataBaixa && dataBaixa >= iniComp && dataBaixa <= fimComp) tipoPagamento = "CARTAO";
+      const dataBaixa = parsearData(row[C.dataBaixa]);
+      if (!dataBaixa || dataBaixa < iniComp || dataBaixa > fimComp) continue;
 
-      if (!tipoPagamento || valor === 0 || !doc) continue;
-      baixas.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor, tipoPagamento, dataBaixa, syncId: sync.id });
+      const valorRec = parsearValor(row[C.valorRec]);
+      if (valorRec === 0) continue;
+
+      const meioPag = String(row[C.meioPag] ?? "").trim();
+      const tipo    = String(row[C.tipo] ?? "").trim();
+      const tipoPagamento = detectarTipoBaixa(meioPag, tipo);
+      if (!tipoPagamento) continue;
+
+      baixas.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor: valorRec, tipoPagamento, dataBaixa, syncId: sync.id });
     }
 
     for (const ck of chunks(baixas, 500)) {

@@ -693,10 +693,8 @@ export default function ImportacaoPage() {
                   <p className="text-emerald-400 font-medium text-sm">{fpResultado.primeiraSync ? "Competência inicializada" : "Query atualizada"}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-400 mt-2">
-                  <span>{fpResultado.totalRegistros} registros FP/PON lidos</span>
                   <span>{fpResultado.novosInadimplentes} inadimplentes novos</span>
                   <span>{fpResultado.novosFlash} flash novos</span>
-                  <span>{fpResultado.totalBaixas} baixas processadas</span>
                   {fpResultado.totalDivergencias > 0 && (
                     <span className="text-amber-400 col-span-2 flex items-center gap-1">
                       <AlertTriangle size={12} /> {fpResultado.totalDivergencias} divergências detectadas
