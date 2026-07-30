@@ -49,14 +49,14 @@ export default function LoginPage() {
       <div className="absolute inset-0 opacity-[0.025] pointer-events-none"
         style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)", backgroundSize: "48px 48px" }} />
 
-      {/* Fingerprint watermark — centralizado no painel esquerdo, atrás de tudo */}
-      <div className="absolute pointer-events-none select-none opacity-[0.10] z-0"
-        style={{ top: "50%", left: "28%", transform: "translate(-50%, -50%)" }}>
-        <Image src="/logo-gr-icon-branco.png" alt="" width={1100} height={1100} className="object-contain flex-shrink-0" />
-      </div>
-
       {/* ── Painel esquerdo — Brand (transparente) ──────────────── */}
-      <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16">
+      <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16 overflow-hidden">
+
+        {/* Fingerprint watermark — ocupa toda a altura do painel, atrás do conteúdo */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.10] z-0"
+          style={{ width: "100vh", height: "100vh" }}>
+          <Image src="/logo-gr-icon-branco.png" alt="" fill className="object-contain" />
+        </div>
 
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
@@ -81,7 +81,6 @@ export default function LoginPage() {
             {[
               { valor: "100%", label: "Rastreável" },
               { valor: "7×",   label: "Empresas"  },
-              { valor: "0",    label: "Planilhas"  },
             ].map(({ valor, label }) => (
               <div key={label} className="flex flex-col items-center gap-1">
                 <span className="text-2xl font-bold text-white tabular-nums">{valor}</span>
