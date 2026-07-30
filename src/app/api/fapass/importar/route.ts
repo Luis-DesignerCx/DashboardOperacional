@@ -250,33 +250,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Processa baixas ───────────────────────────────────────────────────────
-    // Detecta pelo MeioPag (col 16) e DataRec (col 14) — status P/B é irrelevante
-    await prisma.faPassBaixa.deleteMany({ where: { competenciaId } });
-    const baixas: { id: string; competenciaId: string; contratoNumero: string; valor: number; tipoPagamento: string; dataBaixa: Date | null; syncId: string }[] = [];
-
-    for (const row of linhas) {
-      const doc = String(row[C.documento] ?? "").trim();
-      if (!doc) continue;
-
-      const dataBaixa = parsearData(row[C.dataBaixa]);
-      if (!dataBaixa || dataBaixa < iniComp || dataBaixa > fimComp) continue;
-
-      const valorRec = parsearValor(row[C.valorRec]);
-      if (valorRec === 0) continue;
-
-      const meioPag = String(row[C.meioPag] ?? "").trim();
-      const tipo    = String(row[C.tipo] ?? "").trim();
-      const tipoPagamento = detectarTipoBaixa(meioPag, tipo);
-      if (!tipoPagamento) continue;
-
-      baixas.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor: valorRec, tipoPagamento, dataBaixa, syncId: sync.id });
-    }
-
-    for (const ck of chunks(baixas, 500)) {
-      await prisma.faPassBaixa.createMany({ data: ck });
-    }
-
     await prisma.faPassSync.update({
       where: { id: sync.id },
       data: {
@@ -284,7 +257,7 @@ export async function POST(req: NextRequest) {
         totalRegistros: linhas.length,
         totalContratos: gruposInad.size,
         totalFlash: novosSnap.filter((s) => s.isFlash).length,
-        totalBaixas: baixas.length,
+        totalBaixas: 0,
         totalDivergencias: 0,
         status: "CONCLUIDO",
         concluidoEm: new Date(),
