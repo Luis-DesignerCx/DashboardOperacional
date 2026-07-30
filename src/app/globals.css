@@ -151,12 +151,13 @@ body {
 }
 
 /* Texto: mapeamento equivalente de hierarquia dark→light */
-[data-theme="light"] .text-white   { color: #0f172a !important; }
+[data-theme="light"] .text-white     { color: #0f172a !important; }
 [data-theme="light"] .text-slate-200 { color: #1e293b !important; }
-[data-theme="light"] .text-slate-400 { color: #475569 !important; }
-[data-theme="light"] .text-slate-500 { color: #64748b !important; }
-[data-theme="light"] .text-slate-600 { color: #94a3b8 !important; }
-[data-theme="light"] .text-slate-700 { color: #cbd5e1 !important; }
+[data-theme="light"] .text-slate-300 { color: #334155 !important; }
+[data-theme="light"] .text-slate-400 { color: #374151 !important; }
+[data-theme="light"] .text-slate-500 { color: #4b5563 !important; }
+[data-theme="light"] .text-slate-600 { color: #6b7280 !important; }
+[data-theme="light"] .text-slate-700 { color: #9ca3af !important; }
 
 /* Botões com gradiente preservam texto branco */
 [data-theme="light"] button[style*="gradient"]     { color: #ffffff !important; }
