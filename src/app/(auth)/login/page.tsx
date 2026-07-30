@@ -52,10 +52,15 @@ export default function LoginPage() {
       {/* ── Painel esquerdo — Brand (transparente) ──────────────── */}
       <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16 overflow-hidden">
 
-        {/* Fingerprint watermark — cobre todo o fundo do painel */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.10] z-0">
-          <Image src="/logo-gr-icon-branco.png" alt="" width={2600} height={2600} className="object-contain flex-shrink-0" />
-        </div>
+        {/* Fingerprint watermark — background-image para controle preciso do tamanho */}
+        <div className="absolute inset-0 pointer-events-none select-none opacity-[0.10] z-0"
+          style={{
+            backgroundImage: "url('/logo-gr-icon-branco.png')",
+            backgroundSize: "180%",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+          }}
+        />
 
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
