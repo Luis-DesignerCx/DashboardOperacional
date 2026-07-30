@@ -56,7 +56,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 pointer-events-none select-none opacity-[0.10] z-0"
           style={{
             backgroundImage: "url('/logo-gr-icon-branco.png')",
-            backgroundSize: "180%",
+            backgroundSize: "400%",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
           }}
