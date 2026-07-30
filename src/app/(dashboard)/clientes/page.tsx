@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
@@ -6,10 +6,10 @@ import { Search, AlertCircle, ChevronRight, Phone, Loader2, History, X, MessageC
 import Link from "next/link";
 
 const STATUS_COR: Record<string, string> = {
-  SEM_CONTATO: "bg-slate-600 text-slate-200",
+  SEM_CONTATO: "bg-white/[0.12] text-slate-200",
   CONTATO_REALIZADO: "bg-sky-600 text-sky-100",
   VISUALIZOU_SEM_RESPOSTA: "bg-slate-500 text-slate-200",
-  NAO_RESPONDE_MENSAGENS: "bg-slate-700 text-slate-300",
+  NAO_RESPONDE_MENSAGENS: "bg-white/[0.07] text-slate-300",
   PROMESSA_PAGAMENTO: "bg-amber-500 text-amber-100",
   PROMESSA_QUEBRADA: "bg-red-600 text-red-100",
   RECEBIDO_PARCIAL: "bg-lime-600 text-lime-100",
@@ -21,7 +21,7 @@ const STATUS_COR: Record<string, string> = {
   FALECIDO: "bg-zinc-700 text-zinc-200",
   ACORDO_JURIDICO: "bg-blue-700 text-blue-100",
   DISPUTA_JUDICIAL: "bg-rose-700 text-rose-100",
-  OUTROS: "bg-slate-600 text-slate-200",
+  OUTROS: "bg-white/[0.12] text-slate-200",
 };
 
 const STATUS_LABEL: Record<string, string> = {
@@ -93,7 +93,7 @@ const PROMESSA_STATUS_COR: Record<string, string> = {
   ABERTA: "bg-amber-500/10 text-amber-400 border border-amber-500/20",
   PAGA: "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
   QUEBRADA: "bg-red-500/10 text-red-400 border border-red-500/20",
-  CANCELADA: "bg-slate-700 text-slate-400 border border-slate-600",
+  CANCELADA: "bg-white/[0.07] text-slate-400 border border-white/[0.12]",
 };
 const PROMESSA_STATUS_LABEL: Record<string, string> = {
   ABERTA: "Aberta", PAGA: "Paga", QUEBRADA: "Quebrada", CANCELADA: "Cancelada",
@@ -249,7 +249,7 @@ export default function ClientesPage() {
           placeholder="Buscar por nome, contrato ou telefone..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
+          className="w-full bg-[#0f1525] border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
         />
       </div>
 
@@ -259,7 +259,7 @@ export default function ClientesPage() {
           <button
             onClick={() => setEmpresaFiltro(null)}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              !empresaFiltro ? "bg-gr-500 text-white" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+              !empresaFiltro ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
             }`}
           >
             Todas
@@ -269,7 +269,7 @@ export default function ClientesPage() {
               key={emp}
               onClick={() => setEmpresaFiltro(emp === empresaFiltro ? null : emp)}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                empresaFiltro === emp ? "bg-gr-500 text-white" : "bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700"
+                empresaFiltro === emp ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
               }`}
             >
               {emp}
@@ -284,11 +284,11 @@ export default function ClientesPage() {
         </div>
       ) : (
         <>
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+          <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800">
+                  <tr className="border-b border-white/[0.06]">
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Cliente</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Telefone</th>
                     <th className="text-left px-4 py-3 text-slate-400 font-medium">Empresa</th>
@@ -304,7 +304,7 @@ export default function ClientesPage() {
                     const telefone = c.telefones ? c.telefones.split(",")[0] : null;
                     const uc = c.ultimoContato;
                     return (
-                      <tr key={c.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                      <tr key={c.id} className="border-b border-white/[0.06]/50 hover:bg-white/[0.02] transition-colors">
                         <td className="px-4 py-3">
                           <Link href={`/clientes/${c.id}`} className="block">
                             <p className="text-white font-medium hover:text-gr-300 transition-colors">{c.nome}</p>
@@ -322,7 +322,7 @@ export default function ClientesPage() {
                         <td className="px-4 py-3 text-slate-400 text-xs">{nomeEmpresas || "—"}</td>
                         <td className="px-4 py-3">
                           {uc ? (
-                            <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${STATUS_COR[uc.status] ?? "bg-slate-700 text-slate-300"}`}>
+                            <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${STATUS_COR[uc.status] ?? "bg-white/[0.07] text-slate-300"}`}>
                               {STATUS_LABEL[uc.status] ?? uc.status}
                             </span>
                           ) : (
@@ -346,7 +346,7 @@ export default function ClientesPage() {
                             >
                               <History size={14} />
                             </button>
-                            <Link href={`/clientes/${c.id}`} className="flex items-center justify-center p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors">
+                            <Link href={`/clientes/${c.id}`} className="flex items-center justify-center p-1.5 text-slate-400 hover:text-white hover:bg-white/[0.04] rounded-lg transition-colors">
                               <ChevronRight size={16} />
                             </Link>
                           </div>
@@ -372,7 +372,7 @@ export default function ClientesPage() {
               <button
                 onClick={() => carregarPagina(busca, pagina + 1, true)}
                 disabled={carregandoMais}
-                className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
+                className="flex items-center gap-2 bg-[#0b0f1c] hover:bg-white/[0.04] disabled:opacity-50 text-slate-300 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
               >
                 {carregandoMais
                   ? <><Loader2 size={14} className="animate-spin" /> Carregando...</>
@@ -387,13 +387,13 @@ export default function ClientesPage() {
       {/* Modal promessas */}
       {modalPromessas && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800 flex-shrink-0">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b border-white/[0.06] flex-shrink-0">
               <div>
                 <h2 className="text-white font-semibold flex items-center gap-2"><DollarSign size={16} className="text-purple-400" /> Promessas</h2>
                 <p className="text-slate-500 text-xs mt-0.5 truncate max-w-xs">{modalPromessas.nome}</p>
               </div>
-              <button onClick={() => setModalPromessas(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => setModalPromessas(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -409,14 +409,14 @@ export default function ClientesPage() {
               ) : (
                 <div className="space-y-2 max-h-52 overflow-y-auto">
                   {promessas.map((p) => (
-                    <div key={p.id} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
+                    <div key={p.id} className="bg-white/[0.03] border border-white/[0.08]/50 rounded-xl p-3">
                       <div className="flex items-start justify-between gap-2 mb-1.5">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PROMESSA_STATUS_COR[p.status] ?? "bg-slate-700 text-slate-300"}`}>
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PROMESSA_STATUS_COR[p.status] ?? "bg-white/[0.07] text-slate-300"}`}>
                             {PROMESSA_STATUS_LABEL[p.status] ?? p.status}
                           </span>
                           {p.contrato?.numero && (
-                            <span className="text-[10px] text-slate-500 bg-slate-700/60 px-1.5 py-0.5 rounded">{p.contrato.numero}</span>
+                            <span className="text-[10px] text-slate-500 bg-white/[0.07]/60 px-1.5 py-0.5 rounded">{p.contrato.numero}</span>
                           )}
                         </div>
                         <span className="text-white font-bold text-sm tabular-nums flex-shrink-0">{formatarMoeda(Number(p.valorPrometido))}</span>
@@ -433,13 +433,13 @@ export default function ClientesPage() {
               )}
 
               {/* Nova promessa */}
-              <div className="border-t border-slate-800 pt-4">
+              <div className="border-t border-white/[0.06] pt-4">
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Nova promessa</p>
                 <div className="space-y-3">
                   {modalPromessas.contratos.length > 1 && (
                     <div>
                       <label className="block text-xs text-slate-400 mb-1.5">Contrato *</label>
-                      <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                      <select className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                         value={promContratoId} onChange={(e) => setPromContratoId(e.target.value)}>
                         {modalPromessas.contratos.map((ct) => (
                           <option key={ct.id} value={ct.id}>{ct.numero} · {ct.empresa.nome}</option>
@@ -450,17 +450,17 @@ export default function ClientesPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-slate-400 mb-1.5">Valor (R$) *</label>
-                      <input className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500"
+                      <input className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500"
                         placeholder="0,00" value={promForm.valor} onChange={(e) => setPromForm((f) => ({ ...f, valor: e.target.value }))} />
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1.5">Data combinada *</label>
-                      <input type="date" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                      <input type="date" className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                         value={promForm.data} onChange={(e) => setPromForm((f) => ({ ...f, data: e.target.value }))} />
                     </div>
                     <div className="col-span-2">
                       <label className="block text-xs text-slate-400 mb-1.5">Forma de pagamento</label>
-                      <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                      <select className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                         value={promForm.formaPagamento} onChange={(e) => setPromForm((f) => ({ ...f, formaPagamento: e.target.value }))}>
                         <option value="PIX">PIX</option>
                         <option value="BOLETO">Boleto</option>
@@ -472,7 +472,7 @@ export default function ClientesPage() {
                     </div>
                     <div className="col-span-2">
                       <label className="block text-xs text-slate-400 mb-1.5">Observação</label>
-                      <input className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500"
+                      <input className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500"
                         placeholder="Opcional" value={promForm.observacao} onChange={(e) => setPromForm((f) => ({ ...f, observacao: e.target.value }))} />
                     </div>
                   </div>
@@ -481,9 +481,9 @@ export default function ClientesPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 p-5 border-t border-slate-800 flex-shrink-0">
+            <div className="flex gap-3 p-5 border-t border-white/[0.06] flex-shrink-0">
               <button onClick={() => setModalPromessas(null)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
               <button onClick={salvarPromessa} disabled={salvandoProm}
@@ -498,13 +498,13 @@ export default function ClientesPage() {
       {/* Modal histórico de contatos + novo registro */}
       {modalHistorico && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800 flex-shrink-0">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between p-5 border-b border-white/[0.06] flex-shrink-0">
               <div>
                 <h2 className="text-white font-semibold flex items-center gap-2"><History size={16} className="text-sky-400" /> Histórico de Contatos</h2>
                 <p className="text-slate-500 text-xs mt-0.5 truncate max-w-xs">{modalHistorico.nome}</p>
               </div>
-              <button onClick={() => setModalHistorico(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => setModalHistorico(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -518,18 +518,18 @@ export default function ClientesPage() {
               ) : (
                 <div className="space-y-2 max-h-52 overflow-y-auto">
                   {historico.map((h) => (
-                    <div key={h.id} className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-3">
+                    <div key={h.id} className="bg-white/[0.03] border border-white/[0.08]/50 rounded-xl p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="flex items-center gap-1 text-slate-400 text-xs">
                             {TIPO_ICON[h.tipo]}
                             {h.tipo === "WHATSAPP" ? "WhatsApp" : h.tipo === "LIGACAO" ? "Ligação" : "Email"}
                           </span>
-                          <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${STATUS_COR[h.status] ?? "bg-slate-700 text-slate-300"}`}>
+                          <span className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${STATUS_COR[h.status] ?? "bg-white/[0.07] text-slate-300"}`}>
                             {STATUS_LABEL[h.status] ?? h.status}
                           </span>
                           {h.contrato?.numero && (
-                            <span className="text-[10px] text-slate-500 bg-slate-700/60 px-1.5 py-0.5 rounded">{h.contrato.numero}</span>
+                            <span className="text-[10px] text-slate-500 bg-white/[0.07]/60 px-1.5 py-0.5 rounded">{h.contrato.numero}</span>
                           )}
                         </div>
                         <span className="text-[10px] text-slate-500 flex-shrink-0">
@@ -545,13 +545,13 @@ export default function ClientesPage() {
               )}
 
               {/* Novo contato */}
-              <div className="border-t border-slate-800 pt-4">
+              <div className="border-t border-white/[0.06] pt-4">
                 <p className="text-xs text-slate-500 uppercase tracking-wider mb-3">Novo registro</p>
                 <div className="space-y-3">
                   {modalHistorico.contratos.length > 1 && (
                     <div>
                       <label className="block text-xs text-slate-400 mb-1.5">Contrato *</label>
-                      <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                      <select className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                         value={atendContratoId} onChange={(e) => setAtendContratoId(e.target.value)}>
                         {modalHistorico.contratos.map((ct) => (
                           <option key={ct.id} value={ct.id}>{ct.numero} · {ct.empresa.nome}</option>
@@ -562,7 +562,7 @@ export default function ClientesPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs text-slate-400 mb-1.5">Canal *</label>
-                      <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                      <select className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                         value={atendForm.tipo} onChange={(e) => setAtendForm((f) => ({ ...f, tipo: e.target.value }))}>
                         <option value="LIGACAO">Ligação</option>
                         <option value="WHATSAPP">WhatsApp</option>
@@ -571,7 +571,7 @@ export default function ClientesPage() {
                     </div>
                     <div>
                       <label className="block text-xs text-slate-400 mb-1.5">Status *</label>
-                      <select className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                      <select className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                         value={atendForm.status} onChange={(e) => setAtendForm((f) => ({ ...f, status: e.target.value }))}>
                         <option value="ACIONADO">Acionado</option>
                         <option value="VISUALIZOU_SEM_RESPOSTA">Visualizou, não respondeu</option>
@@ -591,13 +591,13 @@ export default function ClientesPage() {
                   {(atendForm.status === "LIGAR_DEPOIS" || atendForm.status === "AGUARDANDO_RETORNO") && (
                     <div>
                       <label className="block text-xs text-slate-400 mb-1.5">Data/hora *</label>
-                      <input type="datetime-local" className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                      <input type="datetime-local" className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                         value={atendForm.agendadoPara} onChange={(e) => setAtendForm((f) => ({ ...f, agendadoPara: e.target.value }))} />
                     </div>
                   )}
                   <div>
                     <label className="block text-xs text-slate-400 mb-1.5">Observação</label>
-                    <textarea rows={2} className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 resize-none placeholder:text-slate-500"
+                    <textarea rows={2} className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 resize-none placeholder:text-slate-500"
                       placeholder="Descreva o atendimento..." value={atendForm.observacao}
                       onChange={(e) => setAtendForm((f) => ({ ...f, observacao: e.target.value }))} />
                   </div>
@@ -606,9 +606,9 @@ export default function ClientesPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 p-5 border-t border-slate-800 flex-shrink-0">
+            <div className="flex gap-3 p-5 border-t border-white/[0.06] flex-shrink-0">
               <button onClick={() => setModalHistorico(null)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Fechar
               </button>
               <button onClick={salvarAtendimento} disabled={salvandoAtend}

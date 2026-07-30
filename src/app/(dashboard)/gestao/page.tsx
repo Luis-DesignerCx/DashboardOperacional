@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useFrente } from "@/contexts/FrenteContext";
@@ -139,14 +139,14 @@ export default function GestaoPage() {
   return (
     <div className="flex gap-0 h-[calc(100vh-4rem)] -m-6 overflow-hidden">
       {/* ── Sidebar: Frentes ── */}
-      <aside className="w-52 flex-shrink-0 border-r border-slate-800 bg-slate-900/50 flex flex-col">
-        <div className="p-4 border-b border-slate-800">
+      <aside className="w-52 flex-shrink-0 border-r border-white/[0.06] bg-[#070b14]/50 flex flex-col">
+        <div className="p-4 border-b border-white/[0.06]">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Frentes</p>
         </div>
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {visiveis.map((eq) => {
             const ativo = eq.id === equipeId;
-            const cor = FAIXA_COR[eq.tipo] ?? "text-slate-400 bg-slate-800 border-slate-700";
+            const cor = FAIXA_COR[eq.tipo] ?? "text-slate-400 bg-[#0b0f1c] border-white/[0.08]";
             const qtd = eq.usuarios.filter((u) => u.perfil === "CONSULTOR").length;
             return (
               <button
@@ -155,7 +155,7 @@ export default function GestaoPage() {
                 className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all ${
                   ativo
                     ? "bg-gr-500/15 text-white border border-gr-500/20 font-medium"
-                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                    : "text-slate-400 hover:text-white hover:bg-white/[0.03]"
                 }`}
               >
                 <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold flex-shrink-0 ${cor}`}>
@@ -163,7 +163,7 @@ export default function GestaoPage() {
                 </span>
                 <span className="truncate flex-1">{FAIXA_LABEL[eq.tipo] ?? eq.nome}</span>
                 {qtd > 0 && (
-                  <span className="text-[10px] bg-slate-700 text-slate-400 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                  <span className="text-[10px] bg-white/[0.07] text-slate-400 px-1.5 py-0.5 rounded-full flex-shrink-0">
                     {qtd}
                   </span>
                 )}
@@ -177,7 +177,7 @@ export default function GestaoPage() {
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 flex-shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] flex-shrink-0">
           <div>
             <h1 className="text-lg font-bold text-white">
               {equipeSelecionada ? (FAIXA_LABEL[equipeSelecionada.tipo] ?? equipeSelecionada.nome) : "Gestão de Carteiras"}
@@ -191,7 +191,7 @@ export default function GestaoPage() {
           <select
             value={competenciaId}
             onChange={(e) => setCompetenciaId(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+            className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           >
             {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
           </select>
@@ -207,7 +207,7 @@ export default function GestaoPage() {
                 className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
                   subFaixa === i
                     ? corSubFaixa
-                    : "text-slate-500 hover:text-slate-300 hover:bg-slate-800"
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
                 }`}
               >
                 {sf.label}
@@ -218,23 +218,23 @@ export default function GestaoPage() {
 
         {/* Cards de totais */}
         {!carregando && filtrados.length > 0 && (
-          <div className="grid grid-cols-4 gap-3 px-6 py-3 border-b border-slate-800 flex-shrink-0">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
+          <div className="grid grid-cols-4 gap-3 px-6 py-3 border-b border-white/[0.06] flex-shrink-0">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Inadimplência total</p>
               <p className="text-lg font-bold text-white mt-0.5">{formatarMoeda(totalInad)}</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Total recebido</p>
               <p className="text-lg font-bold text-emerald-400 mt-0.5">{formatarMoeda(totalRec)}</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Total a parte</p>
               <p className="text-lg font-bold text-sky-400 mt-0.5">{formatarMoeda(totalAP)}</p>
             </div>
             <div className={`border rounded-xl px-4 py-3 ${
               eficiencia >= 80 ? "bg-emerald-500/10 border-emerald-500/20"
               : eficiencia >= 40 ? "bg-amber-500/10 border-amber-500/20"
-              : "bg-slate-900 border-slate-800"
+              : "bg-[#0f1525] border-white/[0.06]"
             }`}>
               <div className="flex items-center gap-1.5">
                 <Activity size={12} className={eficiencia >= 80 ? "text-emerald-400" : eficiencia >= 40 ? "text-amber-400" : "text-slate-500"} />
@@ -250,7 +250,7 @@ export default function GestaoPage() {
         )}
 
         {/* Busca */}
-        <div className="px-6 py-3 border-b border-slate-800 flex-shrink-0">
+        <div className="px-6 py-3 border-b border-white/[0.06] flex-shrink-0">
           <div className="relative max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
@@ -258,7 +258,7 @@ export default function GestaoPage() {
               placeholder="Buscar consultor..."
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
+              className="w-full bg-[#0f1525] border border-white/[0.06] rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
             />
           </div>
         </div>
@@ -276,7 +276,7 @@ export default function GestaoPage() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-2.5 border-b border-slate-800 bg-slate-900/30">
+              <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consultor</span>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Inadimplência</span>
@@ -285,14 +285,14 @@ export default function GestaoPage() {
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">%</span>
               </div>
 
-              <div className="divide-y divide-slate-800/60">
+              <div className="divide-y divide-white/[0.04]">
                 {filtrados.map((c) => {
                   const expandido = expandidos.has(c.id);
                   return (
                     <div key={c.id}>
                       <button
                         onClick={() => toggleExpandir(c.id)}
-                        className="w-full grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-3.5 hover:bg-slate-800/30 transition-colors text-left"
+                        className="w-full grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-3.5 hover:bg-white/[0.02] transition-colors text-left"
                       >
                         <div className="flex items-center gap-2.5">
                           {expandido
@@ -321,15 +321,15 @@ export default function GestaoPage() {
                       </button>
 
                       {expandido && (
-                        <div className="bg-slate-900/60 border-t border-slate-800/50">
-                          <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2 border-b border-slate-800/30">
+                        <div className="bg-[#070b14]/60 border-t border-white/[0.06]/50">
+                          <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2 border-b border-white/[0.06]/30">
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Empresa</span>
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Recebido</span>
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">A Parte</span>
                           </div>
                           {c.porEmpresa.map((emp) => (
-                            <div key={emp.id} className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-b border-slate-800/20 last:border-0 hover:bg-slate-800/20">
+                            <div key={emp.id} className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">
                               <span className="text-slate-300 text-sm">{emp.nome}</span>
                               <span className="text-slate-400 text-sm tabular-nums text-right">{formatarMoeda(emp.inadimplencia)}</span>
                               <span className={`text-sm tabular-nums font-medium text-right ${emp.recebido > 0 ? "text-emerald-400" : "text-slate-400"}`}>
@@ -340,7 +340,7 @@ export default function GestaoPage() {
                               </span>
                             </div>
                           ))}
-                          <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-t border-slate-700/40 bg-slate-800/20">
+                          <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-t border-white/[0.08]/40 bg-white/[0.02]">
                             <span className="text-xs text-slate-500 font-semibold">TOTAL</span>
                             <span className="text-xs text-white tabular-nums font-semibold text-right">{formatarMoeda(c.inadimplencia)}</span>
                             <span className="text-xs text-emerald-400 tabular-nums font-semibold text-right">{formatarMoeda(c.recebido)}</span>

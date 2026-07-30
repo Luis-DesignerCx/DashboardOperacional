@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -109,16 +109,16 @@ export default function HistoricoPage() {
       </div>
 
       {dados.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
           <FileSpreadsheet size={40} className="text-slate-700 mx-auto mb-3" />
           <p className="text-slate-400 font-medium">Nenhuma competência encontrada</p>
           <p className="text-slate-400 text-sm mt-1">Importe uma planilha para começar.</p>
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-800">
+              <tr className="border-b border-white/[0.06]">
                 <th className="text-left text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-4">Competência</th>
                 <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-4">Contratos</th>
                 <th className="text-right text-xs font-medium text-slate-500 uppercase tracking-wider px-6 py-4">Inadimplência</th>
@@ -127,9 +127,9 @@ export default function HistoricoPage() {
                 <th className="px-6 py-4" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-white/[0.04]">
               {dados.map((comp) => (
-                <tr key={comp.id} className="hover:bg-slate-800/30 transition-colors">
+                <tr key={comp.id} className="hover:bg-white/[0.02] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                       {comp.fechada ? (

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useRef } from "react";
 import { formatarDataHora } from "@/lib/utils";
@@ -91,7 +91,7 @@ export default function SolicitacoesPage() {
             className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               filtroStatus === s
                 ? "bg-sky-500 text-white"
-                : "bg-slate-800 text-slate-400 hover:text-white"
+                : "bg-white/[0.07] text-slate-400 hover:text-white"
             }`}
           >
             {s === "TODOS" ? "Todos" : LABEL_STATUS[s]?.label}
@@ -104,7 +104,7 @@ export default function SolicitacoesPage() {
           <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtradas.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
           <ClipboardList size={40} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400">Nenhuma solicitação encontrada</p>
         </div>
@@ -114,14 +114,14 @@ export default function SolicitacoesPage() {
             const st = LABEL_STATUS[s.status];
             const Icon = st.icon;
             return (
-              <div key={s.id} className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+              <div key={s.id} className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex items-center gap-1.5 ${st.cor}`}>
                         <Icon size={12} /> {st.label}
                       </span>
-                      <span className="text-xs text-slate-500 bg-slate-800 px-2 py-1 rounded-full">
+                      <span className="text-xs text-slate-500 bg-[#0b0f1c] px-2 py-1 rounded-full">
                         {LABEL_TIPO[s.tipo]}
                       </span>
                     </div>
@@ -155,7 +155,7 @@ export default function SolicitacoesPage() {
                       const frenteDono = donoAtual?.equipe?.tipo;
                       const frenteDiferente = frenteSolicitante && frenteDono && frenteSolicitante !== frenteDono;
                       return donoAtual ? (
-                        <div className={`mt-1.5 rounded-lg px-3 py-2 border text-xs ${frenteDiferente ? "bg-amber-500/10 border-amber-500/30" : "bg-slate-800 border-slate-700"}`}>
+                        <div className={`mt-1.5 rounded-lg px-3 py-2 border text-xs ${frenteDiferente ? "bg-amber-500/10 border-amber-500/30" : "bg-[#0b0f1c] border-white/[0.08]"}`}>
                           <p className="text-slate-400">
                             Dono atual: <span className="text-slate-300">{donoAtual.nome}</span>
                             {donoAtual.equipe && <span className={`ml-1 ${frenteDiferente ? "text-amber-400 font-medium" : "text-slate-500"}`}>({FRENTE_LABEL[donoAtual.equipe.tipo] ?? donoAtual.equipe.nome})</span>}
@@ -275,13 +275,13 @@ function TransferenciaModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-slate-800">
+      <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl">
+        <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
             <ArrowLeftRight size={16} className="text-sky-400" />
             <h2 className="text-white font-semibold">Transferência Direta</h2>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -312,7 +312,7 @@ function TransferenciaModal({ onClose }: { onClose: () => void }) {
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input
                       autoFocus
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-500"
+                      className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl pl-9 pr-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 placeholder:text-slate-500"
                       placeholder="Nome do cliente ou número do contrato..."
                       value={busca}
                       onChange={(e) => { setBusca(e.target.value); setSelecionado(null); }}
@@ -322,12 +322,12 @@ function TransferenciaModal({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {resultados.length > 0 && (
-                  <div className="border border-slate-700 rounded-xl overflow-hidden max-h-52 overflow-y-auto">
+                  <div className="border border-white/[0.08] rounded-xl overflow-hidden max-h-52 overflow-y-auto">
                     {resultados.map((r) => (
                       <button
                         key={r.contratoId}
                         onClick={() => { setSelecionado(r); setBusca(""); setResultados([]); setConsultorDestinoId(""); }}
-                        className="w-full flex items-start justify-between px-4 py-3 hover:bg-slate-800 transition-colors border-b border-slate-700/50 last:border-0 text-left"
+                        className="w-full flex items-start justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors border-b border-white/[0.08]/50 last:border-0 text-left"
                       >
                         <div>
                           <p className="text-white text-sm font-medium">{r.cliente}</p>
@@ -353,7 +353,7 @@ function TransferenciaModal({ onClose }: { onClose: () => void }) {
             ) : (
               <>
                 {/* Contrato selecionado */}
-                <div className="bg-slate-800 border border-slate-700 rounded-xl p-4">
+                <div className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl p-4">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-white font-semibold">{selecionado.cliente}</p>
@@ -362,7 +362,7 @@ function TransferenciaModal({ onClose }: { onClose: () => void }) {
                     </div>
                     <button
                       onClick={() => setSelecionado(null)}
-                      className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-slate-700 transition-colors"
+                      className="text-slate-500 hover:text-white p-1 rounded-lg hover:bg-white/[0.04] transition-colors"
                     >
                       <X size={14} />
                     </button>
@@ -375,7 +375,7 @@ function TransferenciaModal({ onClose }: { onClose: () => void }) {
                   <select
                     value={consultorDestinoId}
                     onChange={(e) => setConsultorDestinoId(e.target.value)}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
                   >
                     <option value="">Selecione o consultor...</option>
                     {consultores
@@ -391,7 +391,7 @@ function TransferenciaModal({ onClose }: { onClose: () => void }) {
                 <div className="flex gap-3 pt-1">
                   <button
                     onClick={onClose}
-                    className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+                    className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
                   >
                     Cancelar
                   </button>

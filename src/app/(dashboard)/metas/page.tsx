@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Target, Plus, X, CheckCircle2, Loader2, Trash2, TrendingUp, Users, ClipboardCheck, Pencil, Percent } from "lucide-react";
@@ -18,7 +18,7 @@ interface Meta {
   consultor: { nome: string } | null;
 }
 
-const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
+const inputCls = "w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
 
 const TIPO_CONFIG = {
   FINANCEIRA: {
@@ -258,16 +258,16 @@ export default function MetasPage() {
           <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : metas.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
           <Target size={40} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 font-medium">Nenhuma meta configurada</p>
           <p className="text-slate-400 text-sm mt-1">Crie metas financeiras, de quantidade ou de monitoria.</p>
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-800">
+              <tr className="border-b border-white/[0.06]">
                 <th className="text-left px-4 py-3 text-slate-400 font-medium">Meta</th>
                 <th className="text-left px-4 py-3 text-slate-400 font-medium">Consultor</th>
                 <th className="text-left px-4 py-3 text-slate-400 font-medium">Equipe</th>
@@ -283,7 +283,7 @@ export default function MetasPage() {
                 const cfg = tipoCfg(m.tipo);
                 const Icon = cfg.icon;
                 return (
-                  <tr key={m.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                  <tr key={m.id} className="border-b border-white/[0.06]/50 hover:bg-white/[0.02] transition-colors">
                     <td className="px-4 py-3 text-white font-medium">{m.nome || "—"}</td>
                     <td className="px-4 py-3 text-slate-300">
                       {m.consultor ? m.consultor.nome : <span className="text-slate-400 text-xs">Equipe toda</span>}
@@ -327,8 +327,8 @@ export default function MetasPage() {
       {/* Modal */}
       {modalAberto && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-5 border-b border-white/[0.06] sticky top-0 bg-[#0b0f1c] z-10">
               <div>
                 <h2 className="text-white font-semibold">{editandoMeta ? "Editar Meta" : "Nova Meta"}</h2>
                 <p className="text-slate-500 text-xs mt-0.5">
@@ -337,7 +337,7 @@ export default function MetasPage() {
                     : "Defina a meta para a frente nesta competência"}
                 </p>
               </div>
-              <button onClick={() => setModalAberto(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => setModalAberto(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -360,7 +360,7 @@ export default function MetasPage() {
                           if (t === "MONITORIA" && !editandoMeta) setThresholds({ ...DEFAULT_THRESHOLDS });
                         }}
                         className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-center transition-all ${
-                          ativo ? cfg.cor + " font-medium" : "border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-400"
+                          ativo ? cfg.cor + " font-medium" : "border-white/[0.08] text-slate-500 hover:border-white/[0.12] hover:text-slate-400"
                         }`}
                       >
                         <Icon size={16} />
@@ -430,7 +430,7 @@ export default function MetasPage() {
                             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs transition-colors border ${
                               form.modoAlvo === modo
                                 ? "bg-sky-500/20 border-sky-500/40 text-sky-300"
-                                : "bg-slate-800 border-slate-700 text-slate-400 hover:border-slate-600"
+                                : "bg-[#0b0f1c] border-white/[0.08] text-slate-400 hover:border-white/[0.12]"
                             }`}
                           >
                             {modo === "VALOR" ? "R$ fixo" : <><Percent size={10} /> % da inadimplência</>}
@@ -504,17 +504,17 @@ export default function MetasPage() {
                   {form.tipo === "MONITORIA" && (
                     <div className="col-span-2">
                       <label className="block text-xs text-slate-400 mb-1.5">Notas mínimas por faixa</label>
-                      <div className="bg-slate-800/50 border border-slate-700 rounded-xl overflow-hidden">
+                      <div className="bg-[#0b0f1c]/50 border border-white/[0.08] rounded-xl overflow-hidden">
                         <table className="w-full text-xs">
                           <thead>
-                            <tr className="border-b border-slate-700">
+                            <tr className="border-b border-white/[0.08]">
                               <th className="text-left px-3 py-2 text-slate-400">Faixa</th>
                               <th className="text-right px-3 py-2 text-slate-400">Nota mínima</th>
                             </tr>
                           </thead>
                           <tbody>
                             {FAIXAS_THRESH.map((f) => (
-                              <tr key={f} className="border-b border-slate-700/50 last:border-0">
+                              <tr key={f} className="border-b border-white/[0.08]/50 last:border-0">
                                 <td className="px-3 py-1.5 text-slate-300 font-medium">{f}%</td>
                                 <td className="px-3 py-1.5 text-right">
                                   <input
@@ -524,7 +524,7 @@ export default function MetasPage() {
                                     step="0.1"
                                     value={thresholds[String(f)] ?? ""}
                                     onChange={(e) => setThresholds((t) => ({ ...t, [String(f)]: parseFloat(e.target.value) || 0 }))}
-                                    className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-right focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                    className="w-20 bg-white/[0.07] border border-white/[0.12] rounded px-2 py-1 text-white text-right focus:outline-none focus:ring-1 focus:ring-sky-500"
                                   />
                                 </td>
                               </tr>
@@ -581,7 +581,7 @@ export default function MetasPage() {
             <div className="flex gap-3 px-5 pb-5">
               <button
                 onClick={() => setModalAberto(false)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
+                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
               >
                 Cancelar
               </button>

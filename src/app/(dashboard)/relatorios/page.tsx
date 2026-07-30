@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
@@ -31,7 +31,7 @@ export default function RelatoriosPage() {
         <select
           value={competenciaId}
           onChange={(e) => setCompetenciaId(e.target.value)}
-          className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
         >
           {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
         </select>
@@ -53,7 +53,7 @@ export default function RelatoriosPage() {
 
           {/* Ranking empresas */}
           {dados.rankingEmpresas && dados.rankingEmpresas.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6">
               <h2 className="text-white font-semibold mb-5">Recuperação por Empresa</h2>
               <div className="space-y-4">
                 {dados.rankingEmpresas.map((e: any) => (
@@ -69,7 +69,7 @@ export default function RelatoriosPage() {
                         </span>
                       </div>
                     </div>
-                    <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full ${e.percentual >= 80 ? "bg-emerald-500" : e.percentual >= 50 ? "bg-sky-500" : "bg-amber-500"}`}
                         style={{ width: `${Math.min(e.percentual, 100)}%` }}
@@ -83,11 +83,11 @@ export default function RelatoriosPage() {
 
           {/* Ranking consultores */}
           {dados.rankingConsultores && dados.rankingConsultores.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-6">
               <h2 className="text-white font-semibold mb-4">Ranking de Consultores</h2>
               <div className="space-y-2">
                 {dados.rankingConsultores.map((c: any, i: number) => (
-                  <div key={c.id} className="flex items-center gap-3 py-2 border-b border-slate-800/50 last:border-0">
+                  <div key={c.id} className="flex items-center gap-3 py-2 border-b border-white/[0.06]/50 last:border-0">
                     <span className={`w-6 text-center text-xs font-bold ${i === 0 ? "text-amber-400" : i === 1 ? "text-slate-300" : i === 2 ? "text-amber-700" : "text-slate-400"}`}>
                       {i + 1}
                     </span>
@@ -106,13 +106,13 @@ export default function RelatoriosPage() {
 
 function Kpi({ titulo, valor, icon: Icon, cor = "text-white" }: any) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+    <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-slate-400 text-sm">{titulo}</p>
           <p className={`text-2xl font-bold mt-1 ${cor}`}>{valor}</p>
         </div>
-        <div className="p-2.5 rounded-xl bg-slate-800">
+        <div className="p-2.5 rounded-xl bg-[#0b0f1c]">
           <Icon size={18} className="text-slate-400" />
         </div>
       </div>

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { formatarDataHora } from "@/lib/utils";
@@ -56,7 +56,7 @@ export default function AuditoriaPage() {
           placeholder="Filtrar por usuário, tabela ou ação..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
-          className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+          className="w-full bg-[#0f1525] border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
         />
       </div>
 
@@ -65,11 +65,11 @@ export default function AuditoriaPage() {
           <div className="w-8 h-8 border-2 border-sky-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-800">
+                <tr className="border-b border-white/[0.06]">
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Data/Hora</th>
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Usuário</th>
                   <th className="text-left px-4 py-3 text-slate-400 font-medium">Ação</th>
@@ -79,14 +79,14 @@ export default function AuditoriaPage() {
               </thead>
               <tbody>
                 {filtrados.map((r) => (
-                  <tr key={r.id} className="border-b border-slate-800/50 hover:bg-slate-800/20 transition-colors">
+                  <tr key={r.id} className="border-b border-white/[0.06]/50 hover:bg-white/[0.02] transition-colors">
                     <td className="px-4 py-3 text-slate-400 text-xs tabular-nums whitespace-nowrap">{formatarDataHora(r.criadoEm)}</td>
                     <td className="px-4 py-3">
                       <p className="text-white text-xs">{r.usuario.nome}</p>
                       <p className="text-slate-500 text-xs">{r.usuario.email}</p>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${COR_ACAO[r.acao] || "bg-slate-700 text-slate-300"}`}>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${COR_ACAO[r.acao] || "bg-white/[0.07] text-slate-300"}`}>
                         {r.acao}
                       </span>
                     </td>

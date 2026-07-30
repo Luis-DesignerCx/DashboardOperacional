@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
@@ -56,7 +56,7 @@ function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; fre
   return (
     <div className="flex flex-wrap gap-1">
       {todas.map((e) => (
-        <span key={e.id} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${FRENTE_COR[e.tipo] ?? "bg-slate-700 text-slate-300"}`}>
+        <span key={e.id} className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${FRENTE_COR[e.tipo] ?? "bg-white/[0.07] text-slate-300"}`}>
           {FRENTE_LABEL[e.tipo] ?? e.nome}
         </span>
       ))}
@@ -64,7 +64,7 @@ function FrenteChips({ equipe, frentesAdicionais }: { equipe: Equipe | null; fre
   );
 }
 
-const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
+const inputCls = "w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
 
 export default function UsuariosPage() {
   const { data: session } = useSession();
@@ -200,10 +200,10 @@ export default function UsuariosPage() {
       </div>
 
       {/* Tabela */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-800">
+            <tr className="border-b border-white/[0.06]">
               <th className="text-left text-xs text-slate-500 font-medium px-5 py-3">Nome</th>
               <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">E-mail</th>
               <th className="text-left text-xs text-slate-500 font-medium px-4 py-3">Perfil</th>
@@ -216,7 +216,7 @@ export default function UsuariosPage() {
             {usuarios.map((u) => {
               const Icon = PERFIL_ICON[u.perfil];
               return (
-                <tr key={u.id} className="border-b border-slate-800/60 last:border-0 hover:bg-slate-800/30 transition-colors">
+                <tr key={u.id} className="border-b border-white/[0.06]/60 last:border-0 hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-full bg-gr-500/15 flex items-center justify-center flex-shrink-0">
@@ -241,7 +241,7 @@ export default function UsuariosPage() {
                     <FrenteChips equipe={u.equipe} frentesAdicionais={u.frentesAdicionais} />
                   </td>
                   <td className="px-4 py-3.5">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.ativo ? "bg-emerald-500/10 text-emerald-400" : "bg-slate-700 text-slate-500"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.ativo ? "bg-emerald-500/10 text-emerald-400" : "bg-white/[0.07] text-slate-500"}`}>
                       {u.ativo ? "Ativo" : "Inativo"}
                     </span>
                   </td>
@@ -260,7 +260,7 @@ export default function UsuariosPage() {
                         <KeyRound size={14} />
                       </button>
                       <button onClick={() => abrirEditar(u)} title="Editar"
-                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors">
+                        className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.04] transition-colors">
                         <Pencil size={14} />
                       </button>
                       <button onClick={() => setConfirmDelete(u.id)} title="Excluir"
@@ -282,15 +282,15 @@ export default function UsuariosPage() {
       {/* Modal criar / editar */}
       {(modal === "criar" || modal === "editar") && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">{modal === "criar" ? "Novo Usuário" : "Editar Usuário"}</h2>
                 {modal === "criar" && (
                   <p className="text-slate-500 text-xs mt-0.5">Senha inicial: <span className="text-slate-300 font-mono">mudar123</span> — o usuário deverá trocar no primeiro acesso</p>
                 )}
               </div>
-              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -319,21 +319,21 @@ export default function UsuariosPage() {
               {(meuPerfil === "ADMINISTRADOR" || meuPerfil === "GESTOR") && (
                 <div>
                   <label className="block text-xs text-slate-400 mb-1.5">Frentes de cobrança</label>
-                  <div className="space-y-1.5 bg-slate-800/50 border border-slate-700/50 rounded-xl p-3">
+                  <div className="space-y-1.5 bg-[#0b0f1c]/50 border border-white/[0.08]/50 rounded-xl p-3">
                     {frentesDisponiveis.length === 0 && (
                       <p className="text-slate-500 text-xs text-center py-1">Nenhuma frente cadastrada</p>
                     )}
                     {frentesDisponiveis.map((e) => {
                       const selecionada = form.frentesIds.includes(e.id);
                       return (
-                        <label key={e.id} className="flex items-center gap-3 cursor-pointer py-1 px-1 rounded-lg hover:bg-slate-700/40 transition-colors">
+                        <label key={e.id} className="flex items-center gap-3 cursor-pointer py-1 px-1 rounded-lg hover:bg-white/[0.04]/40 transition-colors">
                           <input
                             type="checkbox"
                             checked={selecionada}
                             onChange={() => toggleFrenteId(e.id)}
                             className="w-4 h-4 accent-gr-500 flex-shrink-0"
                           />
-                          <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${FRENTE_COR[e.tipo] ?? "bg-slate-700 text-slate-300"}`}>
+                          <span className={`text-[11px] px-2 py-0.5 rounded font-medium ${FRENTE_COR[e.tipo] ?? "bg-white/[0.07] text-slate-300"}`}>
                             {FRENTE_LABEL[e.tipo] ?? e.nome}
                           </span>
                           <span className="text-slate-300 text-sm">{e.nome}</span>
@@ -350,7 +350,7 @@ export default function UsuariosPage() {
             </div>
             <div className="flex gap-3 px-5 pb-5">
               <button onClick={() => setModal(null)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={salvar} disabled={carregando || !form.nome || !form.email}
@@ -365,13 +365,13 @@ export default function UsuariosPage() {
       {/* Modal redefinir senha */}
       {modal === "senha" && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Redefinir senha</h2>
                 <p className="text-slate-500 text-xs mt-0.5">{editando?.nome}</p>
               </div>
-              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -392,7 +392,7 @@ export default function UsuariosPage() {
               {erro && <p className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{erro}</p>}
               <div className="flex gap-3">
                 <button onClick={() => setModal(null)}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                  className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                   Cancelar
                 </button>
                 <button onClick={redefinirSenha} disabled={carregando || !novaSenha}
@@ -408,12 +408,12 @@ export default function UsuariosPage() {
       {/* Confirmação exclusão */}
       {confirmDelete && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl p-6 space-y-4">
             <h2 className="text-white font-semibold">Excluir usuário?</h2>
             <p className="text-slate-400 text-sm">O usuário será desativado e não conseguirá mais acessar o sistema.</p>
             <div className="flex gap-3">
               <button onClick={() => setConfirmDelete(null)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={() => excluir(confirmDelete)}

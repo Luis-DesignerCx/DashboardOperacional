@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
@@ -219,7 +219,7 @@ export function DashboardGestor() {
             <div key={c.id} className="flex items-center gap-3 px-1">
               <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
                 i === 0 ? "bg-amber-500/20 text-amber-400" :
-                i === 1 ? "bg-slate-600/40 text-slate-300" :
+                i === 1 ? "bg-white/[0.12]/40 text-slate-300" :
                 i === 2 ? "bg-orange-700/20 text-orange-400" : "bg-white/[0.04] text-slate-500"
               }`}>{i + 1}</span>
               <div className="flex-1 min-w-0">

@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { formatarMoeda, formatarData } from "@/lib/utils";
 import { Bell, AlertTriangle, Clock, CheckCircle2, Plus, Search, X, Loader2, Phone, CalendarDays, Trash2, Pencil, ChevronDown } from "lucide-react";
 
-const inputCls = "w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
+const inputCls = "w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
 
 export default function PendenciasPage() {
   const [promessasHoje, setPromessasHoje] = useState<any[]>([]);
@@ -181,7 +181,7 @@ export default function PendenciasPage() {
 
       {/* Resumo */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasVencidas.length > 0 ? "bg-red-500/10 border-red-500/20" : "bg-slate-900 border-slate-800"}`}>
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasVencidas.length > 0 ? "bg-red-500/10 border-red-500/20" : "bg-[#0f1525] border-white/[0.06]"}`}>
           <div className="flex items-center gap-2.5">
             <AlertTriangle size={15} className={promessasVencidas.length > 0 ? "text-red-400" : "text-slate-500"} />
             <div>
@@ -191,7 +191,7 @@ export default function PendenciasPage() {
           </div>
           <span className={`text-lg font-bold ${promessasVencidas.length > 0 ? "text-red-400" : "text-slate-500"}`}>{promessasVencidas.length}</span>
         </div>
-        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasHoje.length > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-slate-900 border-slate-800"}`}>
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasHoje.length > 0 ? "bg-amber-500/10 border-amber-500/20" : "bg-[#0f1525] border-white/[0.06]"}`}>
           <div className="flex items-center gap-2.5">
             <Clock size={15} className={promessasHoje.length > 0 ? "text-amber-400" : "text-slate-500"} />
             <div>
@@ -201,7 +201,7 @@ export default function PendenciasPage() {
           </div>
           <span className={`text-lg font-bold ${promessasHoje.length > 0 ? "text-amber-400" : "text-slate-500"}`}>{promessasHoje.length}</span>
         </div>
-        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasFuturas.length > 0 ? "bg-sky-500/10 border-sky-500/20" : "bg-slate-900 border-slate-800"}`}>
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${promessasFuturas.length > 0 ? "bg-sky-500/10 border-sky-500/20" : "bg-[#0f1525] border-white/[0.06]"}`}>
           <div className="flex items-center gap-2.5">
             <CalendarDays size={15} className={promessasFuturas.length > 0 ? "text-sky-400" : "text-slate-500"} />
             <div>
@@ -211,7 +211,7 @@ export default function PendenciasPage() {
           </div>
           <span className={`text-lg font-bold ${promessasFuturas.length > 0 ? "text-sky-400" : "text-slate-500"}`}>{promessasFuturas.length}</span>
         </div>
-        <div className={`flex items-center justify-between p-3 rounded-xl border ${agendadosHoje.length > 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-slate-900 border-slate-800"}`}>
+        <div className={`flex items-center justify-between p-3 rounded-xl border ${agendadosHoje.length > 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-[#0f1525] border-white/[0.06]"}`}>
           <div className="flex items-center gap-2.5">
             <Phone size={15} className={agendadosHoje.length > 0 ? "text-emerald-400" : "text-slate-500"} />
             <div>
@@ -270,7 +270,7 @@ export default function PendenciasPage() {
           const tel = cli?.telefones ? cli.telefones.split(",")[0].trim() : null;
           const email = cli?.emails ? cli.emails.split(",")[0].trim() : null;
           return (
-            <div key={c.id} className="bg-slate-800/50 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
+            <div key={c.id} className="bg-[#0b0f1c]/50 border border-emerald-500/20 rounded-xl p-4 flex items-center justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <p className="text-white font-medium text-sm truncate">{cli?.nome || "—"}</p>
                 <p className="text-slate-400 text-xs">{c.contrato?.numero} · {c.contrato?.empresa?.nome}</p>
@@ -294,13 +294,13 @@ export default function PendenciasPage() {
       {/* Modal nova promessa */}
       {modalAberto && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Nova Promessa de Pagamento</h2>
                 <p className="text-slate-400 text-xs mt-0.5">Registre o compromisso do cliente</p>
               </div>
-              <button onClick={() => setModalAberto(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => setModalAberto(false)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -322,7 +322,7 @@ export default function PendenciasPage() {
                     <div className="space-y-1.5 max-h-60 overflow-y-auto">
                       {resultadosBusca.map((item) => (
                         <button key={item.id} onClick={() => setContratoSelecionado(item.contrato)}
-                          className="w-full flex items-center justify-between bg-slate-800 hover:bg-slate-700 rounded-xl px-4 py-3 text-left transition-colors">
+                          className="w-full flex items-center justify-between bg-[#0b0f1c] hover:bg-white/[0.04] rounded-xl px-4 py-3 text-left transition-colors">
                           <div>
                             <p className="text-white text-sm font-medium">{item.contrato.cliente.nome}</p>
                             <p className="text-slate-400 text-xs font-mono">{item.contrato.numero} · {item.contrato.empresa.nome}</p>
@@ -380,7 +380,7 @@ export default function PendenciasPage() {
             {contratoSelecionado && (
               <div className="flex gap-3 px-5 pb-5">
                 <button onClick={() => setModalAberto(false)}
-                  className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                  className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                   Cancelar
                 </button>
                 <button onClick={salvarPromessa} disabled={salvando}
@@ -396,13 +396,13 @@ export default function PendenciasPage() {
       {/* Modal editar promessa */}
       {modalEditar && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl">
-            <div className="flex items-center justify-between p-5 border-b border-slate-800">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl">
+            <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
                 <h2 className="text-white font-semibold">Editar Promessa</h2>
                 <p className="text-slate-400 text-xs mt-0.5">{modalEditar.contrato?.cliente?.nome}</p>
               </div>
-              <button onClick={() => setModalEditar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
+              <button onClick={() => setModalEditar(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
               </button>
             </div>
@@ -436,7 +436,7 @@ export default function PendenciasPage() {
             </div>
             <div className="flex gap-3 px-5 pb-5">
               <button onClick={() => setModalEditar(null)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={salvarEdicao} disabled={salvandoEdit}
@@ -451,7 +451,7 @@ export default function PendenciasPage() {
       {/* Modal confirmar exclusão */}
       {confirmandoExclusao && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-red-500/30 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
+          <div className="bg-[#0f1525] border border-red-500/25 rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center space-y-4">
             <div className="w-12 h-12 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
               <Trash2 size={20} className="text-red-400" />
             </div>
@@ -461,7 +461,7 @@ export default function PendenciasPage() {
             </div>
             <div className="flex gap-3">
               <button onClick={() => setConfirmandoExclusao(null)}
-                className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
+                className="flex-1 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors">
                 Cancelar
               </button>
               <button onClick={() => excluirPromessa(confirmandoExclusao)} disabled={excluindo}
@@ -480,11 +480,11 @@ function Section({ titulo, count, icon: Icon, cor, badgeCor, vazio, children, de
   const [aberta, setAberta] = useState<boolean>(defaultAberta ?? false);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+    <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
       {/* Cabeçalho clicável */}
       <button
         onClick={() => setAberta((v) => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-slate-800/60 transition-colors text-left"
+        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.03] transition-colors text-left"
       >
         <Icon size={16} className={cor} />
         <span className="text-white font-semibold text-sm flex-1">{titulo}</span>
@@ -501,7 +501,7 @@ function Section({ titulo, count, icon: Icon, cor, badgeCor, vazio, children, de
 
       {/* Conteúdo expansível */}
       {aberta && (
-        <div className="px-4 pb-4 pt-1 space-y-2 border-t border-slate-800">
+        <div className="px-4 pb-4 pt-1 space-y-2 border-t border-white/[0.06]">
           {count === 0 ? (
             <div className="py-6 text-center">
               <CheckCircle2 size={24} className="mx-auto mb-2 text-slate-700" />
@@ -541,7 +541,7 @@ function CardPromessa({
   const email = cliente?.emails ? cliente.emails.split(",")[0].trim() : null;
 
   return (
-    <div className={`bg-slate-900 border ${borderCor} rounded-xl p-4 flex items-center justify-between gap-4`}>
+    <div className={`bg-[#0f1525] border ${borderCor} rounded-xl p-4 flex items-center justify-between gap-4`}>
       <div className="flex-1 min-w-0">
         <p className="text-white font-medium text-sm truncate">{cliente?.nome || "—"}</p>
         <p className="text-slate-400 text-xs">{p.contrato?.numero} · {p.contrato?.empresa?.nome}</p>
@@ -560,7 +560,7 @@ function CardPromessa({
           <p className="text-slate-400 text-xs">{p.formaPagamento}</p>
         </div>
         <button onClick={onEditar} title="Editar"
-          className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-slate-700 transition-colors">
+          className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.04] transition-colors">
           <Pencil size={14} />
         </button>
         <button onClick={onExcluir} title="Excluir"

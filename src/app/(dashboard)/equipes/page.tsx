@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { Plus, X, Eye, EyeOff, Trash2, Palmtree, RefreshCw } from "lucide-react";
@@ -173,7 +173,7 @@ export default function FrentesPage() {
           <select
             value={competenciaId}
             onChange={(e) => setCompetenciaId(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+            className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           >
             {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
           </select>
@@ -191,7 +191,7 @@ export default function FrentesPage() {
         return (
           <div key={dept} className="space-y-3">
             {/* Cabeçalho do departamento */}
-            <div className={`flex items-center gap-3 pb-2 border-b border-slate-800`}>
+            <div className={`flex items-center gap-3 pb-2 border-b border-white/[0.06]`}>
               <span className={`text-sm font-semibold ${COR_DEPT[dept].split(" ")[0]}`}>
                 {dept}
               </span>
@@ -208,18 +208,18 @@ export default function FrentesPage() {
                 return (
                   <div
                     key={f.id}
-                    className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col"
+                    className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 space-y-4 flex flex-col"
                   >
                     {/* Cabeçalho da frente */}
                     <div className="flex items-start justify-between">
                       <div>
-                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${COR_FRENTE[f.tipo] ?? "bg-slate-700 text-slate-300"}`}>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${COR_FRENTE[f.tipo] ?? "bg-white/[0.07] text-slate-300"}`}>
                           {LABEL_FRENTE[f.tipo] ?? f.tipo}
                         </span>
                         <h2 className="text-white font-semibold mt-2 text-sm">{NOME_FRENTE[f.tipo] ?? f.nome}</h2>
                       </div>
                       <div
-                        className={`w-2.5 h-2.5 rounded-full mt-1 ${f.ativa ? "bg-emerald-400" : "bg-slate-600"}`}
+                        className={`w-2.5 h-2.5 rounded-full mt-1 ${f.ativa ? "bg-emerald-400" : "bg-white/[0.12]"}`}
                         title={f.ativa ? "Ativa" : "Inativa"}
                       />
                     </div>
@@ -296,7 +296,7 @@ export default function FrentesPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => abrirModal(f)}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-slate-700 text-slate-500 hover:border-gr-500/40 hover:text-gr-400 transition-all text-xs"
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg border border-dashed border-white/[0.08] text-slate-500 hover:border-gr-500/40 hover:text-gr-400 transition-all text-xs"
                       >
                         <Plus size={13} />
                         Adicionar
@@ -305,7 +305,7 @@ export default function FrentesPage() {
                         onClick={() => redistribuir(f.id)}
                         disabled={redistribuindo === f.id || consultores.length === 0}
                         title="Redistribuir carteira entre os colaboradores desta frente"
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-slate-700 text-slate-500 hover:border-amber-500/40 hover:text-amber-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs"
+                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-white/[0.08] text-slate-500 hover:border-amber-500/40 hover:text-amber-400 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-xs"
                       >
                         <RefreshCw size={13} className={redistribuindo === f.id ? "animate-spin" : ""} />
                         {redistribuindo === f.id ? "..." : "Redistribuir"}
@@ -322,7 +322,7 @@ export default function FrentesPage() {
       {/* Modal adicionar colaborador */}
       {modal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+          <div className="bg-[#0f1525] border border-white/[0.08] rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
             {/* Header modal */}
             <div className="flex items-center justify-between mb-5">
               <div>
@@ -331,7 +331,7 @@ export default function FrentesPage() {
               </div>
               <button
                 onClick={() => setModal(null)}
-                className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg"
+                className="p-1.5 text-slate-500 hover:text-white hover:bg-white/[0.03] rounded-lg"
               >
                 <X size={16} />
               </button>
@@ -347,7 +347,7 @@ export default function FrentesPage() {
                   value={form.nome}
                   onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
                   required
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
+                  className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                 />
               </div>
 
@@ -360,7 +360,7 @@ export default function FrentesPage() {
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   required
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
+                  className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                 />
               </div>
 
@@ -375,7 +375,7 @@ export default function FrentesPage() {
                     onChange={(e) => setForm((f) => ({ ...f, senha: e.target.value }))}
                     minLength={6}
                     required
-                    className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 pr-10 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500"
+                    className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3.5 py-2.5 pr-10 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                   />
                   <button
                     type="button"
@@ -393,7 +393,7 @@ export default function FrentesPage() {
                 <select
                   value={form.perfil}
                   onChange={(e) => setForm((f) => ({ ...f, perfil: e.target.value }))}
-                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500"
+                  className="w-full bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3.5 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
                 >
                   <option value="CONSULTOR">Colaborador (Consultor)</option>
                   <option value="GESTOR">Gestor</option>
@@ -410,7 +410,7 @@ export default function FrentesPage() {
                 <button
                   type="button"
                   onClick={() => setModal(null)}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-700 text-slate-400 text-sm hover:text-white hover:border-slate-600 transition-colors"
+                  className="flex-1 py-2.5 rounded-xl border border-white/[0.08] text-slate-400 text-sm hover:text-white hover:border-white/[0.12] transition-colors"
                 >
                   Cancelar
                 </button>

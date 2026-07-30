@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
@@ -55,14 +55,14 @@ function faixaCor(pct: number) {
   return "text-emerald-400";
 }
 function faixaBarCor(pct: number) {
-  if (pct < 70) return "bg-slate-600";
+  if (pct < 70) return "bg-white/[0.12]";
   if (pct < 80) return "bg-orange-500";
   if (pct < 90) return "bg-amber-500";
   if (pct < 100) return "bg-yellow-500";
   return "bg-emerald-500";
 }
 
-const inputCls = "bg-slate-800 border border-slate-700 rounded-lg px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 placeholder:text-slate-500";
+const inputCls = "bg-[#0b0f1c] border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
 
 // ─────────────────────────────────────────────────────────
 // GESTOR VIEW
@@ -235,7 +235,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
       </div>
 
       {/* Configuração: base + metas */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+      <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5 space-y-4">
         <h2 className="text-sm font-semibold text-white">Configuração da Comissão</h2>
 
         {/* Valor base */}
@@ -251,7 +251,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                     value={novoBase}
                     onChange={(e) => setNovoBase(e.target.value)}
                     placeholder="1580"
-                    className="bg-slate-800 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-2 focus:ring-gr-500 w-40"
+                    className="bg-[#0b0f1c] border border-white/[0.08] rounded-xl pl-9 pr-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 w-40"
                     autoFocus
                   />
                 </div>
@@ -262,7 +262,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                 >
                   {salvandoBase ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 </button>
-                <button onClick={() => setEditandoBase(false)} className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-colors">
+                <button onClick={() => setEditandoBase(false)} className="p-2 bg-[#0b0f1c] hover:bg-white/[0.04] text-slate-400 rounded-lg transition-colors">
                   <X size={14} />
                 </button>
               </div>
@@ -277,7 +277,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                 )}
                 <button
                   onClick={() => { setEditandoBase(true); setNovoBase(comissaoBase > 0 ? String(comissaoBase) : ""); }}
-                  className="p-1.5 text-slate-500 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                  className="p-1.5 text-slate-500 hover:text-white hover:bg-white/[0.03] rounded-lg transition-colors"
                 >
                   <Pencil size={12} />
                 </button>
@@ -288,10 +288,10 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
 
         {/* Tabela de metas */}
         {metas.length > 0 && (
-          <div className="border border-slate-700 rounded-xl overflow-hidden">
+          <div className="border border-white/[0.08] rounded-xl overflow-hidden">
             <table className="w-full text-xs">
               <thead>
-                <tr className="bg-slate-800/60 border-b border-slate-700">
+                <tr className="bg-white/[0.03] border-b border-white/[0.08]">
                   <th className="text-left px-3 py-2.5 text-slate-400 font-medium">Indicador</th>
                   <th className="text-left px-3 py-2.5 text-slate-400 font-medium">Tipo</th>
                   <th className="text-right px-3 py-2.5 text-slate-400 font-medium">Peso</th>
@@ -303,7 +303,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                 {metas.map((m) => {
                   const valorBase = comissaoBase * m.peso;
                   return (
-                    <tr key={m.id} className="border-b border-slate-700/50 last:border-0">
+                    <tr key={m.id} className="border-b border-white/[0.08]/50 last:border-0">
                       <td className="px-3 py-2.5 text-white font-medium">{m.nome}</td>
                       <td className="px-3 py-2.5">
                         <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
@@ -345,11 +345,11 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
           {consultores.map((c) => {
             const exp = expandidos.has(c.id);
             return (
-              <div key={c.id} className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+              <div key={c.id} className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
                 {/* Row header */}
                 <button
                   onClick={() => toggleExpand(c.id)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-slate-800/30 transition-colors"
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-white/[0.02] transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     {exp ? <ChevronUp size={14} className="text-slate-500" /> : <ChevronDown size={14} className="text-slate-500" />}
@@ -369,10 +369,10 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
 
                 {/* Breakdown expandido */}
                 {exp && (
-                  <div className="border-t border-slate-800">
+                  <div className="border-t border-white/[0.06]">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-slate-800/40 border-b border-slate-800">
+                        <tr className="bg-white/[0.03] border-b border-white/[0.06]">
                           <th className="text-left px-4 py-2.5 text-slate-400 font-medium">Indicador</th>
                           <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Peso</th>
                           <th className="text-right px-4 py-2.5 text-slate-400 font-medium">Base</th>
@@ -384,7 +384,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                       </thead>
                       <tbody>
                         {(c.breakdown ?? []).map((bd) => (
-                          <tr key={bd.metaId} className="border-b border-slate-800/50 last:border-0">
+                          <tr key={bd.metaId} className="border-b border-white/[0.06]/50 last:border-0">
                             <td className="px-4 py-3 text-white font-medium">{bd.nome}</td>
                             <td className="px-4 py-3 text-right text-slate-400 tabular-nums">{Math.round(bd.peso * 100)}%</td>
                             <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{formatarMoeda(bd.valorBase)}</td>
@@ -406,7 +406,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                                       [bd.metaId]: { ...(prev[bd.metaId] ?? {}), [c.id]: e.target.value },
                                     }))
                                   }
-                                  className="w-20 bg-slate-700 border border-slate-600 rounded px-2 py-1 text-white text-right focus:outline-none focus:ring-1 focus:ring-sky-500"
+                                  className="w-20 bg-white/[0.07] border border-white/[0.12] rounded px-2 py-1 text-white text-right focus:outline-none focus:ring-1 focus:ring-sky-500"
                                   placeholder="nota"
                                 />
                               ) : (
@@ -427,7 +427,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
                           </tr>
                         ))}
                         {/* Total */}
-                        <tr className="bg-slate-800/30">
+                        <tr className="bg-white/[0.02]">
                           <td colSpan={6} className="px-4 py-3 text-right text-slate-400 font-medium">Total</td>
                           <td className="px-4 py-3 text-right text-emerald-400 font-bold tabular-nums">{formatarMoeda(c.totalComissao)}</td>
                         </tr>
@@ -441,7 +441,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
         </div>
       ) : (
         !carregando && (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center">
+          <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-10 text-center">
             <p className="text-slate-500 text-sm">Nenhum consultor ativo nesta equipe</p>
           </div>
         )
@@ -453,7 +453,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
           <button
             onClick={salvarNotas}
             disabled={salvandoNotas}
-            className="flex items-center gap-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-700/40 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
+            className="flex items-center gap-2 bg-white/[0.07] hover:bg-white/[0.12] disabled:bg-white/[0.07]/40 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
           >
             {salvandoNotas ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Salvar Notas de Monitoria
@@ -527,7 +527,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
           <div className="w-7 h-7 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : !preview ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
           <DollarSign size={36} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400">Nenhuma meta configurada para esta competência</p>
           <p className="text-slate-400 text-sm mt-1">Aguarde seu gestor configurar as metas da equipe.</p>
@@ -536,17 +536,17 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
         <>
           {/* Cards de resumo */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Total Recebido</p>
               <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.totalRecebido)}</p>
               <p className="text-slate-500 text-[10px] mt-1">inclui valores a parte</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">À Parte</p>
               <p className="text-sky-400 text-xl font-bold tabular-nums">{formatarMoeda(preview.totalAParte ?? 0)}</p>
               <p className="text-slate-500 text-[10px] mt-1">incluído no total recebido</p>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Base (100%)</p>
               <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.comissaoBase)}</p>
             </div>
@@ -558,12 +558,12 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
 
           {/* Barra de progresso financeiro */}
           {preview.percentualMeta > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-5">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-slate-400">Atingimento financeiro</p>
                 <p className={`text-sm font-bold tabular-nums ${faixaCor(preview.percentualMeta)}`}>{preview.percentualMeta.toFixed(1)}%</p>
               </div>
-              <div className="w-full bg-slate-800 rounded-full h-2">
+              <div className="w-full bg-white/[0.06] rounded-full h-2">
                 <div
                   className={`h-2 rounded-full transition-all ${faixaBarCor(preview.percentualMeta)}`}
                   style={{ width: `${Math.min(preview.percentualMeta, 160) / 160 * 100}%` }}
@@ -574,8 +574,8 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
 
           {/* Breakdown por meta */}
           {preview.breakdown && preview.breakdown.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-800">
+            <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-white/[0.06]">
                 <div className="flex items-center gap-2">
                   <TrendingUp size={14} className="text-gr-400" />
                   <h2 className="text-sm font-semibold text-white">Detalhamento por Indicador</h2>
@@ -583,7 +583,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
               </div>
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-800 bg-slate-800/40">
+                  <tr className="border-b border-white/[0.06] bg-white/[0.03]">
                     <th className="text-left px-4 py-3 text-slate-400 font-medium text-xs">Indicador</th>
                     <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Peso</th>
                     <th className="text-right px-4 py-3 text-slate-400 font-medium text-xs">Bônus 100%</th>
@@ -595,7 +595,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
                 </thead>
                 <tbody>
                   {preview.breakdown.map((bd) => (
-                    <tr key={bd.metaId} className="border-b border-slate-800/50 hover:bg-slate-800/20">
+                    <tr key={bd.metaId} className="border-b border-white/[0.06]/50 hover:bg-white/[0.02]">
                       <td className="px-4 py-3 text-white font-medium">{bd.nome}</td>
                       <td className="px-4 py-3 text-right text-slate-400 tabular-nums text-xs">{Math.round(bd.peso * 100)}%</td>
                       <td className="px-4 py-3 text-right text-slate-300 tabular-nums">{formatarMoeda(bd.valorBase)}</td>
@@ -617,7 +617,7 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
                       </td>
                     </tr>
                   ))}
-                  <tr className="bg-slate-800/30">
+                  <tr className="bg-white/[0.02]">
                     <td colSpan={6} className="px-4 py-3 text-right text-slate-400 text-sm font-medium">Total</td>
                     <td className="px-4 py-3 text-right text-emerald-400 font-bold tabular-nums">{formatarMoeda(preview.totalComissao)}</td>
                   </tr>
@@ -678,13 +678,13 @@ export default function ComissaoPage() {
             <span className="text-xs text-slate-500 font-medium mr-1">Frente:</span>
             {frentesGerenciadas.map((f) => {
               const ativo = frenteSelecionada === f.equipeId;
-              const style = FRENTE_CHIP_STYLE[f.equipeId] ?? "bg-slate-700 text-slate-300 border-slate-600";
+              const style = FRENTE_CHIP_STYLE[f.equipeId] ?? "bg-white/[0.07] text-slate-300 border-white/[0.12]";
               return (
                 <button
                   key={f.equipeId}
                   onClick={() => setFrenteSelecionada(f.equipeId)}
                   className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
-                    ativo ? style : "bg-slate-800/50 text-slate-500 border-slate-700 hover:text-slate-300"
+                    ativo ? style : "bg-[#0b0f1c]/50 text-slate-500 border-white/[0.08] hover:text-slate-300"
                   }`}
                 >
                   {f.label}

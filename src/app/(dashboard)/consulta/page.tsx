@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Search, Building2, User, AlertCircle, Loader2, ArrowRight } from "lucide-react";
@@ -86,13 +86,13 @@ export default function ConsultaPage() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Nome do cliente, CPF, telefone ou nº do contrato..."
-          className="w-full bg-slate-900 border border-slate-700 focus:border-gr-500 rounded-2xl pl-12 pr-12 py-4 text-white text-base placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-gr-500/30 transition-all"
+          className="w-full bg-[#0f1525] border border-white/[0.08] focus:border-gr-500 rounded-2xl pl-12 pr-12 py-4 text-white text-base placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40/30 transition-all"
         />
       </div>
 
       {/* Estado inicial */}
       {!buscou && !buscando && query.length < 2 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
           <Search size={40} className="mx-auto mb-3 text-slate-700" />
           <p className="text-slate-400 text-sm">Digite pelo menos 2 caracteres para pesquisar</p>
           <p className="text-slate-400 text-xs mt-1">Funciona com nome, CPF, telefone ou número do contrato</p>
@@ -101,7 +101,7 @@ export default function ConsultaPage() {
 
       {/* Sem resultados */}
       {buscou && resultados.length === 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center">
+        <div className="bg-[#0f1525] border border-white/[0.06] rounded-2xl p-12 text-center">
           <AlertCircle size={36} className="mx-auto mb-3 text-slate-400" />
           <p className="text-slate-400 text-sm">Nenhum cliente encontrado para "{query}"</p>
         </div>
@@ -115,14 +115,14 @@ export default function ConsultaPage() {
             {resultados.map((c) => {
               const carteira = c.carteiras[0];
               return (
-                <div key={c.id} className="bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-2xl p-5 transition-colors">
+                <div key={c.id} className="bg-[#0f1525] border border-white/[0.06] hover:border-white/[0.08] rounded-2xl p-5 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0 space-y-2">
                       {/* Nome + status */}
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="text-white font-semibold">{c.cliente.nome}</p>
                         {c.statusRecuperacao && (
-                          <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${STATUS_COR[c.statusRecuperacao] ?? "bg-slate-800 text-slate-400 border-slate-700"}`}>
+                          <span className={`text-[11px] px-2 py-0.5 rounded border font-medium ${STATUS_COR[c.statusRecuperacao] ?? "bg-white/[0.07] text-slate-400 border-white/[0.08]"}`}>
                             {STATUS_LABEL[c.statusRecuperacao] ?? c.statusRecuperacao}
                           </span>
                         )}
@@ -152,7 +152,7 @@ export default function ConsultaPage() {
                       {/* Consultor responsável */}
                       <div className="flex items-center gap-2">
                         {carteira ? (
-                          <div className="flex items-center gap-2 bg-slate-800 rounded-lg px-3 py-1.5">
+                          <div className="flex items-center gap-2 bg-white/[0.05] rounded-lg px-3 py-1.5">
                             <User size={12} className="text-gr-400 flex-shrink-0" />
                             <span className="text-xs text-white font-medium">{carteira.consultor.nome}</span>
                             {carteira.consultor.equipe && (
@@ -165,7 +165,7 @@ export default function ConsultaPage() {
                             <span className="text-xs text-slate-500">{carteira.competencia.descricao}</span>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-2 bg-slate-800/60 rounded-lg px-3 py-1.5">
+                          <div className="flex items-center gap-2 bg-white/[0.03] rounded-lg px-3 py-1.5">
                             <span className="text-xs text-slate-500">Sem carteira ativa</span>
                           </div>
                         )}
@@ -182,7 +182,7 @@ export default function ConsultaPage() {
                       </div>
                       <Link
                         href={`/clientes/${c.cliente.id}`}
-                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-lg transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-[#0b0f1c] hover:bg-white/[0.04] px-3 py-1.5 rounded-lg transition-colors"
                       >
                         Ver ficha <ArrowRight size={12} />
                       </Link>
