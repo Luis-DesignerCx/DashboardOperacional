@@ -26,7 +26,7 @@ export default function LoginPage() {
 
   return (
     /* ── Wrapper global — gradiente e glows cobrem TODA a tela ── */
-    <div className="relative min-h-screen flex flex-col lg:flex-row overflow-hidden"
+    <div className="login-screen relative min-h-screen flex flex-col lg:flex-row overflow-hidden"
       style={{ background: "linear-gradient(145deg, #1a1438 0%, #0f0c24 40%, #16102e 100%)" }}>
 
       {/* Ambient glows — espalham por toda a tela */}
@@ -55,7 +55,7 @@ export default function LoginPage() {
         {/* Axis watermark — eixos de coordenada com marcações, remete a "GR Axis": */}
         {/* o ponto central (atrás do logo) onde os dados de todas as empresas convergem. */}
         <svg
-          className="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+          className="absolute inset-0 w-full h-full pointer-events-none select-none z-0 text-white"
           viewBox="0 0 600 600"
           fill="none"
           aria-hidden="true"
@@ -74,8 +74,8 @@ export default function LoginPage() {
           </defs>
 
           {/* Anel de órbita — eco sutil do fingerprint original, centrado atrás do logo */}
-          <circle cx="300" cy="198" r="170" stroke="white" strokeOpacity="0.045" strokeWidth="1" />
-          <circle cx="300" cy="198" r="110" stroke="white" strokeOpacity="0.035" strokeWidth="1" />
+          <circle cx="300" cy="198" r="170" stroke="currentColor" strokeOpacity="0.045" strokeWidth="1" />
+          <circle cx="300" cy="198" r="110" stroke="currentColor" strokeOpacity="0.035" strokeWidth="1" />
 
           {/* Eixo horizontal e vertical */}
           <line x1="0" y1="198" x2="600" y2="198" stroke="url(#axisLine)" strokeWidth="1" />
@@ -84,8 +84,8 @@ export default function LoginPage() {
           {/* Marcações (ticks) ao longo dos eixos */}
           {[-240, -180, -120, -60, 60, 120, 180, 240].map((offset) => (
             <g key={`tick-${offset}`}>
-              <line x1={300 + offset} y1="192" x2={300 + offset} y2="204" stroke="white" strokeOpacity="0.09" strokeWidth="1" />
-              <line x1="294" y1={198 + offset} x2="306" y2={198 + offset} stroke="white" strokeOpacity="0.09" strokeWidth="1" />
+              <line x1={300 + offset} y1="192" x2={300 + offset} y2="204" stroke="currentColor" strokeOpacity="0.09" strokeWidth="1" />
+              <line x1="294" y1={198 + offset} x2="306" y2={198 + offset} stroke="currentColor" strokeOpacity="0.09" strokeWidth="1" />
             </g>
           ))}
 
@@ -174,7 +174,7 @@ export default function LoginPage() {
                 required
                 autoComplete="email"
                 placeholder="seu@grgroup.org"
-                className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all"
+                className="login-input w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all"
                 style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(76,61,141,0.25)", backdropFilter: "blur(8px)" }}
                 onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.6)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.1)"; }}
                 onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.25)"; e.target.style.boxShadow = "none"; }}
@@ -191,7 +191,7 @@ export default function LoginPage() {
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all pr-10"
+                  className="login-input w-full rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-600 focus:outline-none transition-all pr-10"
                   style={{ background: "rgba(255,255,255,0.05)", border: "1px solid rgba(76,61,141,0.25)", backdropFilter: "blur(8px)" }}
                   onFocus={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.6)"; e.target.style.boxShadow = "0 0 0 3px rgba(76,61,141,0.1)"; }}
                   onBlur={(e) => { e.target.style.borderColor = "rgba(76,61,141,0.25)"; e.target.style.boxShadow = "none"; }}

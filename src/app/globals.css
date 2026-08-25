@@ -176,6 +176,15 @@ body {
   color: #0f172a;
 }
 
+/* Tela de login — segue o tema em vez de ficar sempre escura */
+[data-theme="light"] .login-screen {
+  background: linear-gradient(145deg, #f5f4ff 0%, #ffffff 45%, #f0effc 100%) !important;
+}
+[data-theme="light"] .login-input {
+  background: rgba(76,61,141,0.045) !important;
+  border-color: rgba(76,61,141,0.18) !important;
+}
+
 /* ── Autofill fix ─────────────────────────────────────────────────────────── */
 input:-webkit-autofill,
 input:-webkit-autofill:hover,
