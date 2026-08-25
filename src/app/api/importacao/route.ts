@@ -14,7 +14,7 @@ import { fatorFerias } from "@/utils/dias-uteis";
 import { Decimal } from "@prisma/client/runtime/library";
 import { Prisma } from "@prisma/client";
 
-// ─── Índices de coluna fixos (0-based) ──────────────────────────────────────
+// ─── Índices de coluna fixos (0-based) — planilha "BASE" ────────────────────
 const C = {
   statusContrato:        1,
   origem:                2,
@@ -28,6 +28,26 @@ const C = {
   totalParcelasVencidas: 17,
   valorContrato:         18,
   valorAReceber:         19,
+} as const;
+
+// ─── Índices de coluna fixos (0-based) — export "FLASH" ─────────────────────
+// Relatório "Consulta Inadimplência" do sistema de cobrança (ex: TSExplorer).
+// Layout bem diferente do BASE — mapeado manualmente a partir do arquivo real
+// "FLASH 15-08.xls" (ago/2026). A linha de cabeçalho tampouco é a primeira:
+// há linhas de título do relatório antes dela (ver encontrarLinhaCabecalho).
+const C_FLASH = {
+  statusContrato:        10, // K — "Status" (ex: VENCIDO)
+  origem:                3,  // D — "Origem"
+  meioPagamento:         4,  // E — "Meio de pagamento"
+  contrato:              5,  // F — "Contrato"
+  nome:                  7,  // H — "Nome da pessoa"
+  dataVencimento:        11, // L — "Data de vencimento"
+  diasAtraso:            13, // N — "Quantidade de dias vencido"
+  telefones:             17, // R — "Telefones"
+  emails:                19, // T — "E-mails"
+  totalParcelasVencidas: 20, // U
+  valorContrato:         23, // X — "Valor do contrato"
+  valorAReceber:         24, // Y — "Valor a receber"
 } as const;
 
 // Normaliza string para comparação flexível (remove acentos, lower, trim)
@@ -55,34 +75,24 @@ function detectarColunaFaixa(header: any[]): number | null {
   return null;
 }
 
-// Detecta coluna do número do contrato pelo cabeçalho — planilhas de origens
-// diferentes (ex: exports "FLASH") podem não seguir o layout fixo de `C`.
-// Evita casar com "status do contrato" / "valor do contrato" (que também
-// contêm a palavra "contrato"), priorizando termos mais específicos.
-function detectarColunaContrato(header: any[]): number | null {
-  const normalizados = header.map((h) => normalizar(String(h ?? "")));
-  const termosEspecificos = [
-    "numero do contrato", "número do contrato", "nº do contrato", "nº contrato",
-    "num contrato", "numero contrato", "codigo do contrato", "código do contrato",
-    "cod contrato", "cod. contrato",
-  ];
-  for (const termo of termosEspecificos) {
-    const i = normalizados.findIndex((c) => c.includes(termo));
-    if (i !== -1) return i;
+// Localiza a linha real do cabeçalho — alguns exports (ex: "FLASH") têm
+// linhas de título do relatório (nome do sistema, "Consulta Inadimplência",
+// data de emissão etc.) antes da linha que de fato nomeia as colunas.
+function encontrarLinhaCabecalho(todasLinhas: any[][]): number {
+  const limite = Math.min(todasLinhas.length, 15);
+  for (let i = 0; i < limite; i++) {
+    const normalizados = (todasLinhas[i] ?? []).map((c) => normalizar(String(c ?? "")));
+    if (normalizados.includes("contrato")) return i;
   }
-  // Fallback: célula cujo texto é exatamente "contrato" (sem qualificadores).
-  // Não usa matches de 1-2 letras (ex: "n", "nº") — planilhas costumam ter
-  // uma coluna de numeração de linha com esse nome, que não é o contrato.
-  const i = normalizados.findIndex((c) => c === "contrato");
-  return i !== -1 ? i : null;
+  return 0; // fallback: assume que a primeira linha já é o cabeçalho
 }
 
 // Detecta linha de totais/rodapé da planilha (ex: "TOTAL", "TOTAL GERAL") pra
 // não contar como cliente — senão os valores somados no rodapé entram de novo
 // no total geral, duplicando o valor de inadimplência.
-function ehLinhaDeTotal(row: any[], colunaContrato: number): boolean {
+function ehLinhaDeTotal(row: any[], colunaContrato: number, colunaNome: number): boolean {
   const contratoTxt = normalizar(String(row[colunaContrato] ?? ""));
-  const nomeTxt      = normalizar(String(row[C.nome] ?? ""));
+  const nomeTxt      = normalizar(String(row[colunaNome] ?? ""));
   return contratoTxt.includes("total") || nomeTxt.includes("total");
 }
 
@@ -120,6 +130,8 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData();
   const arquivo  = formData.get("arquivo")      as File;
   const competenciaId = formData.get("competenciaId") as string;
+  const isFlash  = (formData.get("tipoBase") as string | null) === "FLASH";
+  const colunas  = isFlash ? C_FLASH : C;
 
   if (!arquivo || !competenciaId) {
     return NextResponse.json({ erro: "Arquivo e competência são obrigatórios" }, { status: 400 });
@@ -139,14 +151,14 @@ export async function POST(req: NextRequest) {
     const workbook = XLSX.read(buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const todasLinhas: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-    const headerRow = todasLinhas[0] ?? [];
+    const linhaCabecalho = encontrarLinhaCabecalho(todasLinhas);
+    const headerRow = todasLinhas[linhaCabecalho] ?? [];
     const colunaConsultor = detectarColunaConsultor(headerRow);
     const colunaFaixa = detectarColunaFaixa(headerRow);
-    const colunaContrato = detectarColunaContrato(headerRow) ?? C.contrato;
     let linhasDeTotalDescartadas = 0;
-    const linhas = todasLinhas.slice(1).filter((row) => {
-      if (String(row[colunaContrato] ?? "").trim() === "") return false;
-      if (ehLinhaDeTotal(row, colunaContrato)) { linhasDeTotalDescartadas++; return false; }
+    const linhas = todasLinhas.slice(linhaCabecalho + 1).filter((row) => {
+      if (String(row[colunas.contrato] ?? "").trim() === "") return false;
+      if (ehLinhaDeTotal(row, colunas.contrato, colunas.nome)) { linhasDeTotalDescartadas++; return false; }
       return true;
     });
     if (linhasDeTotalDescartadas > 0) {
@@ -156,7 +168,7 @@ export async function POST(req: NextRequest) {
     // ── 2. Agrupa por contrato ───────────────────────────────────────────────
     const grupos = new Map<string, any[][]>();
     for (const row of linhas) {
-      const num = String(row[colunaContrato] ?? "").trim();
+      const num = String(row[colunas.contrato] ?? "").trim();
       if (!num) continue;
       if (!grupos.has(num)) grupos.set(num, []);
       grupos.get(num)!.push(row);
@@ -225,34 +237,34 @@ export async function POST(req: NextRequest) {
     for (const [num, rows] of grupos) {
       try {
         const row0 = rows[0];
-        const nome = String(row0[C.nome] ?? "").trim();
+        const nome = String(row0[colunas.nome] ?? "").trim();
         if (!nome) { erros++; continue; }
 
         const empresaId = resolverEmpresaId(num);
         if (!empresaId) { erros++; continue; }
 
-        const telefones = normalizarTelefones(String(row0[C.telefones] ?? "").trim());
-        const emails    = String(row0[C.emails] ?? "").trim() || null;
-        const statusContrato       = String(row0[C.statusContrato] ?? "").trim() || null;
-        const totalParcelasVencidas = parseInt(String(row0[C.totalParcelasVencidas] ?? "")) || null;
-        const valorContrato        = parseDecimal(row0[C.valorContrato]);
+        const telefones = normalizarTelefones(String(row0[colunas.telefones] ?? "").trim());
+        const emails    = String(row0[colunas.emails] ?? "").trim() || null;
+        const statusContrato       = String(row0[colunas.statusContrato] ?? "").trim() || null;
+        const totalParcelasVencidas = parseInt(String(row0[colunas.totalParcelasVencidas] ?? "")) || null;
+        const valorContrato        = parseDecimal(row0[colunas.valorContrato]);
 
         let maiorDiasAtraso  = 0;
         let valorTotalAberto = 0;
         const parcelasTemp: Omit<ParcelaRow, "contratoId">[] = [];
 
         rows.forEach((row, idx) => {
-          const dias  = parseInt(String(row[C.diasAtraso] ?? "0")) || 0;
-          const valor = parseDecimal(row[C.valorAReceber]);
+          const dias  = parseInt(String(row[colunas.diasAtraso] ?? "0")) || 0;
+          const valor = parseDecimal(row[colunas.valorAReceber]);
           if (dias > maiorDiasAtraso) maiorDiasAtraso = dias;
           valorTotalAberto += valor;
           parcelasTemp.push({
             id:             randomUUID(),
             numero:         idx + 1,
-            dataVencimento: parseDateExcel(row[C.dataVencimento]) ?? new Date(),
+            dataVencimento: parseDateExcel(row[colunas.dataVencimento]) ?? new Date(),
             diasAtraso:     dias,
-            origem:         String(row[C.origem] ?? "").trim() || null,
-            meioPagamento:  String(row[C.meioPagamento] ?? "").trim() || null,
+            origem:         String(row[colunas.origem] ?? "").trim() || null,
+            meioPagamento:  String(row[colunas.meioPagamento] ?? "").trim() || null,
             valorParcela:   new Decimal(valor.toFixed(2)),
             valorTotalAberto: new Decimal(valor.toFixed(2)),
           });
@@ -366,10 +378,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // ── 9. Determina tipo e distribui apenas contratos SEM carteira ─────────
-    const tipoBase = formData.get("tipoBase") as string | null;
-    const isFlash = tipoBase === "FLASH";
-
+    // ── 9. Distribui apenas contratos SEM carteira (tipo já resolvido no topo) ─
     const todosContratoIds = [
       ...newContratos.map((c) => c.id),
       ...updateOps.map((o) => o.contratoId),
