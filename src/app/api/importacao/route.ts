@@ -321,7 +321,7 @@ export async function POST(req: NextRequest) {
         )
       );
       await prisma.$executeRaw`
-        UPDATE "Cliente" AS c
+        UPDATE "clientes" AS c
         SET nome      = v.nome,
             telefones = COALESCE(v.telefones, c.telefones),
             emails    = COALESCE(v.emails,    c.emails)
@@ -342,7 +342,7 @@ export async function POST(req: NextRequest) {
         )
       );
       await prisma.$executeRaw`
-        UPDATE "Contrato" AS c
+        UPDATE "contratos" AS c
         SET "statusContrato"        = v.sc,
             "totalParcelasVencidas" = v.tpv,
             "maiorDiasAtraso"       = v.mda,
