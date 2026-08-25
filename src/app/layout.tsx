@@ -17,8 +17,8 @@ const sora = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "DASH CR — GR Group",
-  description: "Plataforma de Gestão de Cobrança, Carteira e Performance",
+  title: "GR Axis — GR Group",
+  description: "Gestão Inteligente de Cobrança, Carteira e Performance",
 };
 
 export default function RootLayout({

@@ -52,15 +52,46 @@ export default function LoginPage() {
       {/* ── Painel esquerdo — Brand (transparente) ──────────────── */}
       <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16 overflow-hidden">
 
-        {/* Fingerprint watermark — background-image para controle preciso do tamanho */}
-        <div className="absolute inset-0 pointer-events-none select-none opacity-[0.10] z-0"
-          style={{
-            backgroundImage: "url('/logo-gr-icon-branco.png')",
-            backgroundSize: "400%",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
-          }}
-        />
+        {/* Axis watermark — eixos de coordenada com marcações, remete a "GR Axis": */}
+        {/* o ponto central (atrás do logo) onde os dados de todas as empresas convergem. */}
+        <svg
+          className="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+          viewBox="0 0 600 600"
+          fill="none"
+          aria-hidden="true"
+        >
+          <defs>
+            <linearGradient id="axisLine" x1="0" y1="0" x2="600" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#db824e" stopOpacity="0" />
+              <stop offset="50%" stopColor="#9f5697" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#516cb1" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="axisLineV" x1="0" y1="0" x2="0" y2="600" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor="#516cb1" stopOpacity="0" />
+              <stop offset="33%" stopColor="#9f5697" stopOpacity="0.35" />
+              <stop offset="100%" stopColor="#db824e" stopOpacity="0" />
+            </linearGradient>
+          </defs>
+
+          {/* Anel de órbita — eco sutil do fingerprint original, centrado atrás do logo */}
+          <circle cx="300" cy="198" r="170" stroke="white" strokeOpacity="0.045" strokeWidth="1" />
+          <circle cx="300" cy="198" r="110" stroke="white" strokeOpacity="0.035" strokeWidth="1" />
+
+          {/* Eixo horizontal e vertical */}
+          <line x1="0" y1="198" x2="600" y2="198" stroke="url(#axisLine)" strokeWidth="1" />
+          <line x1="300" y1="0" x2="300" y2="600" stroke="url(#axisLineV)" strokeWidth="1" />
+
+          {/* Marcações (ticks) ao longo dos eixos */}
+          {[-240, -180, -120, -60, 60, 120, 180, 240].map((offset) => (
+            <g key={`tick-${offset}`}>
+              <line x1={300 + offset} y1="192" x2={300 + offset} y2="204" stroke="white" strokeOpacity="0.09" strokeWidth="1" />
+              <line x1="294" y1={198 + offset} x2="306" y2={198 + offset} stroke="white" strokeOpacity="0.09" strokeWidth="1" />
+            </g>
+          ))}
+
+          {/* Origem — ponto de convergência */}
+          <circle cx="300" cy="198" r="3.5" fill="#c98fd0" fillOpacity="0.45" />
+        </svg>
 
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
@@ -71,9 +102,9 @@ export default function LoginPage() {
           </div>
 
           <h1 className="text-4xl font-bold text-white leading-tight tracking-tight mb-4">
-            Gestão de Cobrança<br />
+            Gestão Inteligente<br />
             <span style={{ background: "linear-gradient(90deg, #db824e, #9f5697, #516cb1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              em tempo real
+              de Cobrança
             </span>
           </h1>
           <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
@@ -125,7 +156,7 @@ export default function LoginPage() {
               <Image src="/logo-gr-icon.png" alt="" width={40} height={40} className="relative z-10 w-full h-full object-contain" />
             </div>
             <div>
-              <p className="text-white font-bold text-base leading-none tracking-tight">DASH CR</p>
+              <p className="text-white font-bold text-base leading-none tracking-tight">GR Axis</p>
               <p className="text-slate-500 text-[10px] mt-0.5 tracking-widest uppercase font-medium">Plataforma GR Group</p>
             </div>
           </div>

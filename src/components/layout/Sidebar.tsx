@@ -126,7 +126,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
 
         {!collapsed && (
           <div className="flex-1 min-w-0 leading-tight">
-            <p className="text-white font-bold text-sm tracking-tight">DASH CR</p>
+            <p className="text-white font-bold text-sm tracking-tight">GR Axis</p>
             <p className="text-brand-violet/70 text-[9px] font-semibold tracking-[0.18em] uppercase">GR Group</p>
           </div>
         )}
