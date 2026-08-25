@@ -1,6 +1,7 @@
 "use client";
 
-import { forwardRef, ReactNode, useEffect, useRef, useState } from "react";
+import { CSSProperties, forwardRef, ReactNode, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import {
   motion,
   useAnimation,
@@ -110,3 +111,65 @@ export const SpotlightInput = forwardRef<HTMLInputElement, SpotlightInputProps>(
     );
   }
 );
+
+// ==================== OrbitingLogos ====================
+// Ícones da marca (uma cor cada) orbitando ao redor do logo — reaproveita
+// os anéis já desenhados no fundo da tela de login como "trilha".
+
+type LogoOrbitConfig = {
+  src: string;
+  angle: number;
+  radius: number;
+  duration: number;
+  size?: number;
+  reverse?: boolean;
+  opacity?: number;
+};
+
+function OrbitingLogo({ src, angle, radius, duration, size = 34, reverse = false, opacity = 0.85 }: LogoOrbitConfig) {
+  return (
+    <div
+      style={
+        {
+          "--angle": angle,
+          "--radius": radius,
+          "--duration": duration,
+        } as CSSProperties
+      }
+      className={cn(
+        "absolute left-0 top-0 flex items-center justify-center animate-orbit",
+        reverse && "[animation-direction:reverse]"
+      )}
+    >
+      <div
+        className="-translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-[0_2px_12px_rgba(0,0,0,0.35)] flex items-center justify-center overflow-hidden"
+        style={{ width: size, height: size, opacity }}
+      >
+        <Image src={src} alt="" width={size} height={size} className="w-full h-full object-contain p-1" />
+      </div>
+    </div>
+  );
+}
+
+const ORBIT_ICONS = [
+  "/gr-icon-laranja.png",
+  "/gr-icon-rosa.png",
+  "/gr-icon-roxo.png",
+  "/gr-icon-azul.png",
+  "/gr-icon-verde.png",
+  "/gr-icon-amarelo.png",
+];
+
+// `top` deve coincidir com o centro dos anéis desenhados atrás do logo (cy=198 num viewBox 0..600 → 33%).
+export function OrbitingLogos({ className, top = "33%" }: { className?: string; top?: string }) {
+  return (
+    <div className={cn("pointer-events-none absolute left-1/2", className)} style={{ top }}>
+      {ORBIT_ICONS.slice(0, 3).map((src, i) => (
+        <OrbitingLogo key={src} src={src} angle={i * 120} radius={140} duration={22} size={30} />
+      ))}
+      {ORBIT_ICONS.slice(3, 6).map((src, i) => (
+        <OrbitingLogo key={src} src={src} angle={i * 120 + 60} radius={260} duration={32} size={38} reverse />
+      ))}
+    </div>
+  );
+}

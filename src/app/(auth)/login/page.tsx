@@ -5,7 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
-import { BoxReveal, SpotlightInput } from "@/components/ui/login-effects";
+import { BoxReveal, OrbitingLogos, SpotlightInput } from "@/components/ui/login-effects";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -65,6 +65,9 @@ export default function LoginPage() {
           <circle cx="300" cy="198" r="210" stroke="currentColor" strokeOpacity="0.035" strokeWidth="1" />
           <circle cx="300" cy="198" r="270" stroke="currentColor" strokeOpacity="0.025" strokeWidth="1" />
         </svg>
+
+        {/* Logos da marca orbitando atrás do card do logo */}
+        <OrbitingLogos className="z-[5]" />
 
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
