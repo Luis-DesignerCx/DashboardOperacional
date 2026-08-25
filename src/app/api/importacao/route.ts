@@ -77,6 +77,15 @@ function detectarColunaContrato(header: any[]): number | null {
   return i !== -1 ? i : null;
 }
 
+// Detecta linha de totais/rodapé da planilha (ex: "TOTAL", "TOTAL GERAL") pra
+// não contar como cliente — senão os valores somados no rodapé entram de novo
+// no total geral, duplicando o valor de inadimplência.
+function ehLinhaDeTotal(row: any[], colunaContrato: number): boolean {
+  const contratoTxt = normalizar(String(row[colunaContrato] ?? ""));
+  const nomeTxt      = normalizar(String(row[C.nome] ?? ""));
+  return contratoTxt.includes("total") || nomeTxt.includes("total");
+}
+
 // Limite defensivo: nenhum contrato real deveria ter tantas parcelas assim.
 // Se a coluna de número do contrato for lida errado (ex: aponta pra "meio de
 // pagamento"), muitas linhas de clientes diferentes colidem no mesmo grupo —
@@ -134,7 +143,15 @@ export async function POST(req: NextRequest) {
     const colunaConsultor = detectarColunaConsultor(headerRow);
     const colunaFaixa = detectarColunaFaixa(headerRow);
     const colunaContrato = detectarColunaContrato(headerRow) ?? C.contrato;
-    const linhas = todasLinhas.slice(1).filter((row) => String(row[colunaContrato] ?? "").trim() !== "");
+    let linhasDeTotalDescartadas = 0;
+    const linhas = todasLinhas.slice(1).filter((row) => {
+      if (String(row[colunaContrato] ?? "").trim() === "") return false;
+      if (ehLinhaDeTotal(row, colunaContrato)) { linhasDeTotalDescartadas++; return false; }
+      return true;
+    });
+    if (linhasDeTotalDescartadas > 0) {
+      console.log(`Importação: ${linhasDeTotalDescartadas} linha(s) de total/rodapé descartada(s).`);
+    }
 
     // ── 2. Agrupa por contrato ───────────────────────────────────────────────
     const grupos = new Map<string, any[][]>();
