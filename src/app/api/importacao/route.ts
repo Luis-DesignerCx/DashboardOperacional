@@ -55,6 +55,35 @@ function detectarColunaFaixa(header: any[]): number | null {
   return null;
 }
 
+// Detecta coluna do número do contrato pelo cabeçalho — planilhas de origens
+// diferentes (ex: exports "FLASH") podem não seguir o layout fixo de `C`.
+// Evita casar com "status do contrato" / "valor do contrato" (que também
+// contêm a palavra "contrato"), priorizando termos mais específicos.
+function detectarColunaContrato(header: any[]): number | null {
+  const normalizados = header.map((h) => normalizar(String(h ?? "")));
+  const termosEspecificos = [
+    "numero do contrato", "número do contrato", "nº do contrato", "nº contrato",
+    "num contrato", "numero contrato", "codigo do contrato", "código do contrato",
+    "cod contrato", "cod. contrato",
+  ];
+  for (const termo of termosEspecificos) {
+    const i = normalizados.findIndex((c) => c.includes(termo));
+    if (i !== -1) return i;
+  }
+  // Fallback: célula cujo texto é exatamente "contrato" (sem qualificadores).
+  // Não usa matches de 1-2 letras (ex: "n", "nº") — planilhas costumam ter
+  // uma coluna de numeração de linha com esse nome, que não é o contrato.
+  const i = normalizados.findIndex((c) => c === "contrato");
+  return i !== -1 ? i : null;
+}
+
+// Limite defensivo: nenhum contrato real deveria ter tantas parcelas assim.
+// Se a coluna de número do contrato for lida errado (ex: aponta pra "meio de
+// pagamento"), muitas linhas de clientes diferentes colidem no mesmo grupo —
+// isso trava a importação desse grupo em vez de criar um contrato monstro
+// com valor de inadimplência absurdo.
+const LIMITE_PARCELAS_POR_CONTRATO = 300;
+
 // Mapeia texto da faixa da planilha para TipoEquipe
 function faixaParaTipoEquipe(faixa: string): string | null {
   const f = normalizar(faixa);
@@ -104,15 +133,27 @@ export async function POST(req: NextRequest) {
     const headerRow = todasLinhas[0] ?? [];
     const colunaConsultor = detectarColunaConsultor(headerRow);
     const colunaFaixa = detectarColunaFaixa(headerRow);
-    const linhas = todasLinhas.slice(1).filter((row) => String(row[C.contrato] ?? "").trim() !== "");
+    const colunaContrato = detectarColunaContrato(headerRow) ?? C.contrato;
+    const linhas = todasLinhas.slice(1).filter((row) => String(row[colunaContrato] ?? "").trim() !== "");
 
     // ── 2. Agrupa por contrato ───────────────────────────────────────────────
     const grupos = new Map<string, any[][]>();
     for (const row of linhas) {
-      const num = String(row[C.contrato] ?? "").trim();
+      const num = String(row[colunaContrato] ?? "").trim();
       if (!num) continue;
       if (!grupos.has(num)) grupos.set(num, []);
       grupos.get(num)!.push(row);
+    }
+
+    // Descarta grupos anormalmente grandes — provável coluna de contrato mal
+    // detectada, unindo linhas de clientes diferentes num único "contrato".
+    let errosPorGrupoGigante = 0;
+    for (const [num, rows] of [...grupos]) {
+      if (rows.length > LIMITE_PARCELAS_POR_CONTRATO) {
+        console.error(`Importação: grupo "${num}" com ${rows.length} linhas excede o limite de ${LIMITE_PARCELAS_POR_CONTRATO} — descartado (provável coluna de contrato incorreta).`);
+        grupos.delete(num);
+        errosPorGrupoGigante++;
+      }
     }
 
     // ── 3. Carrega empresas e contratos existentes (1 query cada) ────────────
@@ -302,7 +343,7 @@ export async function POST(req: NextRequest) {
         totalLinhas:    linhas.length,
         totalContratos: processados,
         processadas:    processados,
-        erros,
+        erros:      erros + errosPorGrupoGigante,
         status:     "CONCLUIDO",
         concluidoEm: new Date(),
       },
