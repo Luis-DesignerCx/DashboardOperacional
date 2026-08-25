@@ -467,7 +467,8 @@ export async function POST(req: NextRequest) {
       data: { status: "ERRO" },
     });
     console.error(err);
-    return NextResponse.json({ erro: "Erro ao processar arquivo" }, { status: 500 });
+    const detalhe = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ erro: `Erro ao processar arquivo: ${detalhe}` }, { status: 500 });
   }
 }
 
