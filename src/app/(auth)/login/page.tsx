@@ -5,7 +5,6 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
-import { BoxReveal, OrbitingLogos, SpotlightInput } from "@/components/ui/login-effects";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -66,9 +65,6 @@ export default function LoginPage() {
           <circle cx="300" cy="198" r="270" stroke="currentColor" strokeOpacity="0.025" strokeWidth="1" />
         </svg>
 
-        {/* Logos da marca orbitando atrás do card do logo */}
-        <OrbitingLogos className="z-[5]" />
-
         {/* Conteúdo */}
         <div className="relative z-10 flex flex-col items-center text-center max-w-md">
           {/* Logo */}
@@ -77,34 +73,28 @@ export default function LoginPage() {
             <Image src="/logo-gr.png" alt="GR Group" width={220} height={64} className="block" priority />
           </div>
 
-          <BoxReveal boxColor="#9f5697" delay={0.1}>
-            <h1 className="text-4xl font-bold text-white leading-tight tracking-tight mb-4">
-              Gestão Inteligente<br />
-              <span style={{ background: "linear-gradient(90deg, #db824e, #9f5697, #516cb1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-                de Cobrança
-              </span>
-            </h1>
-          </BoxReveal>
-          <BoxReveal boxColor="#516cb1" delay={0.25}>
-            <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
-              Carteira inteligente, distribuição automática e performance da sua equipe num único lugar.
-            </p>
-          </BoxReveal>
+          <h1 className="text-4xl font-bold text-white leading-tight tracking-tight mb-4">
+            Gestão Inteligente<br />
+            <span style={{ background: "linear-gradient(90deg, #db824e, #9f5697, #516cb1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+              de Cobrança
+            </span>
+          </h1>
+          <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
+            Carteira inteligente, distribuição automática e performance da sua equipe num único lugar.
+          </p>
 
           {/* Stats */}
-          <BoxReveal boxColor="#db824e" delay={0.4} width="100%" className="mt-10">
-            <div className="flex items-center justify-center gap-8">
-              {[
-                { valor: "100%", label: "Rastreável" },
-                { valor: "7×",   label: "Empresas"  },
-              ].map(({ valor, label }) => (
-                <div key={label} className="flex flex-col items-center gap-1">
-                  <span className="text-2xl font-bold text-white tabular-nums">{valor}</span>
-                  <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{label}</span>
-                </div>
-              ))}
-            </div>
-          </BoxReveal>
+          <div className="mt-10 flex items-center gap-8">
+            {[
+              { valor: "100%", label: "Rastreável" },
+              { valor: "7×",   label: "Empresas"  },
+            ].map(({ valor, label }) => (
+              <div key={label} className="flex flex-col items-center gap-1">
+                <span className="text-2xl font-bold text-white tabular-nums">{valor}</span>
+                <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{label}</span>
+              </div>
+            ))}
+          </div>
 
           {/* Barra de cores da marca */}
           <div className="mt-8 flex items-center gap-1 opacity-40">
@@ -143,17 +133,13 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <BoxReveal boxColor="#6460e4" delay={0.05}>
-            <h2 className="text-2xl font-bold text-white tracking-tight mb-1">Bem-vindo</h2>
-          </BoxReveal>
-          <BoxReveal boxColor="#6460e4" delay={0.15} width="100%" className="mb-8">
-            <p className="text-slate-500 text-sm">Entre com suas credenciais para continuar.</p>
-          </BoxReveal>
+          <h2 className="text-2xl font-bold text-white tracking-tight mb-1">Bem-vindo</h2>
+          <p className="text-slate-500 text-sm mb-8">Entre com suas credenciais para continuar.</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Email</label>
-              <SpotlightInput
+              <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -170,7 +156,7 @@ export default function LoginPage() {
             <div>
               <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Senha</label>
               <div className="relative">
-                <SpotlightInput
+                <input
                   type={mostrar ? "text" : "password"}
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
