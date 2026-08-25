@@ -42,3 +42,14 @@ prisma/dev.db-journal
 # env (somente .example é versionado)
 .env
 .env.local
+
+# planilhas de trabalho (dados sensíveis de clientes, não versionar)
+/planilhas/
+
+# scripts de debug/uso local (não fazem parte do produto)
+scripts/fapass-atualizar.bat
+scripts/fapass-dados.json
+scripts/fapass-debug.py
+scripts/fapass-debug2.py
+scripts/fapass-sync-local.mjs
+scripts/validar-dashboard.mjs

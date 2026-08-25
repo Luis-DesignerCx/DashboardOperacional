@@ -1,12 +1,29 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || session.user.perfil !== "ADMINISTRADOR") {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  const { senha } = await req.json().catch(() => ({ senha: undefined }));
+  if (!senha) {
+    return NextResponse.json({ erro: "Senha obrigatória" }, { status: 400 });
+  }
+
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: session.user.id },
+    select: { senhaHash: true },
+  });
+  if (!usuario) return NextResponse.json({ erro: "Usuário não encontrado" }, { status: 404 });
+
+  const senhaCorreta = await bcrypt.compare(senha, usuario.senhaHash);
+  if (!senhaCorreta) {
+    return NextResponse.json({ erro: "Senha incorreta" }, { status: 401 });
   }
 
   try {
@@ -25,6 +42,16 @@ export async function POST() {
     await prisma.contrato.deleteMany({});
     await prisma.cliente.deleteMany({});
     await prisma.competencia.deleteMany({});
+
+    // Registra quem executou o reset — gravado por último, após a limpeza da própria Auditoria
+    await prisma.auditoria.create({
+      data: {
+        usuarioId: session.user.id,
+        tabela: "sistema",
+        registroId: "reset-total",
+        acao: "RESET_BASE",
+      },
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err: any) {

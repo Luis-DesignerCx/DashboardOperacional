@@ -88,23 +88,25 @@ export default function ConfiguracoesPage() {
 
 function ResetSistema() {
   const [confirmando, setConfirmando] = useState(false);
-  const [texto, setTexto] = useState("");
+  const [senha, setSenha] = useState("");
   const [resetando, setResetando] = useState(false);
   const [feito, setFeito] = useState(false);
   const [erro, setErro] = useState("");
 
-  const CONFIRMACAO = "LIMPAR TUDO";
-
   async function executarReset() {
     setResetando(true);
     setErro("");
-    const res = await fetch("/api/admin/reset", { method: "POST" });
+    const res = await fetch("/api/admin/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ senha }),
+    });
     const data = await res.json();
     setResetando(false);
     if (!res.ok) { setErro(data.erro || "Erro ao resetar"); return; }
     setFeito(true);
     setConfirmando(false);
-    setTexto("");
+    setSenha("");
   }
 
   if (feito) {
@@ -140,26 +142,27 @@ function ResetSistema() {
       ) : (
         <div className="space-y-3">
           <p className="text-sm text-slate-300">
-            Digite <span className="font-mono font-bold text-red-400">{CONFIRMACAO}</span> para confirmar:
+            Digite sua senha de administrador para confirmar:
           </p>
           <input
             autoFocus
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder={CONFIRMACAO}
-            className="w-full bg-surface-1 border border-red-500/30 rounded-lg px-4 py-2.5 text-white text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-500"
+            type="password"
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder="Sua senha"
+            className="w-full bg-surface-1 border border-red-500/30 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
           />
           {erro && <p className="text-red-400 text-sm">{erro}</p>}
           <div className="flex gap-3">
             <button
-              onClick={() => { setConfirmando(false); setTexto(""); setErro(""); }}
+              onClick={() => { setConfirmando(false); setSenha(""); setErro(""); }}
               className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
             >
               Cancelar
             </button>
             <button
               onClick={executarReset}
-              disabled={texto !== CONFIRMACAO || resetando}
+              disabled={!senha || resetando}
               className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-red-600/20 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               {resetando ? "Limpando..." : "Confirmar limpeza"}
