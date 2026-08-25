@@ -17,7 +17,7 @@ const sora = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "GR Axis — GR Group",
+  title: "CRM · Cuidado & Reconquista — GR Group",
   description: "Gestão Inteligente de Cobrança, Carteira e Performance",
 };
 

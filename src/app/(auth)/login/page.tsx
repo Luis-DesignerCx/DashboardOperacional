@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
+import { BoxReveal, SpotlightInput } from "@/components/ui/login-effects";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -52,45 +53,17 @@ export default function LoginPage() {
       {/* ── Painel esquerdo — Brand (transparente) ──────────────── */}
       <div className="relative hidden lg:flex lg:w-[56%] flex-col items-center justify-center p-16 overflow-hidden">
 
-        {/* Axis watermark — eixos de coordenada com marcações, remete a "GR Axis": */}
-        {/* o ponto central (atrás do logo) onde os dados de todas as empresas convergem. */}
+        {/* Anéis concêntricos — eco sutil da marca, centrados atrás do logo */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none select-none z-0 text-white"
           viewBox="0 0 600 600"
           fill="none"
           aria-hidden="true"
         >
-          <defs>
-            <linearGradient id="axisLine" x1="0" y1="0" x2="600" y2="0" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#db824e" stopOpacity="0" />
-              <stop offset="50%" stopColor="#9f5697" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#516cb1" stopOpacity="0" />
-            </linearGradient>
-            <linearGradient id="axisLineV" x1="0" y1="0" x2="0" y2="600" gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor="#516cb1" stopOpacity="0" />
-              <stop offset="33%" stopColor="#9f5697" stopOpacity="0.35" />
-              <stop offset="100%" stopColor="#db824e" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
-          {/* Anel de órbita — eco sutil do fingerprint original, centrado atrás do logo */}
-          <circle cx="300" cy="198" r="170" stroke="currentColor" strokeOpacity="0.045" strokeWidth="1" />
-          <circle cx="300" cy="198" r="110" stroke="currentColor" strokeOpacity="0.035" strokeWidth="1" />
-
-          {/* Eixo horizontal e vertical */}
-          <line x1="0" y1="198" x2="600" y2="198" stroke="url(#axisLine)" strokeWidth="1" />
-          <line x1="300" y1="0" x2="300" y2="600" stroke="url(#axisLineV)" strokeWidth="1" />
-
-          {/* Marcações (ticks) ao longo dos eixos */}
-          {[-240, -180, -120, -60, 60, 120, 180, 240].map((offset) => (
-            <g key={`tick-${offset}`}>
-              <line x1={300 + offset} y1="192" x2={300 + offset} y2="204" stroke="currentColor" strokeOpacity="0.09" strokeWidth="1" />
-              <line x1="294" y1={198 + offset} x2="306" y2={198 + offset} stroke="currentColor" strokeOpacity="0.09" strokeWidth="1" />
-            </g>
-          ))}
-
-          {/* Origem — ponto de convergência */}
-          <circle cx="300" cy="198" r="3.5" fill="#c98fd0" fillOpacity="0.45" />
+          <circle cx="300" cy="198" r="90"  stroke="currentColor" strokeOpacity="0.05" strokeWidth="1" />
+          <circle cx="300" cy="198" r="150" stroke="currentColor" strokeOpacity="0.045" strokeWidth="1" />
+          <circle cx="300" cy="198" r="210" stroke="currentColor" strokeOpacity="0.035" strokeWidth="1" />
+          <circle cx="300" cy="198" r="270" stroke="currentColor" strokeOpacity="0.025" strokeWidth="1" />
         </svg>
 
         {/* Conteúdo */}
@@ -101,28 +74,34 @@ export default function LoginPage() {
             <Image src="/logo-gr.png" alt="GR Group" width={220} height={64} className="block" priority />
           </div>
 
-          <h1 className="text-4xl font-bold text-white leading-tight tracking-tight mb-4">
-            Gestão Inteligente<br />
-            <span style={{ background: "linear-gradient(90deg, #db824e, #9f5697, #516cb1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
-              de Cobrança
-            </span>
-          </h1>
-          <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
-            Carteira inteligente, distribuição automática e performance da sua equipe num único lugar.
-          </p>
+          <BoxReveal boxColor="#9f5697" delay={0.1}>
+            <h1 className="text-4xl font-bold text-white leading-tight tracking-tight mb-4">
+              Gestão Inteligente<br />
+              <span style={{ background: "linear-gradient(90deg, #db824e, #9f5697, #516cb1)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}>
+                de Cobrança
+              </span>
+            </h1>
+          </BoxReveal>
+          <BoxReveal boxColor="#516cb1" delay={0.25}>
+            <p className="text-slate-400 text-sm leading-relaxed max-w-xs">
+              Carteira inteligente, distribuição automática e performance da sua equipe num único lugar.
+            </p>
+          </BoxReveal>
 
           {/* Stats */}
-          <div className="mt-10 flex items-center gap-8">
-            {[
-              { valor: "100%", label: "Rastreável" },
-              { valor: "7×",   label: "Empresas"  },
-            ].map(({ valor, label }) => (
-              <div key={label} className="flex flex-col items-center gap-1">
-                <span className="text-2xl font-bold text-white tabular-nums">{valor}</span>
-                <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{label}</span>
-              </div>
-            ))}
-          </div>
+          <BoxReveal boxColor="#db824e" delay={0.4} width="100%" className="mt-10">
+            <div className="flex items-center justify-center gap-8">
+              {[
+                { valor: "100%", label: "Rastreável" },
+                { valor: "7×",   label: "Empresas"  },
+              ].map(({ valor, label }) => (
+                <div key={label} className="flex flex-col items-center gap-1">
+                  <span className="text-2xl font-bold text-white tabular-nums">{valor}</span>
+                  <span className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest">{label}</span>
+                </div>
+              ))}
+            </div>
+          </BoxReveal>
 
           {/* Barra de cores da marca */}
           <div className="mt-8 flex items-center gap-1 opacity-40">
@@ -156,18 +135,22 @@ export default function LoginPage() {
               <Image src="/logo-gr-icon.png" alt="" width={40} height={40} className="relative z-10 w-full h-full object-contain" />
             </div>
             <div>
-              <p className="text-white font-bold text-base leading-none tracking-tight">GR Axis</p>
+              <p className="text-white font-bold text-base leading-none tracking-tight">CRM · Cuidado &amp; Reconquista</p>
               <p className="text-slate-500 text-[10px] mt-0.5 tracking-widest uppercase font-medium">Plataforma GR Group</p>
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-white tracking-tight mb-1">Bem-vindo</h2>
-          <p className="text-slate-500 text-sm mb-8">Entre com suas credenciais para continuar.</p>
+          <BoxReveal boxColor="#6460e4" delay={0.05}>
+            <h2 className="text-2xl font-bold text-white tracking-tight mb-1">Bem-vindo</h2>
+          </BoxReveal>
+          <BoxReveal boxColor="#6460e4" delay={0.15} width="100%" className="mb-8">
+            <p className="text-slate-500 text-sm">Entre com suas credenciais para continuar.</p>
+          </BoxReveal>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Email</label>
-              <input
+              <SpotlightInput
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -184,7 +167,7 @@ export default function LoginPage() {
             <div>
               <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-widest mb-1.5">Senha</label>
               <div className="relative">
-                <input
+                <SpotlightInput
                   type={mostrar ? "text" : "password"}
                   value={senha}
                   onChange={(e) => setSenha(e.target.value)}
