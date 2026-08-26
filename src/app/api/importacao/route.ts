@@ -214,6 +214,33 @@ export async function POST(req: NextRequest) {
     });
     const existingMap = new Map(existingContratos.map((c) => [c.numero, c]));
 
+    // Importação FLASH: contratos que já têm carteira nesta competência
+    // atribuída a uma equipe que NÃO é Flash (ou seja, já fazem parte da
+    // base mensal) são ignorados por completo — não entram, não atualizam
+    // dados nem parcelas. Contratos já em Flash (envio incremental semanal)
+    // continuam sendo atualizados normalmente.
+    let ignoradosPorBaseMensal = 0;
+    if (isFlash && existingContratos.length > 0) {
+      const carteirasExistentes = await prisma.carteiraParcela.findMany({
+        where: { competenciaId, contratoId: { in: existingContratos.map((c) => c.id) } },
+        include: { consultor: { include: { equipe: true } } },
+      });
+      const contratoIdParaTipoEquipe = new Map(
+        carteirasExistentes.map((c) => [c.contratoId, c.consultor.equipe?.tipo])
+      );
+      for (const [num, ec] of [...existingMap]) {
+        const tipoEquipe = contratoIdParaTipoEquipe.get(ec.id);
+        if (tipoEquipe && tipoEquipe !== "FLASH") {
+          grupos.delete(num);
+          existingMap.delete(num);
+          ignoradosPorBaseMensal++;
+        }
+      }
+      if (ignoradosPorBaseMensal > 0) {
+        console.log(`Importação FLASH: ${ignoradosPorBaseMensal} contrato(s) ignorado(s) por já estarem na base mensal desta competência.`);
+      }
+    }
+
     // ── 4. Prepara dados em memória ──────────────────────────────────────────
     type ClienteRow  = { id: string; nome: string; telefones: string | null; emails: string | null };
     type ContratoRow = {
