@@ -87,23 +87,84 @@ export default function ImportacaoPage() {
     else setFpStatus(null);
   }
 
+  // Limite seguro abaixo do teto de corpo de requisição da Vercel (~4.5MB) —
+  // arquivos menores vão pelo caminho direto (rápido); arquivos maiores
+  // (ex: a query bruta do Passaporte BC, ~56MB) vão pelo Supabase Storage +
+  // GitHub Actions, que processa fora da Vercel e não tem esse limite.
+  const FP_LIMITE_UPLOAD_DIRETO = 4 * 1024 * 1024;
+
   async function handleFpSync() {
     if (!fpArquivo || !competenciaId) return;
     setFpCarregando(true);
     setFpErro("");
     setFpResultado(null);
-    setFpProgresso("Processando...");
+
     try {
-      const form = new FormData();
-      form.append("arquivo", fpArquivo);
-      form.append("competenciaId", competenciaId);
+      if (fpArquivo.size <= FP_LIMITE_UPLOAD_DIRETO) {
+        setFpProgresso("Processando...");
+        const form = new FormData();
+        form.append("arquivo", fpArquivo);
+        form.append("competenciaId", competenciaId);
 
-      const res = await fetch("/api/fapass/importar", { method: "POST", body: form });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.erro || "Erro ao importar");
+        const res = await fetch("/api/fapass/importar", { method: "POST", body: form });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.erro || "Erro ao importar");
 
-      await carregarFpStatus(competenciaId);
-      setFpResultado(data);
+        await carregarFpStatus(competenciaId);
+        setFpResultado(data);
+        return;
+      }
+
+      // ── Arquivo grande: Storage + GitHub Actions (assíncrono) ─────────────
+      setFpProgresso("Preparando upload...");
+      const urlRes = await fetch("/api/fapass/upload-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competenciaId }),
+      });
+      const urlData = await urlRes.json();
+      if (!urlRes.ok) throw new Error(urlData.erro || "Erro ao preparar upload");
+
+      setFpProgresso("Enviando arquivo (pode demorar em conexões lentas)...");
+      const putRes = await fetch(urlData.uploadUrl, {
+        method: "PUT",
+        body: fpArquivo,
+        headers: { "Content-Type": "application/octet-stream" },
+      });
+      if (!putRes.ok) throw new Error("Falha ao enviar arquivo para o Storage");
+
+      setFpProgresso("Disparando processamento...");
+      const trigRes = await fetch("/api/fapass/trigger", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ syncId: urlData.syncId, filePath: urlData.filePath, competenciaId }),
+      });
+      const trigData = await trigRes.json();
+      if (!trigRes.ok) throw new Error(trigData.erro || "Erro ao disparar processamento");
+
+      setFpProgresso("Processando em segundo plano (pode levar alguns minutos)...");
+      for (let tentativa = 0; tentativa < 90; tentativa++) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const statusRes = await fetch(`/api/fapass/status?competenciaId=${competenciaId}`);
+        const statusData = await statusRes.json();
+        const sync = statusData.ultimaSync;
+        if (sync?.id !== urlData.syncId) continue;
+
+        if (sync.status === "CONCLUIDO") {
+          setFpResultado({
+            primeiraSync: sync.primeiraSync,
+            novosInadimplentes: Math.max(0, sync.totalContratos - sync.totalFlash),
+            novosFlash: sync.totalFlash,
+            totalDivergencias: sync.totalDivergencias,
+          });
+          await carregarFpStatus(competenciaId);
+          return;
+        }
+        if (sync.status === "ERRO") {
+          throw new Error(sync.erro || "Erro ao processar no GitHub Actions");
+        }
+      }
+      throw new Error("Tempo limite excedido aguardando o processamento. Confira o status manualmente em alguns minutos.");
     } catch (e: any) {
       setFpErro(e?.message || "Erro ao processar o arquivo.");
     } finally {
