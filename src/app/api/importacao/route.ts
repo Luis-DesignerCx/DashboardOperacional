@@ -55,6 +55,77 @@ function normalizar(s: string): string {
   return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
 }
 
+// ─── Regras de filtro de inadimplência (Regras_de_Filtro.docx) ──────────────
+// Aplicadas a BASE e FLASH igualmente. Ver planilhas/Regras_de_Filtro (1).docx.
+
+// 1. Status do contrato — mantém só ATIVO / ATIVOREV (nível do contrato).
+const STATUS_PERMITIDOS = new Set(["ativo", "ativorev"]);
+
+// 2. Origem — mantém só estas (nível da parcela).
+const ORIGENS_PERMITIDAS = new Set([
+  "saldo", "saldo alocado", "entrada", "entrada efetiva", "entrada alocada", "intermediaria",
+]);
+
+// 4. Tags — remove a linha se QUALQUER tag da célula bater EXATAMENTE (não
+// "contém") com uma destas. Ex: "PRORVENCCONT" não é removida mesmo contendo
+// "PRO" como substring — por isso a comparação é por token, não por includes.
+const TAGS_PROIBIDAS = new Set([
+  "7dias", "jud", "pos7n", "judsemlim", "audtdist", "pro", "proclim", "raq", "expirado", "pdd181+",
+]);
+function temTagProibida(tagsCell: string): boolean {
+  if (!tagsCell) return false;
+  return tagsCell
+    .split(",")
+    .map((t) => normalizar(t).replace(/\s+/g, ""))
+    .some((t) => t && TAGS_PROIBIDAS.has(t));
+}
+
+// 5. Meio de pagamento — mantém só Boleto/Cartão/Pix, agrupando os valores
+// originais da planilha. Qualquer outro valor (ex: REPASSE, Transferência
+// Bancária, Depósito em Conta Corrente) é excluído.
+const MEIO_PAGAMENTO_CATEGORIA: Record<string, "BOLETO" | "CARTAO" | "PIX"> = {
+  "boleto bancario": "BOLETO",
+  "cartao de credito": "CARTAO",
+  "cartao de credito cob": "CARTAO",
+  "link para pagamento": "CARTAO",
+  "link para pagamento cob": "CARTAO",
+  "cartao recorrente": "CARTAO",
+  "cartao recorrente cob": "CARTAO",
+  "pix": "PIX",
+  "pix cob": "PIX",
+};
+function categoriaMeioPagamento(valor: string): "BOLETO" | "CARTAO" | "PIX" | null {
+  return MEIO_PAGAMENTO_CATEGORIA[normalizar(valor)] ?? null;
+}
+
+// Detecta coluna de "Data da venda" pelo cabeçalho (regra 3)
+function detectarColunaDataVenda(header: any[]): number | null {
+  const termos = ["data da venda", "data venda"];
+  for (let i = 0; i < header.length; i++) {
+    const cell = normalizar(String(header[i] ?? ""));
+    if (termos.some((t) => cell.includes(t))) return i;
+  }
+  return null;
+}
+
+// Detecta coluna de "Tags" pelo cabeçalho (regra 4)
+function detectarColunaTags(header: any[]): number | null {
+  for (let i = 0; i < header.length; i++) {
+    if (normalizar(String(header[i] ?? "")).includes("tags")) return i;
+  }
+  return null;
+}
+
+// Detecta coluna de "Número do documento" pelo cabeçalho (regra 6)
+function detectarColunaNumeroDocumento(header: any[]): number | null {
+  const termos = ["numero do documento", "número do documento", "nº documento", "num documento", "numero documento"];
+  for (let i = 0; i < header.length; i++) {
+    const cell = normalizar(String(header[i] ?? ""));
+    if (termos.some((t) => cell.includes(normalizar(t)))) return i;
+  }
+  return null;
+}
+
 // Detecta coluna de consultor pelo cabeçalho
 function detectarColunaConsultor(header: any[]): number | null {
   const termos = ["consultor", "responsavel", "colaborador", "atendente", "operador"];
@@ -155,6 +226,12 @@ export async function POST(req: NextRequest) {
     const headerRow = todasLinhas[linhaCabecalho] ?? [];
     const colunaConsultor = detectarColunaConsultor(headerRow);
     const colunaFaixa = detectarColunaFaixa(headerRow);
+    const colunaDataVenda = detectarColunaDataVenda(headerRow);
+    const colunaTags = detectarColunaTags(headerRow);
+    const colunaNumeroDocumento = detectarColunaNumeroDocumento(headerRow);
+    if (colunaDataVenda === null) console.log("Importação: coluna 'Data da venda' não encontrada — regra 3 (mês corrente) não aplicada.");
+    if (colunaTags === null) console.log("Importação: coluna 'Tags' não encontrada — regra 4 (tags proibidas) não aplicada.");
+    if (colunaNumeroDocumento === null) console.log("Importação: coluna 'Número do documento' não encontrada — regra 6 não aplicada.");
     let linhasDeTotalDescartadas = 0;
     const linhas = todasLinhas.slice(linhaCabecalho + 1).filter((row) => {
       if (String(row[colunas.contrato] ?? "").trim() === "") return false;
@@ -186,6 +263,31 @@ export async function POST(req: NextRequest) {
         errosPorGrupoGigante++;
         detalhesErrosGrupoGigante.push({ contrato: num, motivo });
       }
+    }
+
+    // Regras 1 e 3 (nível de contrato): status do contrato e data da venda.
+    // "Mês corrente" = mês/ano reais no momento da importação.
+    const agora = new Date();
+    const mesCorrente = agora.getUTCMonth();
+    const anoCorrente = agora.getUTCFullYear();
+    let filtradosPorStatusOuData = 0;
+    for (const [num, rows] of [...grupos]) {
+      const row0 = rows[0];
+      const statusOk = STATUS_PERMITIDOS.has(normalizar(String(row0[colunas.statusContrato] ?? "")));
+      let dataVendaOk = true;
+      if (colunaDataVenda !== null) {
+        const dataVenda = parseDateExcel(row0[colunaDataVenda]);
+        if (dataVenda && dataVenda.getUTCFullYear() === anoCorrente && dataVenda.getUTCMonth() === mesCorrente) {
+          dataVendaOk = false;
+        }
+      }
+      if (!statusOk || !dataVendaOk) {
+        grupos.delete(num);
+        filtradosPorStatusOuData++;
+      }
+    }
+    if (filtradosPorStatusOuData > 0) {
+      console.log(`Importação: ${filtradosPorStatusOuData} contrato(s) filtrado(s) por status ou data da venda (regras 1/3).`);
     }
 
     // ── 3. Carrega empresas e contratos existentes (1 query cada) ────────────
@@ -264,6 +366,7 @@ export async function POST(req: NextRequest) {
     const allParcelas:  ParcelaRow[]  = [];
     let erros = 0;
     const detalhesErros: { contrato: string; motivo: string }[] = [];
+    let filtradosVazios = 0;
 
     for (const [num, rows] of grupos) {
       try {
@@ -280,11 +383,36 @@ export async function POST(req: NextRequest) {
         const totalParcelasVencidas = parseInt(String(row0[colunas.totalParcelasVencidas] ?? "")) || null;
         const valorContrato        = parseDecimal(row0[colunas.valorContrato]);
 
+        // Regras 2, 4, 5 e 6 (nível de parcela): origem, tags, meio de
+        // pagamento e número do documento.
+        const rowsFiltradas = rows.filter((row) => {
+          const origemRaw = String(row[colunas.origem] ?? "").trim();
+          if (!ORIGENS_PERMITIDAS.has(normalizar(origemRaw))) return false;
+
+          if (colunaTags !== null) {
+            const tagsRaw = String(row[colunaTags] ?? "").trim();
+            if (temTagProibida(tagsRaw)) return false;
+          }
+
+          const meioPagRaw = String(row[colunas.meioPagamento] ?? "").trim();
+          const categoria = categoriaMeioPagamento(meioPagRaw);
+          if (!categoria) return false;
+
+          if (categoria !== "BOLETO" && colunaNumeroDocumento !== null) {
+            const numDoc = String(row[colunaNumeroDocumento] ?? "").trim();
+            if (numDoc) return false;
+          }
+
+          return true;
+        });
+
+        if (rowsFiltradas.length === 0) { filtradosVazios++; continue; }
+
         let maiorDiasAtraso  = 0;
         let valorTotalAberto = 0;
         const parcelasTemp: Omit<ParcelaRow, "contratoId">[] = [];
 
-        rows.forEach((row, idx) => {
+        rowsFiltradas.forEach((row, idx) => {
           const dias  = parseInt(String(row[colunas.diasAtraso] ?? "0")) || 0;
           const valor = parseDecimal(row[colunas.valorAReceber]);
           if (dias > maiorDiasAtraso) maiorDiasAtraso = dias;
@@ -397,7 +525,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 8. Atualiza registro de importação ───────────────────────────────────
-    const processados = grupos.size - erros;
+    if (filtradosVazios > 0) {
+      console.log(`Importação: ${filtradosVazios} contrato(s) sem nenhuma parcela válida após as regras de filtro (origem/tags/meio de pagamento/documento).`);
+    }
+    const processados = grupos.size - erros - filtradosVazios;
     const detalhesErrosFinal = [...detalhesErrosGrupoGigante, ...detalhesErros];
     await prisma.importacao.update({
       where: { id: importacao.id },
