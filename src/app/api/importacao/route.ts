@@ -344,7 +344,7 @@ export async function POST(req: NextRequest) {
       // Clientes
       const cliRows = Prisma.join(
         chunk.map((op) =>
-          Prisma.sql`(${op.clienteId}::uuid, ${op.cliData.nome}::text, ${op.cliData.telefones ?? null}::text, ${op.cliData.emails ?? null}::text)`
+          Prisma.sql`(${op.clienteId}::text, ${op.cliData.nome}::text, ${op.cliData.telefones ?? null}::text, ${op.cliData.emails ?? null}::text)`
         )
       );
       await prisma.$executeRaw`
@@ -359,7 +359,7 @@ export async function POST(req: NextRequest) {
       // Contratos
       const ctRows = Prisma.join(
         chunk.map((op) =>
-          Prisma.sql`(${op.contratoId}::uuid,
+          Prisma.sql`(${op.contratoId}::text,
                       ${op.ctData.statusContrato ?? null}::text,
                       ${op.ctData.totalParcelasVencidas ?? null}::int,
                       ${op.ctData.maiorDiasAtraso}::int,
