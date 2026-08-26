@@ -14,7 +14,11 @@ import { fatorFerias } from "@/utils/dias-uteis";
 import { Decimal } from "@prisma/client/runtime/library";
 import { Prisma } from "@prisma/client";
 
-// ─── Índices de coluna fixos (0-based) — planilha "BASE" ────────────────────
+// ─── Índices de coluna fixos (0-based) — fallback quando o cabeçalho não é
+// reconhecido (ver detectarColunasPorCabecalho). Cada layout de planilha já
+// visto até hoje tem colunas em posições diferentes — por isso a leitura real
+// é sempre por NOME da coluna no cabeçalho; estes números são só o último
+// recurso caso uma coluna não seja encontrada pelo nome.
 const C = {
   statusContrato:        1,
   origem:                2,
@@ -30,11 +34,10 @@ const C = {
   valorAReceber:         19,
 } as const;
 
-// ─── Índices de coluna fixos (0-based) — export "FLASH" ─────────────────────
-// Relatório "Consulta Inadimplência" do sistema de cobrança (ex: TSExplorer).
-// Layout bem diferente do BASE — mapeado manualmente a partir do arquivo real
-// "FLASH 15-08.xls" (ago/2026). A linha de cabeçalho tampouco é a primeira:
-// há linhas de título do relatório antes dela (ver encontrarLinhaCabecalho).
+// Mesmo fallback, mas com os valores confirmados do export "FLASH" (relatório
+// "Consulta Inadimplência" do sistema de cobrança), usado quando a
+// importação é do tipo FLASH e o cabeçalho não bate com nenhum termo
+// conhecido — na prática, quase sempre é sobrescrito pela detecção abaixo.
 const C_FLASH = {
   statusContrato:        10, // K — "Status" (ex: VENCIDO)
   origem:                3,  // D — "Origem"
@@ -49,6 +52,61 @@ const C_FLASH = {
   valorContrato:         23, // X — "Valor do contrato"
   valorAReceber:         24, // Y — "Valor a receber"
 } as const;
+
+type ColunaKey = keyof typeof C;
+
+// Termos de cabeçalho usados para localizar cada coluna pelo NOME, e não por
+// índice fixo — cobre layouts diferentes (ex: BASE "crua" e FLASH, que usam
+// nomes de coluna iguais em posições diferentes) sem precisar mapear cada
+// planilha na mão. Só sobrescreve o índice fixo quando encontra um termo com
+// confiança razoável; senão mantém o fallback (`C`/`C_FLASH`).
+const TERMOS_COLUNA: Partial<Record<ColunaKey, string[]>> = {
+  nome:                  ["nome da pessoa", "nome do cliente", "nome completo", "nome"],
+  statusContrato:        ["status do contrato", "status contrato", "status"],
+  origem:                ["origem"],
+  meioPagamento:         ["meio de pagamento", "meio pagamento", "forma de pagamento"],
+  dataVencimento:        ["data de vencimento"],
+  diasAtraso:            ["quantidade de dias vencido", "dias de atraso", "dias atraso", "dias vencido"],
+  valorContrato:         ["valor do contrato", "valor contrato"],
+  valorAReceber:         ["valor a receber", "valor receber", "saldo devedor"],
+  telefones:             ["telefone", "telefones", "celular"],
+  emails:                ["e-mail", "email", "emails"],
+  totalParcelasVencidas: ["parcelas vencidas"],
+};
+
+// Detecta o número do contrato pelo cabeçalho, com cuidado pra não colidir
+// com "status do contrato" / "valor do contrato" (que também contêm a
+// palavra "contrato").
+function detectarColunaContrato(normalizados: string[]): number | null {
+  const termosEspecificos = [
+    "numero do contrato", "número do contrato", "nº do contrato", "nº contrato",
+    "num contrato", "numero contrato", "codigo do contrato", "código do contrato", "cod contrato",
+  ];
+  for (const termo of termosEspecificos) {
+    const i = normalizados.findIndex((c) => c.includes(termo));
+    if (i !== -1) return i;
+  }
+  const i = normalizados.findIndex((c) => c === "contrato");
+  return i !== -1 ? i : null;
+}
+
+function detectarColunasPorCabecalho(header: any[], fallback: Record<ColunaKey, number>): Record<ColunaKey, number> {
+  const normalizados = header.map((h) => normalizar(String(h ?? "")));
+  const resolvido: Record<ColunaKey, number> = { ...fallback };
+
+  const idxContrato = detectarColunaContrato(normalizados);
+  if (idxContrato !== null) resolvido.contrato = idxContrato;
+
+  for (const campo of Object.keys(TERMOS_COLUNA) as ColunaKey[]) {
+    const termos = TERMOS_COLUNA[campo]!;
+    for (const termo of termos) {
+      const i = normalizados.findIndex((c) => c.includes(termo));
+      if (i !== -1) { resolvido[campo] = i; break; }
+    }
+  }
+
+  return resolvido;
+}
 
 // Normaliza string para comparação flexível (remove acentos, lower, trim)
 function normalizar(s: string): string {
@@ -202,7 +260,6 @@ export async function POST(req: NextRequest) {
   const arquivo  = formData.get("arquivo")      as File;
   const competenciaId = formData.get("competenciaId") as string;
   const isFlash  = (formData.get("tipoBase") as string | null) === "FLASH";
-  const colunas  = isFlash ? C_FLASH : C;
 
   if (!arquivo || !competenciaId) {
     return NextResponse.json({ erro: "Arquivo e competência são obrigatórios" }, { status: 400 });
@@ -224,6 +281,8 @@ export async function POST(req: NextRequest) {
     const todasLinhas: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
     const linhaCabecalho = encontrarLinhaCabecalho(todasLinhas);
     const headerRow = todasLinhas[linhaCabecalho] ?? [];
+    const colunas = detectarColunasPorCabecalho(headerRow, isFlash ? C_FLASH : C);
+    console.log(`Importação (${isFlash ? "FLASH" : "BASE"}): cabeçalho na linha ${linhaCabecalho + 1}, colunas resolvidas =`, colunas);
     const colunaConsultor = detectarColunaConsultor(headerRow);
     const colunaFaixa = detectarColunaFaixa(headerRow);
     const colunaDataVenda = detectarColunaDataVenda(headerRow);
@@ -625,6 +684,7 @@ export async function POST(req: NextRequest) {
       erros,
       importacaoId: importacao.id,
       tipoDetectado: isFlash ? "FLASH" : "BASE",
+      colunasResolvidas: colunas,
     });
   } catch (err) {
     await prisma.importacao.update({
