@@ -177,11 +177,14 @@ export async function POST(req: NextRequest) {
     // Descarta grupos anormalmente grandes — provável coluna de contrato mal
     // detectada, unindo linhas de clientes diferentes num único "contrato".
     let errosPorGrupoGigante = 0;
+    const detalhesErrosGrupoGigante: { contrato: string; motivo: string }[] = [];
     for (const [num, rows] of [...grupos]) {
       if (rows.length > LIMITE_PARCELAS_POR_CONTRATO) {
-        console.error(`Importação: grupo "${num}" com ${rows.length} linhas excede o limite de ${LIMITE_PARCELAS_POR_CONTRATO} — descartado (provável coluna de contrato incorreta).`);
+        const motivo = `Grupo com ${rows.length} linhas excede o limite de ${LIMITE_PARCELAS_POR_CONTRATO} (provável coluna de contrato incorreta)`;
+        console.error(`Importação: grupo "${num}" — ${motivo} — descartado.`);
         grupos.delete(num);
         errosPorGrupoGigante++;
+        detalhesErrosGrupoGigante.push({ contrato: num, motivo });
       }
     }
 
@@ -260,15 +263,16 @@ export async function POST(req: NextRequest) {
     const updateOps:    UpdateOp[]    = [];
     const allParcelas:  ParcelaRow[]  = [];
     let erros = 0;
+    const detalhesErros: { contrato: string; motivo: string }[] = [];
 
     for (const [num, rows] of grupos) {
       try {
         const row0 = rows[0];
         const nome = String(row0[colunas.nome] ?? "").trim();
-        if (!nome) { erros++; continue; }
+        if (!nome) { erros++; detalhesErros.push({ contrato: num, motivo: "Nome do cliente vazio" }); continue; }
 
         const empresaId = resolverEmpresaId(num);
-        if (!empresaId) { erros++; continue; }
+        if (!empresaId) { erros++; detalhesErros.push({ contrato: num, motivo: "Não foi possível identificar a empresa pelo número do contrato" }); continue; }
 
         const telefones = normalizarTelefones(String(row0[colunas.telefones] ?? "").trim());
         const emails    = String(row0[colunas.emails] ?? "").trim() || null;
@@ -328,6 +332,7 @@ export async function POST(req: NextRequest) {
       } catch (e) {
         console.error(`Erro no contrato ${num}:`, e);
         erros++;
+        detalhesErros.push({ contrato: num, motivo: e instanceof Error ? e.message : "Erro desconhecido ao processar a linha" });
       }
     }
 
@@ -393,6 +398,7 @@ export async function POST(req: NextRequest) {
 
     // ── 8. Atualiza registro de importação ───────────────────────────────────
     const processados = grupos.size - erros;
+    const detalhesErrosFinal = [...detalhesErrosGrupoGigante, ...detalhesErros];
     await prisma.importacao.update({
       where: { id: importacao.id },
       data: {
@@ -400,6 +406,7 @@ export async function POST(req: NextRequest) {
         totalContratos: processados,
         processadas:    processados,
         erros:      erros + errosPorGrupoGigante,
+        detalhesErros: detalhesErrosFinal.length > 0 ? detalhesErrosFinal : undefined,
         status:     "CONCLUIDO",
         concluidoEm: new Date(),
       },

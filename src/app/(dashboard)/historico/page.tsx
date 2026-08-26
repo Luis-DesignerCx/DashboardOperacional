@@ -11,6 +11,7 @@ interface ImportacaoResumo {
   totalContratos: number;
   totalLinhas: number;
   erros: number;
+  detalhesErros: { contrato: string; motivo: string }[] | null;
   status: string;
   criadoEm: string;
   concluidoEm: string | null;
@@ -37,6 +38,7 @@ export default function HistoricoPage() {
   const [exportando, setExportando] = useState<string | null>(null);
   const [cancelando, setCancelando] = useState<string | null>(null);
   const [fechando, setFechando] = useState<string | null>(null);
+  const [erroDetalhe, setErroDetalhe] = useState<ImportacaoResumo | null>(null);
 
   useEffect(() => {
     fetch("/api/historico")
@@ -163,7 +165,16 @@ export default function HistoricoPage() {
                           {new Date(comp.ultimaImportacao.criadoEm).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                           {" · "}{comp.ultimaImportacao.totalContratos} contratos
                           {comp.ultimaImportacao.erros > 0 && (
-                            <span className="text-amber-500"> · {comp.ultimaImportacao.erros} erros</span>
+                            comp.ultimaImportacao.detalhesErros?.length ? (
+                              <button
+                                onClick={() => setErroDetalhe(comp.ultimaImportacao)}
+                                className="text-amber-500 hover:text-amber-400 underline decoration-dotted transition-colors"
+                              >
+                                {" "}· {comp.ultimaImportacao.erros} erros
+                              </button>
+                            ) : (
+                              <span className="text-amber-500"> · {comp.ultimaImportacao.erros} erros</span>
+                            )
                           )}
                         </p>
                       </div>
@@ -214,6 +225,39 @@ export default function HistoricoPage() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {erroDetalhe && (
+        <div
+          className="fixed inset-0 bg-surface-0/90 backdrop-blur-md z-[100] flex items-center justify-center p-4"
+          onClick={() => setErroDetalhe(null)}
+        >
+          <div
+            className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-card-lg animate-fade-in-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-5 border-b border-white/[0.06] flex items-center justify-between">
+              <div>
+                <p className="text-white font-semibold text-sm">Erros na importação</p>
+                <p className="text-slate-400 text-xs mt-0.5 truncate max-w-[380px]">{erroDetalhe.nomeArquivo}</p>
+              </div>
+              <button
+                onClick={() => setErroDetalhe(null)}
+                className="text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                <XCircle size={18} />
+              </button>
+            </div>
+            <div className="overflow-y-auto p-5 space-y-2">
+              {erroDetalhe.detalhesErros?.map((d, i) => (
+                <div key={i} className="bg-surface-1 border border-white/[0.05] rounded-lg px-3 py-2">
+                  <p className="text-white text-xs font-medium truncate">{d.contrato}</p>
+                  <p className="text-amber-500 text-xs mt-0.5">{d.motivo}</p>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>

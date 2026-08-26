@@ -215,6 +215,7 @@ model Importacao {
   totalContratos Int        @default(0)
   processadas   Int         @default(0)
   erros         Int         @default(0)
+  detalhesErros Json?       // [{ contrato: string, motivo: string }]
   status        String      @default("PROCESSANDO")
   criadoEm      DateTime    @default(now())
   concluidoEm   DateTime?

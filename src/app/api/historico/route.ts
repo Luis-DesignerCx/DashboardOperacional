@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
           totalContratos: true,
           totalLinhas: true,
           erros: true,
+          detalhesErros: true,
           status: true,
           criadoEm: true,
           concluidoEm: true,
