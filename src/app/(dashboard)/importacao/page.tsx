@@ -793,6 +793,15 @@ export default function ImportacaoPage() {
                 {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Processando...</> : <><RefreshCw size={15} /> Importar Fã Pass</>}
               </button>
               <button
+                onClick={() => window.open(`/api/fapass/exportar?competenciaId=${competenciaId}`, "_blank")}
+                disabled={!competenciaId}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white/[0.07] hover:bg-white/[0.12] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                title="Exporta os dados de inadimplência, baixas e divergências desta competência"
+              >
+                <ArrowDownToLine size={15} />
+                Exportar
+              </button>
+              <button
                 onClick={handleFpFecharCiclo}
                 disabled={fpFechando || !fpStatus?.totalContratos}
                 className="flex items-center gap-2 px-4 py-2.5 bg-white/[0.07] hover:bg-white/[0.12] disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"

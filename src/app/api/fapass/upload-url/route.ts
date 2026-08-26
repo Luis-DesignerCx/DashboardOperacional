@@ -25,8 +25,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "Supabase Storage não configurado no servidor." }, { status: 500 });
   }
 
-  // Nome do arquivo: competencias/{id}/{timestamp}.xlsx
-  const filePath = `competencias/${competenciaId}/${Date.now()}.xlsx`;
+  // Nome do arquivo FIXO por competência (não por timestamp) — cada novo upload
+  // sobrescreve o anterior (upsert: true abaixo), então o Storage nunca acumula
+  // arquivo por reimportação. O arquivo é só uma passagem: o GitHub Actions
+  // apaga ele do Storage assim que termina de processar (ver fapass-sync.yml).
+  const filePath = `competencias/${competenciaId}/query.xlsx`;
 
   // Solicita URL assinada para upload ao Supabase Storage
   const resp = await fetch(`${supabaseUrl}/storage/v1/object/sign/upload/fapass/${filePath}`, {

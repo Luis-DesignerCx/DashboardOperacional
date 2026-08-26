@@ -53,6 +53,14 @@ jobs:
           FAPASS_SYNC_ID: ${{ github.event.client_payload.syncId }}
         run: node scripts/fapass-importar.mjs
 
+      - name: Limpar arquivo do Supabase Storage
+        if: always()
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FAPASS_FILE_PATH: ${{ github.event.client_payload.filePath }}
+        run: python scripts/fapass-limpar-storage.py
+
       - name: Limpar arquivos temporários
         if: always()
         run: |
