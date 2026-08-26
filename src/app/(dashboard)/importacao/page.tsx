@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle, ArrowDownToLine, CheckCheck } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
+import { Select } from "@/components/ui/Select";
 
 interface Competencia {
   id: string;
@@ -307,16 +308,17 @@ export default function ImportacaoPage() {
             <p className="text-slate-400 text-sm">O recebimento será marcado como <span className="text-emerald-400 font-medium">Confirmado</span> e não será sobrescrito em próximas importações.</p>
             <div>
               <label className="text-xs text-slate-400 block mb-1.5">Motivo</label>
-              <select
+              <Select
                 value={resolverMotivo}
-                onChange={(e) => setResolverMotivo(e.target.value)}
-                className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-emerald-500"
-              >
-                <option>Juros e encargos</option>
-                <option>Valor verificado com o banco</option>
-                <option>Acordo negociado</option>
-                <option>Outro</option>
-              </select>
+                onValueChange={setResolverMotivo}
+                className="py-2 focus:ring-emerald-500"
+                options={[
+                  { value: "Juros e encargos", label: "Juros e encargos" },
+                  { value: "Valor verificado com o banco", label: "Valor verificado com o banco" },
+                  { value: "Acordo negociado", label: "Acordo negociado" },
+                  { value: "Outro", label: "Outro" },
+                ]}
+              />
             </div>
             <div className="flex gap-2 pt-1">
               <button
@@ -365,15 +367,14 @@ export default function ImportacaoPage() {
                 <span className="text-xs font-medium text-slate-300">Nova Competência</span>
               </div>
               <div className="flex gap-2">
-                <select
-                  value={novoMes}
-                  onChange={(e) => setNovoMes(Number(e.target.value))}
-                  className="flex-1 bg-white/[0.07] border border-white/[0.12] rounded-lg px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500"
-                >
-                  {MESES.map((m, i) => (
-                    <option key={i + 1} value={i + 1}>{m}</option>
-                  ))}
-                </select>
+                <div className="flex-1">
+                  <Select
+                    value={String(novoMes)}
+                    onValueChange={(v) => setNovoMes(Number(v))}
+                    className="w-full bg-white/[0.07] border-white/[0.12] py-2"
+                    options={MESES.map((m, i) => ({ value: String(i + 1), label: m }))}
+                  />
+                </div>
                 <input
                   type="number"
                   value={novoAno}
@@ -395,16 +396,13 @@ export default function ImportacaoPage() {
             </div>
           )}
 
-          <select
+          <Select
             value={competenciaId}
-            onChange={(e) => { setCompetenciaId(e.target.value); setTipoImport(null); if (e.target.value) carregarFpStatus(e.target.value); }}
-            className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
-          >
-            <option value="">Selecione a competência</option>
-            {competencias.filter((c) => !c.fechada).map((c) => (
-              <option key={c.id} value={c.id}>{c.descricao}</option>
-            ))}
-          </select>
+            onValueChange={(v) => { setCompetenciaId(v); setTipoImport(null); if (v) carregarFpStatus(v); }}
+            placeholder="Selecione a competência"
+            className="w-full"
+            options={competencias.filter((c) => !c.fechada).map((c) => ({ value: c.id, label: c.descricao }))}
+          />
 
           {/* Tipo de base */}
           <div className="mt-3">
@@ -492,16 +490,13 @@ export default function ImportacaoPage() {
             {consultoresDisponiveis.length > 0 ? (
               <div className="flex gap-2 items-end">
                 <div className="flex-1">
-                  <select
+                  <Select
                     value={novaFeriasConsultorId}
-                    onChange={(e) => setNovaFeriasConsultorId(e.target.value)}
-                    className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-gr-500"
-                  >
-                    <option value="">Selecionar consultor</option>
-                    {consultoresDisponiveis.map((c) => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))}
-                  </select>
+                    onValueChange={setNovaFeriasConsultorId}
+                    placeholder="Selecionar consultor"
+                    className="w-full py-2 text-xs"
+                    options={consultoresDisponiveis.map((c) => ({ value: c.id, label: c.nome }))}
+                  />
                 </div>
                 <input
                   type="date"
