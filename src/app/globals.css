@@ -4,6 +4,8 @@
 
 /* ── Design tokens ────────────────────────────────────────────────────────── */
 :root {
+  color-scheme: dark;
+
   --background:       #070b14;
   --foreground:       #dde1ec;
   --font-sora:        "Sora", sans-serif;
