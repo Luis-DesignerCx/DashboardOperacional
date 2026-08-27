@@ -32,13 +32,14 @@ export async function POST(req: NextRequest) {
   const filePath = `competencias/${competenciaId}/query.xlsx`;
 
   // Solicita URL assinada para upload ao Supabase Storage
-  const resp = await fetch(`${supabaseUrl}/storage/v1/object/sign/upload/fapass/${filePath}`, {
+  // (a ordem correta do endpoint é "object/upload/sign", não "object/sign/upload")
+  const resp = await fetch(`${supabaseUrl}/storage/v1/object/upload/sign/fapass/${filePath}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${serviceKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ upsert: true, expiresIn: 3600 }),
+    body: JSON.stringify({ upsert: true }),
   });
 
   if (!resp.ok) {
@@ -46,12 +47,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: `Erro ao gerar URL de upload: ${erro}` }, { status: 500 });
   }
 
-  const { url: signedPath, token } = await resp.json();
+  const { url: signedPath } = await resp.json();
 
-  // Monta a URL completa para o cliente fazer o PUT
+  // O "url" retornado é relativo a /storage/v1 (ex: "/object/upload/sign/fapass/...?token=...")
   const uploadUrl = signedPath.startsWith("http")
     ? signedPath
-    : `${supabaseUrl}${signedPath}`;
+    : `${supabaseUrl}/storage/v1${signedPath}`;
 
   // Cria o registro de sync com status AGUARDANDO
   const sync = await prisma.faPassSync.create({
