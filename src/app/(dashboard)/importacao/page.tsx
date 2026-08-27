@@ -93,6 +93,24 @@ export default function ImportacaoPage() {
   // GitHub Actions, que processa fora da Vercel e não tem esse limite.
   const FP_LIMITE_UPLOAD_DIRETO = 4 * 1024 * 1024;
 
+  // Roda a redução (só linhas FP/PON) num Web Worker, sem travar a aba.
+  function reduzirArquivoFaPass(file: File): Promise<Blob> {
+    return new Promise(async (resolve, reject) => {
+      const worker = new Worker(new URL("../../../workers/fapass-reduzir.worker.ts", import.meta.url));
+      worker.onmessage = (e: MessageEvent<{ ok: boolean; buffer?: ArrayBuffer; erro?: string }>) => {
+        worker.terminate();
+        if (e.data.ok && e.data.buffer) {
+          resolve(new Blob([e.data.buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+        } else {
+          reject(new Error(e.data.erro || "Erro ao reduzir arquivo"));
+        }
+      };
+      worker.onerror = (e) => { worker.terminate(); reject(new Error(e.message || "Erro no worker de redução")); };
+      const buffer = await file.arrayBuffer();
+      worker.postMessage({ buffer }, [buffer]);
+    });
+  }
+
   async function handleFpSync() {
     if (!fpArquivo || !competenciaId) return;
     setFpCarregando(true);
@@ -115,7 +133,16 @@ export default function ImportacaoPage() {
         return;
       }
 
-      // ── Arquivo grande: Storage + GitHub Actions (assíncrono) ─────────────
+      // ── Arquivo grande: reduz no navegador, depois Storage + GitHub Actions ──
+      // O bucket do Supabase Storage tem limite de 50MB (plano gratuito) — a
+      // query bruta do Fã Pass pode passar disso. A maior parte do arquivo é
+      // dado histórico já baixado, irrelevante pra importação (que só usa
+      // linhas com Documento prefixado FP/PON), então reduzir antes de enviar
+      // custuma resolver sem perder nenhum dado que seria usado de qualquer
+      // forma. Isso é transparente pro usuário — ele só vê "Reduzindo...".
+      setFpProgresso("Preparando arquivo (pode demorar em arquivos grandes)...");
+      const arquivoParaEnviar = await reduzirArquivoFaPass(fpArquivo);
+
       setFpProgresso("Preparando upload...");
       const urlRes = await fetch("/api/fapass/upload-url", {
         method: "POST",
@@ -128,7 +155,7 @@ export default function ImportacaoPage() {
       setFpProgresso("Enviando arquivo (pode demorar em conexões lentas)...");
       const putRes = await fetch(urlData.uploadUrl, {
         method: "PUT",
-        body: fpArquivo,
+        body: arquivoParaEnviar,
         headers: { "Content-Type": "application/octet-stream" },
       });
       if (!putRes.ok) throw new Error("Falha ao enviar arquivo para o Storage");
