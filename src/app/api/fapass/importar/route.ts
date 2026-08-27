@@ -9,20 +9,24 @@ import * as XLSX from "xlsx";
 import { randomUUID } from "crypto";
 
 // ─── Índices de coluna (0-based) ─────────────────────────────────────────────
-// Passaporte | Fornecedor | Id | Vencimento | Tipo | Valor | Status | TiposBaixa
-// | Dias Venc. Ant. | Status Lote | Consultor | Meta | Faixa | StatusAc.
-// | Data Rec. | Valor Rec. | MeioPag. | Valor EmDia | Observação
+// Layout real da query "Base CAR Passaporte BC" (confirmado por auditoria em
+// 2026-08-26 contra o arquivo real, 30 colunas):
+// Id | Documento | DataMovimento | Emissao | Empresa | Operacao | Tipo |
+// Fornecedor | Valor | Desconto | JurosMulta | Taxa | Impostos | Alteradores |
+// SaldoPendente | ValorBaixado | Status | Vencimento | DataBaixa | TiposBaixa |
+// Grupo | Aplicacao | Passaporte | TipoPassaporte | SeriePassaporte |
+// DataVenda | DataExpiracao | Titular | Dependentes | Agregados
+// Não existe coluna dedicada de "meio de pagamento" — o campo Tipo já cumpre
+// esse papel (ex: "Boleto Bradesco.", "Cartão Master Crédito", "Rec. Master").
 const C = {
-  documento:  0,
-  fornecedor: 1,
-  vencimento: 3,
-  tipo:       4,
-  valor:      5,
-  status:     6,
-  tiposBaixa: 7,
-  dataBaixa:  14,
-  valorRec:   15,
-  meioPag:    16,
+  documento:  1,
+  fornecedor: 7,
+  tipo:       6,
+  valor:      8,
+  status:     16,
+  vencimento: 17,
+  dataBaixa:  18,
+  tiposBaixa: 19,
 } as const;
 
 function parsearValor(val: unknown): number {
@@ -57,17 +61,13 @@ function isInadimplencia(tipo: string): boolean {
   if (/^cart[aã]o/i.test(t)) return false;
   return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t);
 }
-// Determina tipo de baixa pelo MeioPag (col 16), com fallback no Tipo (col 4)
-// Para cartão: status P/B é irrelevante — depende apenas do MeioPag e DataRec
-function detectarTipoBaixa(meioPag: string, tipo: string): "CARTAO" | "BOLETO_PIX" | null {
-  const m = String(meioPag ?? "").trim();
-  if (/cart[aã]o/i.test(m)) return "CARTAO";
-  if (/boleto|pix|dinheiro|dep[oó]sito|transfer[eê]ncia|ted/i.test(m)) return "BOLETO_PIX";
-  // MeioPag vazio: fallback pelo Tipo da dívida
-  const t = String(tipo ?? "").trim();
-  if (/^rec\.\s*(master|visa|elo|amex|hipercard)/i.test(t)) return "CARTAO";
-  if (/boleto/i.test(t)) return "BOLETO_PIX";
-  return null;
+// Sem coluna dedicada de meio de pagamento nesta query — Tipo já indica o
+// meio (ex: "Boleto Bradesco.", "PIX Fã Pass.", "Cartão Master Crédito").
+function isBaixaNormal(tipo: string): boolean {
+  return /boleto|pix|dinheiro|dep[oó]sito|transfer[eê]ncia|ted/i.test(String(tipo ?? ""));
+}
+function isBaixaCartao(tipo: string): boolean {
+  return /^cart[aã]o/i.test(String(tipo ?? "").trim());
 }
 
 function obterEquipe(dias: number): string {
@@ -135,6 +135,11 @@ export async function POST(req: NextRequest) {
     const gruposInad = new Map<string, { fornecedor: string; linhas: { valor: number; vencimento: Date }[] }>();
 
     for (const row of linhas) {
+      const doc = String(row[C.documento] ?? "").trim();
+      if (!doc) continue;
+      const docUpper = doc.toUpperCase();
+      if (!(docUpper.startsWith("FP") || docUpper.startsWith("PON"))) continue;
+
       const status = String(row[C.status] ?? "").trim().toUpperCase();
       if (status !== "P") continue;
 
@@ -150,9 +155,6 @@ export async function POST(req: NextRequest) {
       const isFlashRow = vencimento >= iniComp && vencimento <= ontem;
       const isInadRow  = vencimento <= ontem;
       if (!isInadRow && !isFlashRow) continue;
-
-      const doc = String(row[C.documento] ?? "").trim();
-      if (!doc) continue;
 
       const fornecedor = String(row[C.fornecedor] ?? "").trim();
       if (!gruposInad.has(doc)) gruposInad.set(doc, { fornecedor, linhas: [] });
@@ -251,26 +253,32 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Processa baixas ───────────────────────────────────────────────────────
-    // Detecta pelo MeioPag (col 16) e DataRec (col 14) — status P/B é irrelevante
+    // Sem coluna dedicada de meio de pagamento — usa Status (col 16) e Tipo
+    // (col 6). Cartão: status é irrelevante (só depende do Tipo e DataBaixa).
     await prisma.faPassBaixa.deleteMany({ where: { competenciaId } });
     const baixas: { id: string; competenciaId: string; contratoNumero: string; valor: number; tipoPagamento: string; dataBaixa: Date | null; syncId: string }[] = [];
 
     for (const row of linhas) {
       const doc = String(row[C.documento] ?? "").trim();
       if (!doc) continue;
+      const docUpper = doc.toUpperCase();
+      if (!(docUpper.startsWith("FP") || docUpper.startsWith("PON"))) continue;
 
       const dataBaixa = parsearData(row[C.dataBaixa]);
       if (!dataBaixa || dataBaixa < iniComp || dataBaixa > fimComp) continue;
 
-      const valorRec = parsearValor(row[C.valorRec]);
-      if (valorRec === 0) continue;
+      const valor = parsearValor(row[C.valor]);
+      if (valor === 0) continue;
 
-      const meioPag = String(row[C.meioPag] ?? "").trim();
-      const tipo    = String(row[C.tipo] ?? "").trim();
-      const tipoPagamento = detectarTipoBaixa(meioPag, tipo);
+      const status = String(row[C.status] ?? "").trim().toUpperCase();
+      const tipo   = String(row[C.tipo] ?? "").trim();
+
+      let tipoPagamento: "CARTAO" | "BOLETO_PIX" | null = null;
+      if (status === "B" && isBaixaNormal(tipo)) tipoPagamento = "BOLETO_PIX";
+      if (isBaixaCartao(tipo)) tipoPagamento = "CARTAO";
       if (!tipoPagamento) continue;
 
-      baixas.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor: valorRec, tipoPagamento, dataBaixa, syncId: sync.id });
+      baixas.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor, tipoPagamento, dataBaixa, syncId: sync.id });
     }
 
     for (const ck of chunks(baixas, 500)) {
