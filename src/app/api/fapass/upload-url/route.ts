@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${serviceKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ upsert: true }),
+    body: JSON.stringify({ upsert: true, expiresIn: 3600 }),
   });
 
   if (!resp.ok) {
