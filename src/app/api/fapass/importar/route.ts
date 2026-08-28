@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
       if (!isInadimplencia(tipo)) continue;
 
       const tiposBaixa = String(row[C.tiposBaixa] ?? "").trim();
-      if (/cancelamento de passaporte/i.test(tiposBaixa)) continue;
+      if (/cancelamento/i.test(tiposBaixa)) continue;
 
       const vencimento = parsearData(row[C.vencimento]);
       if (!vencimento) continue;

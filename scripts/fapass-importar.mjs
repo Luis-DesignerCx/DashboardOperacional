@@ -72,7 +72,7 @@ async function main() {
     for (const row of linhasFP) {
       if (row.status !== "P") continue;
       if (!isInadimplencia(row.tipo)) continue;
-      if (/cancelamento de passaporte/i.test(row.tiposBaixa)) continue;
+      if (/cancelamento/i.test(row.tiposBaixa)) continue;
       if (!row.vencimento) continue;
 
       const venc = new Date(row.vencimento);
