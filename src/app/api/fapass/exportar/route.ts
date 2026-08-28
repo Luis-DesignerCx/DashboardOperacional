@@ -25,12 +25,25 @@ export async function GET(req: NextRequest) {
     const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
     if (!competencia) return NextResponse.json({ erro: "Competência não encontrada" }, { status: 404 });
 
-    const [inadimplencia, baixas, divergencias, sync] = await Promise.all([
+    const [inadimplenciaBruta, baixas, divergencias, sync] = await Promise.all([
       prisma.faPassInadimplencia.findMany({ where: { competenciaId }, orderBy: { contratoNumero: "asc" } }),
       prisma.faPassBaixa.findMany({ where: { competenciaId }, orderBy: { contratoNumero: "asc" } }),
       prisma.faPassDivergencia.findMany({ where: { competenciaId }, orderBy: { contratoNumero: "asc" } }),
       prisma.faPassSync.findFirst({ where: { competenciaId }, orderBy: { criadoEm: "desc" } }),
     ]);
+
+    // Contratos marcados como "cancelamento"/inadimplência equivocada pelo
+    // consultor saem do total -- mesma regra do resto do sistema, agora também
+    // aplicada aqui pra bater com o que a tela mostra (ver /api/fapass/status).
+    const numerosDistintos = [...new Set(inadimplenciaBruta.map((i) => i.contratoNumero))];
+    const equivocados = numerosDistintos.length
+      ? await prisma.contrato.findMany({
+          where: { numero: { in: numerosDistintos }, inadimplenciaEquivocada: true },
+          select: { numero: true },
+        })
+      : [];
+    const numerosEquivocadosSet = new Set(equivocados.map((c) => c.numero));
+    const inadimplencia = inadimplenciaBruta.filter((i) => !numerosEquivocadosSet.has(i.contratoNumero));
 
     const linhasInad = inadimplencia.map((i) => ({
       Contrato: i.contratoNumero,

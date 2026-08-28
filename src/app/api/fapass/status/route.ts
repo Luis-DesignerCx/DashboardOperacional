@@ -13,15 +13,14 @@ export async function GET(req: NextRequest) {
   const competenciaId = searchParams.get("competenciaId");
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
 
-  const [ultimaSync, totalInad, totalBaixas, totalDiverg] = await Promise.all([
+  const [ultimaSync, numerosInad, totalBaixas, totalDiverg] = await Promise.all([
     prisma.faPassSync.findFirst({
       where: { competenciaId },
       orderBy: { criadoEm: "desc" },
     }),
-    prisma.faPassInadimplencia.aggregate({
+    prisma.faPassInadimplencia.findMany({
       where: { competenciaId },
-      _sum: { valor: true },
-      _count: true,
+      select: { contratoNumero: true },
     }),
     prisma.faPassBaixa.aggregate({
       where: { competenciaId },
@@ -32,6 +31,25 @@ export async function GET(req: NextRequest) {
       where: { competenciaId, status: "PENDENTE" },
     }),
   ]);
+
+  // Contratos que o consultor marcou como "cancelamento"/inadimplência equivocada
+  // saem do total geral -- mesma regra já aplicada em todo o resto do sistema
+  // (ver contrato.inadimplenciaEquivocada em carteira/dashboard/comissão), só
+  // que nunca tinha sido aplicada aqui no Fã Pass.
+  const numerosDistintos = [...new Set(numerosInad.map((r) => r.contratoNumero))];
+  const equivocados = numerosDistintos.length
+    ? await prisma.contrato.findMany({
+        where: { numero: { in: numerosDistintos }, inadimplenciaEquivocada: true },
+        select: { numero: true },
+      })
+    : [];
+  const numerosEquivocados = equivocados.map((c) => c.numero);
+
+  const totalInad = await prisma.faPassInadimplencia.aggregate({
+    where: { competenciaId, contratoNumero: { notIn: numerosEquivocados } },
+    _sum: { valor: true },
+    _count: true,
+  });
 
   return NextResponse.json({
     ultimaSync,
