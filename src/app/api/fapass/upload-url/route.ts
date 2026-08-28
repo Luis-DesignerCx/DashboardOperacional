@@ -31,6 +31,16 @@ export async function POST(req: NextRequest) {
   // apaga ele do Storage assim que termina de processar (ver fapass-sync.yml).
   const filePath = `competencias/${competenciaId}/query.xlsx`;
 
+  // Apaga qualquer arquivo antigo nesse mesmo caminho antes de gerar a URL.
+  // O parâmetro "upsert" no passo de assinatura não é confiável (a API do
+  // Storage já recusou reassinar um caminho existente com 409 "KeyAlreadyExists"
+  // mesmo com upsert:true) -- apagar antes garante que a assinatura nunca
+  // esbarra num arquivo residual de uma tentativa anterior.
+  await fetch(`${supabaseUrl}/storage/v1/object/fapass/${filePath}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${serviceKey}` },
+  }).catch(() => {});
+
   // Solicita URL assinada para upload ao Supabase Storage
   // (a ordem correta do endpoint é "object/upload/sign", não "object/sign/upload")
   const resp = await fetch(`${supabaseUrl}/storage/v1/object/upload/sign/fapass/${filePath}`, {
