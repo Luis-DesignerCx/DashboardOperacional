@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Plus, CalendarDays, Trash2, UmbrellaOff, Snowflake, RefreshCw, Lock, AlertTriangle, ArrowDownToLine, CheckCheck } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
 import { Select } from "@/components/ui/Select";
@@ -81,10 +81,64 @@ export default function ImportacaoPage() {
   const [novaFeriasFim, setNovaFeriasFim] = useState("");
   const [salvandoFerias, setSalvandoFerias] = useState(false);
 
+  // Guarda o syncId que já está sendo acompanhado, pra não duplicar o loop de
+  // polling caso o usuário saia da tela e volte (ver resumirFpSyncSePendente).
+  const fpSyncEmAndamento = useRef<string | null>(null);
+
   async function carregarFpStatus(cId: string) {
     const d = await fetch(`/api/fapass/status?competenciaId=${cId}`).then((r) => r.json()).catch(() => null);
     if (d && !d.erro) setFpStatus(d);
     else setFpStatus(null);
+    resumirFpSyncSePendente(cId, d);
+  }
+
+  // Se a competência tem uma sync em andamento no GitHub Actions (AGUARDANDO
+  // ou PROCESSANDO) que o usuário disparou antes de trocar de tela, retoma o
+  // acompanhamento automaticamente — o processamento em si roda no GitHub
+  // Actions e nunca parou, só a tela local perdeu o estado ao desmontar.
+  function resumirFpSyncSePendente(cId: string, statusData: any) {
+    const sync = statusData?.ultimaSync;
+    if (!sync || (sync.status !== "AGUARDANDO" && sync.status !== "PROCESSANDO")) return;
+    if (fpSyncEmAndamento.current === sync.id) return; // já acompanhando esse
+    fpSyncEmAndamento.current = sync.id;
+    setFpCarregando(true);
+    setFpErro("");
+    setFpProgresso("Retomando acompanhamento de uma importação em segundo plano...");
+    pollFpSync(sync.id, cId);
+  }
+
+  async function pollFpSync(syncId: string, cId: string) {
+    try {
+      setFpProgresso("Processando em segundo plano (pode levar alguns minutos)...");
+      for (let tentativa = 0; tentativa < 90; tentativa++) {
+        await new Promise((r) => setTimeout(r, 5000));
+        const statusRes = await fetch(`/api/fapass/status?competenciaId=${cId}`);
+        const statusData = await statusRes.json();
+        const sync = statusData.ultimaSync;
+        if (sync?.id !== syncId) continue;
+
+        if (sync.status === "CONCLUIDO") {
+          setFpResultado({
+            primeiraSync: sync.primeiraSync,
+            novosInadimplentes: Math.max(0, sync.totalContratos - sync.totalFlash),
+            novosFlash: sync.totalFlash,
+            totalDivergencias: sync.totalDivergencias,
+          });
+          await carregarFpStatus(cId);
+          return;
+        }
+        if (sync.status === "ERRO") {
+          throw new Error(sync.erro || "Erro ao processar no GitHub Actions");
+        }
+      }
+      throw new Error("Tempo limite excedido aguardando o processamento. Confira o status manualmente em alguns minutos.");
+    } catch (e: any) {
+      setFpErro(e?.message || "Erro ao processar o arquivo.");
+    } finally {
+      setFpCarregando(false);
+      setFpProgresso("");
+      fpSyncEmAndamento.current = null;
+    }
   }
 
   // Limite seguro abaixo do teto de corpo de requisição da Vercel (~4.5MB) —
@@ -130,6 +184,8 @@ export default function ImportacaoPage() {
 
         await carregarFpStatus(competenciaId);
         setFpResultado(data);
+        setFpCarregando(false);
+        setFpProgresso("");
         return;
       }
 
@@ -169,32 +225,10 @@ export default function ImportacaoPage() {
       const trigData = await trigRes.json();
       if (!trigRes.ok) throw new Error(trigData.erro || "Erro ao disparar processamento");
 
-      setFpProgresso("Processando em segundo plano (pode levar alguns minutos)...");
-      for (let tentativa = 0; tentativa < 90; tentativa++) {
-        await new Promise((r) => setTimeout(r, 5000));
-        const statusRes = await fetch(`/api/fapass/status?competenciaId=${competenciaId}`);
-        const statusData = await statusRes.json();
-        const sync = statusData.ultimaSync;
-        if (sync?.id !== urlData.syncId) continue;
-
-        if (sync.status === "CONCLUIDO") {
-          setFpResultado({
-            primeiraSync: sync.primeiraSync,
-            novosInadimplentes: Math.max(0, sync.totalContratos - sync.totalFlash),
-            novosFlash: sync.totalFlash,
-            totalDivergencias: sync.totalDivergencias,
-          });
-          await carregarFpStatus(competenciaId);
-          return;
-        }
-        if (sync.status === "ERRO") {
-          throw new Error(sync.erro || "Erro ao processar no GitHub Actions");
-        }
-      }
-      throw new Error("Tempo limite excedido aguardando o processamento. Confira o status manualmente em alguns minutos.");
+      fpSyncEmAndamento.current = urlData.syncId;
+      await pollFpSync(urlData.syncId, competenciaId);
     } catch (e: any) {
       setFpErro(e?.message || "Erro ao processar o arquivo.");
-    } finally {
       setFpCarregando(false);
       setFpProgresso("");
     }
