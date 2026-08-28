@@ -125,9 +125,23 @@ async function main() {
       } else {
         clienteId = randomUUID(); contratoId = randomUUID();
         await prisma.cliente.create({ data: { id: clienteId, nome: grupo.fornecedor || doc } });
-        await prisma.contrato.create({ data: { id: contratoId, numero: doc, clienteId, empresaId: empresaFaPass.id, maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
-        contratoMap.set(doc, { id: contratoId, numero: doc, clienteId });
-        criados++;
+        try {
+          await prisma.contrato.create({ data: { id: contratoId, numero: doc, clienteId, empresaId: empresaFaPass.id, maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
+          contratoMap.set(doc, { id: contratoId, numero: doc, clienteId });
+          criados++;
+        } catch (err) {
+          // Corrida entre tentativas de importação (ex: usuário clicou "importar" mais de
+          // uma vez): outro processo já criou esse contrato entre a busca em lote e aqui.
+          // Em vez de derrubar a importação inteira, usa o contrato que já existe.
+          if (err.code !== "P2002") throw err;
+          const existenteAgora = await prisma.contrato.findUnique({ where: { numero: doc }, select: { id: true, clienteId: true } });
+          if (!existenteAgora) throw err;
+          contratoId = existenteAgora.id;
+          clienteId = existenteAgora.clienteId;
+          await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
+          contratoMap.set(doc, { id: contratoId, numero: doc, clienteId });
+          atualizados++;
+        }
       }
 
       novosSnap.push({ id: randomUUID(), competenciaId: competencia.id, contratoNumero: doc, valor: valorTotal, vencimentoMaisAntigo: vencMaisAntigo, faixa: isFlash ? "FLASH" : obterEquipe(diasAtraso), isFlash, syncId: sync.id });
