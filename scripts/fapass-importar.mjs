@@ -94,10 +94,10 @@ async function main() {
     });
     const contratoMap = new Map(contratosExistentes.map((c) => [c.numero, c]));
 
-    const novosSnap = [];
-    const novosParaDistribuir = [];
-    let criados = 0, atualizados = 0;
-
+    // Primeiro passo: só cálculo em memória, sem ida ao banco -- pra depois
+    // gravar tudo em lote (criar/atualizar um contrato por vez, sequencial,
+    // é o que fazia uma competência com muitos contratos novos levar ~20min).
+    const paraProcessar = [];
     for (const [doc, grupo] of gruposInad) {
       if (!primeiraSync && docsExistentes.has(doc)) continue;
 
@@ -114,42 +114,58 @@ async function main() {
       if (!vencMaisAntigo || valorTotal === 0) continue;
 
       const diasAtraso = calcDiasAtraso(vencMaisAntigo, hoje);
-      let contratoId, clienteId;
-      const existente = contratoMap.get(doc);
-
-      if (existente) {
-        contratoId = existente.id;
-        clienteId = existente.clienteId;
-        await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
-        atualizados++;
-      } else {
-        clienteId = randomUUID(); contratoId = randomUUID();
-        await prisma.cliente.create({ data: { id: clienteId, nome: grupo.fornecedor || doc } });
-        try {
-          await prisma.contrato.create({ data: { id: contratoId, numero: doc, clienteId, empresaId: empresaFaPass.id, maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
-          contratoMap.set(doc, { id: contratoId, numero: doc, clienteId });
-          criados++;
-        } catch (err) {
-          // Corrida entre tentativas de importação (ex: usuário clicou "importar" mais de
-          // uma vez): outro processo já criou esse contrato entre a busca em lote e aqui.
-          // Em vez de derrubar a importação inteira, usa o contrato que já existe.
-          if (err.code !== "P2002") throw err;
-          const existenteAgora = await prisma.contrato.findUnique({ where: { numero: doc }, select: { id: true, clienteId: true } });
-          if (!existenteAgora) throw err;
-          contratoId = existenteAgora.id;
-          clienteId = existenteAgora.clienteId;
-          await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
-          contratoMap.set(doc, { id: contratoId, numero: doc, clienteId });
-          atualizados++;
-        }
-      }
-
-      novosSnap.push({ id: randomUUID(), competenciaId: competencia.id, contratoNumero: doc, valor: valorTotal, vencimentoMaisAntigo: vencMaisAntigo, faixa: isFlash ? "FLASH" : obterEquipe(diasAtraso), isFlash, syncId: sync.id });
-      novosParaDistribuir.push({ contratoId, clienteId, valorTotalAberto: valorTotal, maiorDiasAtraso: diasAtraso, isFlash });
-
-      if ((criados + atualizados) % 200 === 0) process.stdout.write(`\r  Contratos: ${criados} criados, ${atualizados} atualizados`);
+      paraProcessar.push({ doc, fornecedor: grupo.fornecedor, vencMaisAntigo, valorTotal, isFlash, diasAtraso, existente: contratoMap.get(doc) ?? null });
     }
-    console.log(`\n  Criados: ${criados} | Atualizados: ${atualizados}`);
+
+    const paraCriar = paraProcessar.filter((p) => !p.existente);
+    const paraAtualizar = paraProcessar.filter((p) => p.existente);
+
+    // Cria em lote os clientes e contratos novos. skipDuplicates cobre a corrida
+    // entre tentativas de importação concorrentes (ex: clique duplo) -- se outro
+    // processo já criou o contrato entre a busca em lote e aqui, essa linha é só
+    // ignorada, sem derrubar a importação inteira.
+    const novosIds = new Map(paraCriar.map((p) => [p.doc, { clienteId: randomUUID(), contratoId: randomUUID() }]));
+    if (paraCriar.length > 0) {
+      const clientesNovos = paraCriar.map((p) => ({ id: novosIds.get(p.doc).clienteId, nome: p.fornecedor || p.doc }));
+      for (const ck of chunks(clientesNovos, 1000)) await prisma.cliente.createMany({ data: ck, skipDuplicates: true });
+
+      const contratosNovos = paraCriar.map((p) => ({
+        id: novosIds.get(p.doc).contratoId, numero: p.doc, clienteId: novosIds.get(p.doc).clienteId,
+        empresaId: empresaFaPass.id, maiorDiasAtraso: p.diasAtraso, valorTotalAberto: p.valorTotal,
+      }));
+      for (const ck of chunks(contratosNovos, 1000)) await prisma.contrato.createMany({ data: ck, skipDuplicates: true });
+
+      // Re-busca pra pegar o id/clienteId CANÔNICO -- se algum foi ignorado pelo
+      // skipDuplicates (corrida com outra importação), o id gerado aqui não é o
+      // que ficou gravado.
+      const canonicos = await prisma.contrato.findMany({
+        where: { numero: { in: paraCriar.map((p) => p.doc) } },
+        select: { id: true, numero: true, clienteId: true },
+      });
+      for (const c of canonicos) contratoMap.set(c.numero, c);
+    }
+
+    // Atualiza em lote os contratos já existentes (paralelo, com limite de
+    // concorrência pra não estourar o pool de conexões do banco).
+    const CONCORRENCIA = 15;
+    for (let i = 0; i < paraAtualizar.length; i += CONCORRENCIA) {
+      const lote = paraAtualizar.slice(i, i + CONCORRENCIA);
+      await Promise.all(lote.map((p) =>
+        prisma.contrato.update({ where: { id: p.existente.id }, data: { maiorDiasAtraso: p.diasAtraso, valorTotalAberto: p.valorTotal } })
+      ));
+      process.stdout.write(`\r  Contratos atualizados: ${Math.min(i + CONCORRENCIA, paraAtualizar.length)}/${paraAtualizar.length}`);
+    }
+    if (paraAtualizar.length > 0) console.log("");
+    console.log(`  Criados: ${paraCriar.length} | Atualizados: ${paraAtualizar.length}`);
+
+    const novosSnap = [];
+    const novosParaDistribuir = [];
+    for (const p of paraProcessar) {
+      const resolvido = p.existente ?? contratoMap.get(p.doc);
+      if (!resolvido) continue; // não deveria acontecer, mas evita quebrar a importação por 1 linha
+      novosSnap.push({ id: randomUUID(), competenciaId: competencia.id, contratoNumero: p.doc, valor: p.valorTotal, vencimentoMaisAntigo: p.vencMaisAntigo, faixa: p.isFlash ? "FLASH" : obterEquipe(p.diasAtraso), isFlash: p.isFlash, syncId: sync.id });
+      novosParaDistribuir.push({ contratoId: resolvido.id, clienteId: resolvido.clienteId, valorTotalAberto: p.valorTotal, maiorDiasAtraso: p.diasAtraso, isFlash: p.isFlash });
+    }
 
     if (novosSnap.length > 0) {
       for (const ck of chunks(novosSnap, 1000)) await prisma.faPassInadimplencia.createMany({ data: ck, skipDuplicates: true });

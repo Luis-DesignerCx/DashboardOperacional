@@ -109,9 +109,14 @@ export default function ImportacaoPage() {
 
   async function pollFpSync(syncId: string, cId: string) {
     try {
-      setFpProgresso("Processando em segundo plano (pode levar alguns minutos)...");
-      for (let tentativa = 0; tentativa < 90; tentativa++) {
-        await new Promise((r) => setTimeout(r, 5000));
+      // O GitHub Actions tem timeout de 30min (fapass-sync.yml) e, pra
+      // competências com muitos contratos novos, o processamento em si já leva
+      // uns 20min (import sequencial por contrato) -- por isso o polling
+      // acompanha por até 35min antes de desistir (10s x 210 tentativas),
+      // dando folga além do timeout do próprio job.
+      setFpProgresso("Processando em segundo plano (pode levar até 20-30 minutos em arquivos grandes)...");
+      for (let tentativa = 0; tentativa < 210; tentativa++) {
+        await new Promise((r) => setTimeout(r, 10000));
         const statusRes = await fetch(`/api/fapass/status?competenciaId=${cId}`);
         const statusData = await statusRes.json();
         const sync = statusData.ultimaSync;
