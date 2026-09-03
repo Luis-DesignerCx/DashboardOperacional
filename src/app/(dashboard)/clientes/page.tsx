@@ -103,7 +103,6 @@ export default function ClientesPage() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
-  const [temMais, setTemMais] = useState(false);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [busca, setBusca] = useState("");
   const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
@@ -128,19 +127,29 @@ export default function ClientesPage() {
   const [salvandoProm, setSalvandoProm] = useState(false);
   const [erroProm, setErroProm] = useState("");
 
-  async function carregarPagina(q: string, pg: number, append = false) {
-    if (pg === 1 && !append) setCarregando(true);
-    else setCarregandoMais(true);
-
-    const params = new URLSearchParams({ page: String(pg) });
-    if (q) params.set("q", q);
-    const data = await fetch(`/api/clientes?${params}`).then((r) => r.json()).catch(() => ({}));
-    const lista: Cliente[] = Array.isArray(data.clientes) ? data.clientes : [];
-
-    if (append) setClientes((prev) => [...prev, ...lista]);
-    else { setClientes(lista); setTotal(data.total ?? 0); }
-    setPagina(pg);
-    setTemMais(data.temMais ?? false);
+  // Busca TODAS as páginas em sequência (sem exigir clique em "Carregar
+  // mais") -- assim a busca por texto e o filtro por empresa (que é
+  // client-side, ver `filtrados` abaixo) sempre enxergam a lista inteira, não
+  // só o que já tinha sido carregado até então.
+  async function carregarTodos(q: string) {
+    setCarregando(true);
+    let pg = 1;
+    let acumulado: Cliente[] = [];
+    let totalAtual = 0;
+    while (true) {
+      const params = new URLSearchParams({ page: String(pg) });
+      if (q) params.set("q", q);
+      const data = await fetch(`/api/clientes?${params}`).then((r) => r.json()).catch(() => ({}));
+      const lista: Cliente[] = Array.isArray(data.clientes) ? data.clientes : [];
+      acumulado = acumulado.concat(lista);
+      totalAtual = data.total ?? totalAtual;
+      setClientes(acumulado);
+      setTotal(totalAtual);
+      setPagina(pg);
+      if (!data.temMais || lista.length === 0) break;
+      pg++;
+      setCarregandoMais(true);
+    }
     setCarregando(false);
     setCarregandoMais(false);
   }
@@ -214,16 +223,14 @@ export default function ClientesPage() {
     setPromessas(Array.isArray(atualizado) ? atualizado : []);
   }
 
-  // Carga inicial
-  useEffect(() => { carregarPagina("", 1); }, []);
+  // Carga inicial -- já traz todas as páginas
+  useEffect(() => { carregarTodos(""); }, []);
 
-  // Busca com debounce
+  // Busca com debounce -- também recarrega tudo (a busca já filtra no servidor)
   useEffect(() => {
     if (buscaTimer.current) clearTimeout(buscaTimer.current);
     buscaTimer.current = setTimeout(() => {
-      setPagina(1);
-      setTemMais(false);
-      carregarPagina(busca, 1);
+      carregarTodos(busca);
     }, 400);
   }, [busca]);
 
@@ -366,19 +373,11 @@ export default function ClientesPage() {
             )}
           </div>
 
-          {/* Carregar mais */}
-          {temMais && !empresaFiltro && (
-            <div className="flex justify-center pt-1">
-              <button
-                onClick={() => carregarPagina(busca, pagina + 1, true)}
-                disabled={carregandoMais}
-                className="flex items-center gap-2 bg-surface-1 hover:bg-white/[0.04] disabled:opacity-50 text-slate-300 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
-              >
-                {carregandoMais
-                  ? <><Loader2 size={14} className="animate-spin" /> Carregando...</>
-                  : <>Carregar mais · {clientes.length}/{total}</>
-                }
-              </button>
+          {/* A lista inteira já carrega automaticamente (sem botão) -- só um
+              indicador discreto enquanto as páginas seguintes ainda chegam. */}
+          {carregandoMais && (
+            <div className="flex justify-center items-center gap-2 pt-1 text-slate-500 text-xs">
+              <Loader2 size={13} className="animate-spin" /> Carregando mais clientes · {clientes.length}/{total}
             </div>
           )}
         </>
