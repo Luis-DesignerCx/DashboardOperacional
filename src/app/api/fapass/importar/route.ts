@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
       const vencimento = parsearData(row[C.vencimento]);
       if (!vencimento) continue;
 
-      const isFlashRow = vencimento >= iniComp && vencimento <= fimComp;
+      const isFlashRow = vencimento >= iniComp && vencimento <= ontem;
       const isInadRow  = vencimento <= ontem;
       if (!isInadRow && !isFlashRow) continue;
 

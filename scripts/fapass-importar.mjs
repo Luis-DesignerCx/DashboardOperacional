@@ -76,7 +76,7 @@ async function main() {
       if (!row.vencimento) continue;
 
       const venc = new Date(row.vencimento);
-      const isFlashRow = venc >= iniComp && venc <= fimComp;
+      const isFlashRow = venc >= iniComp && venc <= ontem;
       const isInadRow  = venc <= ontem;
       if (!isInadRow && !isFlashRow) continue;
 
