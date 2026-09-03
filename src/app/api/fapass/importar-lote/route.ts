@@ -1,4 +1,4 @@
-export const maxDuration = 120;
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
@@ -8,26 +8,42 @@ import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { randomUUID } from "crypto";
 
-// ─── Índices de coluna (0-based) ─────────────────────────────────────────────
-// Layout real da query "Base CAR Passaporte BC" (confirmado por auditoria em
-// 2026-08-26 contra o arquivo real, 30 colunas):
-// Id | Documento | DataMovimento | Emissao | Empresa | Operacao | Tipo |
-// Fornecedor | Valor | Desconto | JurosMulta | Taxa | Impostos | Alteradores |
-// SaldoPendente | ValorBaixado | Status | Vencimento | DataBaixa | TiposBaixa |
-// Grupo | Aplicacao | Passaporte | TipoPassaporte | SeriePassaporte |
-// DataVenda | DataExpiracao | Titular | Dependentes | Agregados
-// Não existe coluna dedicada de "meio de pagamento" — o campo Tipo já cumpre
-// esse papel (ex: "Boleto Bradesco.", "Cartão Master Crédito", "Rec. Master").
-const C = {
-  documento:  1,
-  fornecedor: 7,
-  tipo:       6,
-  valor:      8,
-  status:     16,
-  vencimento: 17,
-  dataBaixa:  18,
-  tiposBaixa: 19,
-} as const;
+// ─── Formato "Lote" ───────────────────────────────────────────────────────────
+// Ponte temporária enquanto a query oficial ("Base CAR Passaporte BC", ver
+// /api/fapass/importar) está com valor incorreto e o Weriton corrige na fonte.
+// Formato diferente: já vem filtrado/curado manualmente, com Faixa e Consultor
+// já definidos (ex: planilha "INAD PASS SETEMBRO.xlsx"). Detecção por nome de
+// coluna, não por índice fixo, já que não é a mesma query.
+//
+// Colunas esperadas (cabeçalho): Passaporte, Fornecedor, Vencimento, Tipo,
+// Valor, Status, TiposBaixa, Consultor (opcional -- sem ela, distribui
+// automaticamente como no fluxo normal), Faixa (informativa -- a faixa real
+// usada no sistema é recalculada a partir do vencimento mais antigo, pra ficar
+// consistente com o resto do sistema/comissão).
+const TERMOS_COLUNA: Record<string, string[]> = {
+  documento:  ["passaporte", "documento"],
+  fornecedor: ["fornecedor", "nome", "cliente"],
+  tipo:       ["tipo"],
+  valor:      ["valor"],
+  status:     ["status"],
+  vencimento: ["vencimento"],
+  tiposBaixa: ["tiposbaixa", "tipos de baixa", "tipo de baixa"],
+  consultor:  ["consultor"],
+};
+
+function normalizar(s: string): string {
+  return String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+
+function detectarColunas(header: unknown[]): Record<string, number> {
+  const normalizados = header.map((h) => normalizar(String(h ?? "")));
+  const colunas: Record<string, number> = {};
+  for (const [chave, termos] of Object.entries(TERMOS_COLUNA)) {
+    const idx = normalizados.findIndex((h) => termos.some((t) => h === t || h.includes(t)));
+    if (idx >= 0) colunas[chave] = idx;
+  }
+  return colunas;
+}
 
 function parsearValor(val: unknown): number {
   if (val == null) return 0;
@@ -49,25 +65,18 @@ function parsearData(val: unknown): Date | null {
     return new Date(Date.UTC(d.y, d.m - 1, d.d));
   }
   const s = String(val).trim();
-  // DD/MM/YYYY ou YYYY-MM-DD
   const dmY = s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
   if (dmY) return new Date(Date.UTC(+dmY[3], +dmY[2] - 1, +dmY[1]));
   const iso = new Date(s);
   return isNaN(iso.getTime()) ? null : iso;
 }
 
+// Mesma regra já usada na query oficial (ver /api/fapass/importar): cobra
+// boleto e "Rec*"; cartão já foi debitado, não entra.
 function isInadimplencia(tipo: string): boolean {
   const t = String(tipo ?? "").trim();
   if (/^cart[aã]o/i.test(t)) return false;
   return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t);
-}
-// Sem coluna dedicada de meio de pagamento nesta query — Tipo já indica o
-// meio (ex: "Boleto Bradesco.", "PIX Fã Pass.", "Cartão Master Crédito").
-function isBaixaNormal(tipo: string): boolean {
-  return /boleto|pix|dinheiro|dep[oó]sito|transfer[eê]ncia|ted/i.test(String(tipo ?? ""));
-}
-function isBaixaCartao(tipo: string): boolean {
-  return /^cart[aã]o/i.test(String(tipo ?? "").trim());
 }
 
 function obterEquipe(dias: number): string {
@@ -92,7 +101,6 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const arquivo = form.get("arquivo") as File | null;
   const competenciaId = form.get("competenciaId") as string | null;
-
   if (!arquivo || !competenciaId) {
     return NextResponse.json({ erro: "arquivo e competenciaId são obrigatórios" }, { status: 400 });
   }
@@ -104,14 +112,22 @@ export async function POST(req: NextRequest) {
   const empresaFaPass = await prisma.empresa.findFirst({ where: { prefixos: { has: "FP" } } });
   if (!empresaFaPass) return NextResponse.json({ erro: "Empresa Fã Pass não encontrada. Configure prefixo FP." }, { status: 422 });
 
-  // Lê e parseia o xlsx
   const buffer = Buffer.from(await arquivo.arrayBuffer());
   const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
   const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+  const todasLinhas = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+  if (todasLinhas.length < 2) return NextResponse.json({ erro: "Planilha vazia" }, { status: 400 });
 
-  // Pula cabeçalho (linha 0)
-  const linhas = (rows as unknown[][]).slice(1).filter((r) => r && r.length > C.status);
+  const header = todasLinhas[0] as unknown[];
+  const C = detectarColunas(header);
+  if (C.documento == null || C.valor == null || C.vencimento == null || C.status == null) {
+    return NextResponse.json({
+      erro: "Não achei as colunas esperadas (Passaporte/Documento, Valor, Vencimento, Status) no cabeçalho.",
+      cabecalhoLido: header,
+    }, { status: 400 });
+  }
+  const temConsultorNaPlanilha = C.consultor != null;
+  const linhas = todasLinhas.slice(1).filter((r) => r && r.length > 0);
 
   const sync = await prisma.faPassSync.create({
     data: { competenciaId, origem: "MANUAL", status: "PROCESSANDO" },
@@ -125,14 +141,13 @@ export async function POST(req: NextRequest) {
 
     const snapExistente = await prisma.faPassInadimplencia.count({ where: { competenciaId } });
     const primeiraSync = snapExistente === 0;
-
     const docsExistentes = primeiraSync ? new Set<string>() : new Set(
       (await prisma.faPassInadimplencia.findMany({ where: { competenciaId }, select: { contratoNumero: true } }))
         .map((r) => r.contratoNumero)
     );
 
-    // ── Agrupa por contrato (inadimplência) ───────────────────────────────────
-    const gruposInad = new Map<string, { fornecedor: string; linhas: { valor: number; vencimento: Date }[] }>();
+    // ── Agrupa por contrato ────────────────────────────────────────────────────
+    const gruposInad = new Map<string, { fornecedor: string; consultorNome: string | null; linhas: { valor: number; vencimento: Date }[] }>();
 
     for (const row of linhas) {
       const doc = String(row[C.documento] ?? "").trim();
@@ -143,11 +158,8 @@ export async function POST(req: NextRequest) {
       const status = String(row[C.status] ?? "").trim().toUpperCase();
       if (status !== "P") continue;
 
-      const tipo = String(row[C.tipo] ?? "").trim();
-      if (!isInadimplencia(tipo)) continue;
-
-      const tiposBaixa = String(row[C.tiposBaixa] ?? "").trim();
-      if (/cancelamento/i.test(tiposBaixa)) continue;
+      if (C.tipo != null && !isInadimplencia(String(row[C.tipo] ?? ""))) continue;
+      if (C.tiposBaixa != null && /cancelamento/i.test(String(row[C.tiposBaixa] ?? ""))) continue;
 
       const vencimento = parsearData(row[C.vencimento]);
       if (!vencimento) continue;
@@ -156,10 +168,25 @@ export async function POST(req: NextRequest) {
       const isInadRow  = vencimento <= ontem;
       if (!isInadRow && !isFlashRow) continue;
 
-      const fornecedor = String(row[C.fornecedor] ?? "").trim();
-      if (!gruposInad.has(doc)) gruposInad.set(doc, { fornecedor, linhas: [] });
+      const fornecedor = C.fornecedor != null ? String(row[C.fornecedor] ?? "").trim() : "";
+      const consultorNome = temConsultorNaPlanilha ? String(row[C.consultor] ?? "").trim() || null : null;
+
+      if (!gruposInad.has(doc)) gruposInad.set(doc, { fornecedor, consultorNome, linhas: [] });
       gruposInad.get(doc)!.linhas.push({ valor: parsearValor(row[C.valor]), vencimento });
     }
+
+    // ── Resolve consultores citados na planilha (nome -> Usuario) ─────────────
+    // Casa pelo primeiro nome, exato -- evita confundir "Gabriel" com "Gabriela".
+    const nomesConsultorCitados = [...new Set([...gruposInad.values()].map((g) => g.consultorNome).filter((n): n is string => !!n))];
+    const consultoresAtivos = nomesConsultorCitados.length
+      ? await prisma.usuario.findMany({ where: { perfil: "CONSULTOR", ativo: true }, select: { id: true, nome: true, emFerias: true } })
+      : [];
+    const consultorPorPrimeiroNome = new Map<string, { id: string; nome: string; emFerias: boolean }>();
+    for (const c of consultoresAtivos) {
+      const primeiroNome = normalizar(c.nome.split(" ")[0]);
+      if (!consultorPorPrimeiroNome.has(primeiroNome)) consultorPorPrimeiroNome.set(primeiroNome, c);
+    }
+    const consultoresNaoEncontrados = new Set<string>();
 
     // ── Busca contratos existentes em lote ────────────────────────────────────
     const todosDocumentos = [...gruposInad.keys()];
@@ -169,11 +196,9 @@ export async function POST(req: NextRequest) {
     });
     const contratoMap = new Map(contratosExistentes.map((c) => [c.numero, c]));
 
-    const novosSnap: {
-      id: string; competenciaId: string; contratoNumero: string;
-      valor: number; vencimentoMaisAntigo: Date; faixa: string; isFlash: boolean; syncId: string;
-    }[] = [];
-    const novosParaDistribuir: { contratoId: string; clienteId: string; valorTotalAberto: number; maiorDiasAtraso: number; isFlash: boolean }[] = [];
+    const novosSnap: { id: string; competenciaId: string; contratoNumero: string; valor: number; vencimentoMaisAntigo: Date; faixa: string; isFlash: boolean; syncId: string }[] = [];
+    // consultorId != null quando a planilha já diz quem é o consultor (atribuição direta, sem round-robin)
+    const novosParaDistribuir: { contratoId: string; clienteId: string; valorTotalAberto: number; maiorDiasAtraso: number; isFlash: boolean; consultorId: string | null }[] = [];
     let criados = 0, atualizados = 0;
 
     for (const [doc, grupo] of gruposInad) {
@@ -182,7 +207,6 @@ export async function POST(req: NextRequest) {
       let vencMaisAntigo: Date | null = null;
       let valorTotal = 0;
       let isFlash = true;
-
       for (const l of grupo.linhas) {
         valorTotal += l.valor;
         if (!vencMaisAntigo || l.vencimento < vencMaisAntigo) vencMaisAntigo = l.vencimento;
@@ -207,17 +231,23 @@ export async function POST(req: NextRequest) {
         criados++;
       }
 
+      let consultorId: string | null = null;
+      if (grupo.consultorNome) {
+        const encontrado = consultorPorPrimeiroNome.get(normalizar(grupo.consultorNome));
+        if (encontrado && !encontrado.emFerias) consultorId = encontrado.id;
+        else consultoresNaoEncontrados.add(grupo.consultorNome);
+      }
+
       novosSnap.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor: valorTotal, vencimentoMaisAntigo: vencMaisAntigo, faixa: isFlash ? "FLASH" : obterEquipe(diasAtraso), isFlash, syncId: sync.id });
-      novosParaDistribuir.push({ contratoId, clienteId, valorTotalAberto: valorTotal, maiorDiasAtraso: diasAtraso, isFlash });
+      novosParaDistribuir.push({ contratoId, clienteId, valorTotalAberto: valorTotal, maiorDiasAtraso: diasAtraso, isFlash, consultorId });
     }
 
     if (novosSnap.length > 0) {
-      for (const ck of chunks(novosSnap, 500)) {
-        await prisma.faPassInadimplencia.createMany({ data: ck, skipDuplicates: true });
-      }
+      for (const ck of chunks(novosSnap, 500)) await prisma.faPassInadimplencia.createMany({ data: ck, skipDuplicates: true });
     }
 
-    // ── Distribui carteiras ───────────────────────────────────────────────────
+    // ── Distribui carteiras: usa o consultor da planilha quando tem; senão round-robin por equipe ──
+    let atribuidosDaPlanilha = 0, atribuidosAutomatico = 0;
     if (novosParaDistribuir.length > 0) {
       const jaDistribuidos = new Set(
         (await prisma.carteiraParcela.findMany({
@@ -227,62 +257,39 @@ export async function POST(req: NextRequest) {
       );
       const semCarteira = novosParaDistribuir.filter((c) => !jaDistribuidos.has(c.contratoId));
 
-      if (semCarteira.length > 0) {
+      const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string }[] = [];
+
+      const comConsultorDaPlanilha = semCarteira.filter((c) => c.consultorId);
+      for (const c of comConsultorDaPlanilha) {
+        novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: c.consultorId!, competenciaId });
+        atribuidosDaPlanilha++;
+      }
+
+      const semConsultor = semCarteira.filter((c) => !c.consultorId);
+      if (semConsultor.length > 0) {
         const todasEquipes = await prisma.equipe.findMany({
           where: { ativa: true },
           include: { usuarios: { where: { ativo: true, perfil: "CONSULTOR", emFerias: false }, select: { id: true } } },
         });
         const equipeMap = new Map(todasEquipes.map((e) => [e.tipo, e]));
-        const porEquipe = new Map<string, typeof semCarteira>();
-        for (const c of semCarteira) {
+        const porEquipe = new Map<string, typeof semConsultor>();
+        for (const c of semConsultor) {
           const tipo = c.isFlash ? "FLASH" : obterEquipe(c.maiorDiasAtraso);
           if (!porEquipe.has(tipo)) porEquipe.set(tipo, []);
           porEquipe.get(tipo)!.push(c);
         }
-        const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string }[] = [];
         for (const [tipo, lista] of porEquipe) {
           const equipe = equipeMap.get(tipo);
           if (!equipe?.usuarios.length) continue;
           const consultores = equipe.usuarios.map((u) => u.id);
-          lista.forEach((c, i) => novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId }));
-        }
-        for (const ck of chunks(novasAtribuicoes, 500)) {
-          await prisma.carteiraParcela.createMany({ data: ck, skipDuplicates: true });
+          lista.forEach((c, i) => {
+            novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId });
+            atribuidosAutomatico++;
+          });
         }
       }
-    }
 
-    // ── Processa baixas ───────────────────────────────────────────────────────
-    // Sem coluna dedicada de meio de pagamento — usa Status (col 16) e Tipo
-    // (col 6). Cartão: status é irrelevante (só depende do Tipo e DataBaixa).
-    await prisma.faPassBaixa.deleteMany({ where: { competenciaId } });
-    const baixas: { id: string; competenciaId: string; contratoNumero: string; valor: number; tipoPagamento: string; dataBaixa: Date | null; syncId: string }[] = [];
-
-    for (const row of linhas) {
-      const doc = String(row[C.documento] ?? "").trim();
-      if (!doc) continue;
-      const docUpper = doc.toUpperCase();
-      if (!(docUpper.startsWith("FP") || docUpper.startsWith("PON"))) continue;
-
-      const dataBaixa = parsearData(row[C.dataBaixa]);
-      if (!dataBaixa || dataBaixa < iniComp || dataBaixa > fimComp) continue;
-
-      const valor = parsearValor(row[C.valor]);
-      if (valor === 0) continue;
-
-      const status = String(row[C.status] ?? "").trim().toUpperCase();
-      const tipo   = String(row[C.tipo] ?? "").trim();
-
-      let tipoPagamento: "CARTAO" | "BOLETO_PIX" | null = null;
-      if (status === "B" && isBaixaNormal(tipo)) tipoPagamento = "BOLETO_PIX";
-      if (isBaixaCartao(tipo)) tipoPagamento = "CARTAO";
-      if (!tipoPagamento) continue;
-
-      baixas.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor, tipoPagamento, dataBaixa, syncId: sync.id });
-    }
-
-    for (const ck of chunks(baixas, 500)) {
-      await prisma.faPassBaixa.createMany({ data: ck });
+      for (const ck of chunks(novasAtribuicoes, 500)) await prisma.carteiraParcela.createMany({ data: ck, skipDuplicates: true });
     }
 
     await prisma.faPassSync.update({
@@ -292,7 +299,7 @@ export async function POST(req: NextRequest) {
         totalRegistros: linhas.length,
         totalContratos: gruposInad.size,
         totalFlash: novosSnap.filter((s) => s.isFlash).length,
-        totalBaixas: baixas.length,
+        totalBaixas: 0,
         totalDivergencias: 0,
         status: "CONCLUIDO",
         concluidoEm: new Date(),
@@ -305,10 +312,12 @@ export async function POST(req: NextRequest) {
       totalContratos: gruposInad.size,
       novosInadimplentes: novosSnap.filter((s) => !s.isFlash).length,
       novosFlash: novosSnap.filter((s) => s.isFlash).length,
-      totalBaixas: baixas.length,
-      totalDivergencias: 0,
       criados,
       atualizados,
+      atribuidosDaPlanilha,
+      atribuidosAutomatico,
+      consultoresNaoEncontrados: [...consultoresNaoEncontrados],
+      colunasResolvidas: C,
     });
   } catch (err: any) {
     await prisma.faPassSync.update({ where: { id: sync.id }, data: { status: "ERRO", erro: err.message } });

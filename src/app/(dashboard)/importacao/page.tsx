@@ -60,6 +60,7 @@ export default function ImportacaoPage() {
   const [fpErro, setFpErro] = useState("");
   const [fpStatus, setFpStatus] = useState<any | null>(null);
   const [fpFechando, setFpFechando] = useState(false);
+  const [fpModoLote, setFpModoLote] = useState(false);
 
   // Baixas confirmadas (empreendimentos gerais)
   const [bxArquivo, setBxArquivo] = useState<File | null>(null);
@@ -168,6 +169,32 @@ export default function ImportacaoPage() {
       const buffer = await file.arrayBuffer();
       worker.postMessage({ buffer }, [buffer]);
     });
+  }
+
+  // Ponte temporária: planilha "Lote" já curada (Faixa e Consultor prontos),
+  // enquanto a query oficial está com valor incorreto e o Weriton não corrige
+  // na fonte -- ver /api/fapass/importar-lote. Sempre caminho direto (essas
+  // planilhas são pequenas, não passam pelo limite da Vercel).
+  async function handleFpImportarLote() {
+    if (!fpArquivo || !competenciaId) return;
+    setFpCarregando(true);
+    setFpErro("");
+    setFpResultado(null);
+    try {
+      const form = new FormData();
+      form.append("arquivo", fpArquivo);
+      form.append("competenciaId", competenciaId);
+      const res = await fetch("/api/fapass/importar-lote", { method: "POST", body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.erro || "Erro ao importar");
+      await carregarFpStatus(competenciaId);
+      setFpResultado(data);
+    } catch (e: any) {
+      setFpErro(e?.message || "Erro ao processar o arquivo.");
+    } finally {
+      setFpCarregando(false);
+      setFpProgresso("");
+    }
   }
 
   async function handleFpSync() {
@@ -869,12 +896,22 @@ export default function ImportacaoPage() {
         {/* Upload do arquivo */}
         {competenciaId && (
           <>
+            <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={fpModoLote}
+                onChange={(e) => { setFpModoLote(e.target.checked); setFpArquivo(null); setFpResultado(null); setFpErro(""); }}
+                className="rounded border-white/20 bg-white/[0.05]"
+              />
+              Planilha "Lote" já curada (Faixa/Consultor prontos) — ponte enquanto a query oficial não é corrigida
+            </label>
+
             <div>
-              <label className="block text-sm text-slate-400 mb-1.5">Arquivo da QUERY</label>
+              <label className="block text-sm text-slate-400 mb-1.5">{fpModoLote ? "Arquivo do Lote" : "Arquivo da QUERY"}</label>
               <label className="flex items-center gap-3 w-full border border-dashed border-white/[0.08] rounded-xl px-4 py-3 cursor-pointer hover:border-gr-500 hover:bg-gr-500/5 transition-colors">
                 <FileSpreadsheet size={18} className="text-slate-500 flex-shrink-0" />
                 <span className="text-sm text-slate-400 truncate">
-                  {fpArquivo ? fpArquivo.name : "Base CAR Passaporte BC.xlsx"}
+                  {fpArquivo ? fpArquivo.name : fpModoLote ? "INAD PASS SETEMBRO.xlsx" : "Base CAR Passaporte BC.xlsx"}
                 </span>
                 <input type="file" accept=".xlsx,.xls" className="hidden" onChange={(e) => { setFpArquivo(e.target.files?.[0] || null); setFpResultado(null); setFpErro(""); }} />
               </label>
@@ -902,9 +939,20 @@ export default function ImportacaoPage() {
                 <div className="grid grid-cols-2 gap-x-4 text-xs text-slate-400 mt-2">
                   <span>{fpResultado.novosInadimplentes} inadimplentes novos</span>
                   <span>{fpResultado.novosFlash} flash novos</span>
+                  {fpModoLote && (
+                    <>
+                      <span>{fpResultado.atribuidosDaPlanilha ?? 0} atribuídos pela planilha</span>
+                      <span>{fpResultado.atribuidosAutomatico ?? 0} distribuídos automaticamente</span>
+                    </>
+                  )}
                   {fpResultado.totalDivergencias > 0 && (
                     <span className="text-amber-400 col-span-2 flex items-center gap-1">
                       <AlertTriangle size={12} /> {fpResultado.totalDivergencias} divergências detectadas
+                    </span>
+                  )}
+                  {fpResultado.consultoresNaoEncontrados?.length > 0 && (
+                    <span className="text-amber-400 col-span-2 flex items-center gap-1">
+                      <AlertTriangle size={12} /> Consultor não encontrado (distribuído automático): {fpResultado.consultoresNaoEncontrados.join(", ")}
                     </span>
                   )}
                 </div>
@@ -913,11 +961,11 @@ export default function ImportacaoPage() {
 
             <div className="flex gap-3">
               <button
-                onClick={handleFpSync}
+                onClick={fpModoLote ? handleFpImportarLote : handleFpSync}
                 disabled={!fpArquivo || fpCarregando}
                 className="flex-1 flex items-center justify-center gap-2 bg-gr-500 hover:bg-gr-600 disabled:bg-gr-500/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
-                {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Processando...</> : <><RefreshCw size={15} /> Importar Fã Pass</>}
+                {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Processando...</> : <><RefreshCw size={15} /> {fpModoLote ? "Importar Lote" : "Importar Fã Pass"}</>}
               </button>
               <button
                 onClick={() => window.open(`/api/fapass/exportar?competenciaId=${competenciaId}`, "_blank")}
