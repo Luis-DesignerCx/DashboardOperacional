@@ -48,6 +48,12 @@ export async function GET(req: NextRequest) {
     orderBy: { atribuidoEm: "asc" },
   });
 
+  // Pra resolver a equipe "congelada" (CarteiraParcela.tipoEquipe) de volta pro
+  // equipeId usado nas metas -- assume 1 equipe ativa por tipo, mesma premissa
+  // já usada em todo o resto do sistema (dashboard, comissão, importação).
+  const todasEquipesExport = await prisma.equipe.findMany({ select: { id: true, tipo: true } });
+  const equipeIdPorTipo = new Map(todasEquipesExport.map((e) => [e.tipo, e.id]));
+
   // Metas FINANCEIRAS da competência — para calcular metaAlvo de quem não está congelado
   const metas = await prisma.meta.findMany({
     where: { competenciaId, tipo: "FINANCEIRA" },
@@ -133,10 +139,14 @@ export async function GET(req: NextRequest) {
     if (snap) continue; // consultor congelado — valores vêm do snapshot abaixo
 
     if (!resumoMap.has(cId)) {
+      // Equipe "congelada" na carteira daquele mês -- não a equipe atual do
+      // consultor. Linhas antigas (pré-migração, tipoEquipe null) caem no
+      // fallback pela equipe atual, igual ao comportamento de sempre.
+      const equipeCongelada = carteira.tipoEquipe ? equipeIdPorTipo.get(carteira.tipoEquipe) ?? null : null;
       resumoMap.set(cId, {
         nome: carteira.consultor.nome,
         email: carteira.consultor.email,
-        equipeId: carteira.consultor.equipeId ?? null,
+        equipeId: equipeCongelada ?? carteira.consultor.equipeId ?? null,
         inadimplencia: 0, recebido: 0, metaAlvo: null, emFerias: false, consultorId: cId,
       });
     }
