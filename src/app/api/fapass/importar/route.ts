@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { randomUUID } from "crypto";
+import { TipoEquipe } from "@prisma/client";
 
 // ─── Índices de coluna (0-based) ─────────────────────────────────────────────
 // Layout real da query "Base CAR Passaporte BC" (confirmado por auditoria em
@@ -70,7 +71,7 @@ function isBaixaCartao(tipo: string): boolean {
   return /^cart[aã]o/i.test(String(tipo ?? "").trim());
 }
 
-function obterEquipe(dias: number): string {
+function obterEquipe(dias: number): TipoEquipe {
   if (dias <= 0)  return "FLASH";
   if (dias <= 30) return "CRA_1_30";
   if (dias <= 90) return "CR_31_90";
@@ -171,7 +172,7 @@ export async function POST(req: NextRequest) {
 
     const novosSnap: {
       id: string; competenciaId: string; contratoNumero: string;
-      valor: number; vencimentoMaisAntigo: Date; faixa: string; isFlash: boolean; syncId: string;
+      valor: number; vencimentoMaisAntigo: Date; faixa: TipoEquipe; isFlash: boolean; syncId: string;
     }[] = [];
     const novosParaDistribuir: { contratoId: string; clienteId: string; valorTotalAberto: number; maiorDiasAtraso: number; isFlash: boolean }[] = [];
     let criados = 0, atualizados = 0;
@@ -233,18 +234,18 @@ export async function POST(req: NextRequest) {
           include: { usuarios: { where: { ativo: true, perfil: "CONSULTOR", emFerias: false }, select: { id: true } } },
         });
         const equipeMap = new Map(todasEquipes.map((e) => [e.tipo, e]));
-        const porEquipe = new Map<string, typeof semCarteira>();
+        const porEquipe = new Map<TipoEquipe, typeof semCarteira>();
         for (const c of semCarteira) {
           const tipo = c.isFlash ? "FLASH" : obterEquipe(c.maiorDiasAtraso);
           if (!porEquipe.has(tipo)) porEquipe.set(tipo, []);
           porEquipe.get(tipo)!.push(c);
         }
-        const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string }[] = [];
+        const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe }[] = [];
         for (const [tipo, lista] of porEquipe) {
           const equipe = equipeMap.get(tipo);
           if (!equipe?.usuarios.length) continue;
           const consultores = equipe.usuarios.map((u) => u.id);
-          lista.forEach((c, i) => novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId }));
+          lista.forEach((c, i) => novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId, tipoEquipe: tipo }));
         }
         for (const ck of chunks(novasAtribuicoes, 500)) {
           await prisma.carteiraParcela.createMany({ data: ck, skipDuplicates: true });

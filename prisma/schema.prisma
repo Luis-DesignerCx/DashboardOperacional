@@ -308,6 +308,14 @@ model CarteiraParcela {
   contratoId    String
   consultorId   String
   competenciaId String
+  // Equipe do consultor NO MOMENTO em que essa carteira foi distribuída nessa
+  // competência -- "congelada", não muda se o consultor trocar de equipe
+  // depois. Sem isso, relatórios de mês fechado (dashboard/comissão/metas)
+  // mudavam retroativamente toda vez que alguém trocava de equipe, porque
+  // eram calculados em cima da equipe ATUAL do usuário (Usuario.equipeId),
+  // não da equipe de quando o dinheiro entrou. Nullable só pra não quebrar
+  // linhas antigas (pré-migração), que caem no fallback da equipe atual.
+  tipoEquipe    TipoEquipe?
   ativo         Boolean     @default(true)
   atribuidoEm   DateTime    @default(now())
 

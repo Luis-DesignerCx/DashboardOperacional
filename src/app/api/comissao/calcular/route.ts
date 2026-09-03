@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
 
   const equipe = await prisma.equipe.findUnique({
     where: { id: equipeId },
-    select: { comissaoBase: true },
+    select: { comissaoBase: true, tipo: true },
   });
   const comissaoBase = Number(equipe?.comissaoBase ?? 0);
 
@@ -43,15 +43,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "Nenhuma meta configurada para esta equipe/competência" }, { status: 400 });
   }
 
-  const consultores = await prisma.usuario.findMany({
+  // Quem teve carteira dessa equipe NESSA competência -- usa a equipe congelada
+  // na carteira (CarteiraParcela.tipoEquipe), não a equipe atual do usuário.
+  // Sem isso, se alguém trocasse de equipe depois, a comissão de um mês já
+  // fechado sumia (ou reaparecia na equipe errada) na hora de recalcular.
+  // Linhas antigas (antes dessa migração, tipoEquipe null) caem no fallback
+  // pela equipe atual, igual ao comportamento de sempre.
+  const carteirasDaEquipe = await prisma.carteiraParcela.findMany({
     where: {
+      competenciaId,
       ativo: true,
-      perfil: "CONSULTOR",
       OR: [
-        { equipeId },
-        { frentesAdicionais: { some: { equipeId } } },
+        { tipoEquipe: equipe!.tipo },
+        { tipoEquipe: null, consultor: { OR: [{ equipeId }, { frentesAdicionais: { some: { equipeId } } }] } },
       ],
     },
+    select: { consultorId: true },
+    distinct: ["consultorId"],
+  });
+  const consultorIds = carteirasDaEquipe.map((c) => c.consultorId);
+
+  const consultores = await prisma.usuario.findMany({
+    where: { id: { in: consultorIds }, ativo: true, perfil: "CONSULTOR" },
     select: { id: true, nome: true },
   });
 
@@ -75,18 +88,18 @@ export async function POST(req: NextRequest) {
           equivocada: false,
           contrato: {
             inadimplenciaEquivocada: false,
-            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } },
+            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true, OR: [{ tipoEquipe: equipe!.tipo }, { tipoEquipe: null }] } },
           },
         },
         _sum: { valorTotalAberto: true },
       });
-      const saldoConsultor = Number(saldoAgg._sum.valorTotalAberto ?? 0);
+      const saldoConsultor = Number(saldoAgg._sum?.valorTotalAberto ?? 0);
 
       const [recebimentos, qtdRecuperados] = await Promise.all([
         prisma.recebimento.findMany({
           where: {
             consultorId: consultor.id,
-            contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
+            contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true, OR: [{ tipoEquipe: equipe!.tipo }, { tipoEquipe: null }] } } },
             dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: { valor: true, valorAParte: true },
@@ -94,7 +107,7 @@ export async function POST(req: NextRequest) {
         prisma.contrato.count({
           where: {
             statusRecuperacao: "RECUPERADO_INTEGRALMENTE",
-            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } },
+            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true, OR: [{ tipoEquipe: equipe!.tipo }, { tipoEquipe: null }] } },
           },
         }),
       ]);

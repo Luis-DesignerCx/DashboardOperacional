@@ -64,10 +64,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     equipe.usuarios.map((u) => u.id)
   );
 
-  const novas: { id: string; contratoId: string; consultorId: string; competenciaId: string }[] = [];
+  const novas: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe }[] = [];
   for (const at of atribuicoes) {
     for (const contratoId of at.contratoIds) {
-      novas.push({ id: randomUUID(), contratoId, consultorId: at.consultorId, competenciaId });
+      novas.push({ id: randomUUID(), contratoId, consultorId: at.consultorId, competenciaId, tipoEquipe: equipe.tipo });
     }
   }
 

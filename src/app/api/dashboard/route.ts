@@ -284,22 +284,55 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
   // Sem filtro = todas as frentes
   const semFiltro = equipeIds.length === 0;
 
-  // Filtro de consultor: frente principal OU frente adicional (EquipeConsultor)
-  const filtroConsultor = semFiltro
-    ? { ativo: true, perfil: "CONSULTOR" as const }
-    : {
-        ativo: true,
-        perfil: "CONSULTOR" as const,
-        OR: equipeIds.flatMap((eqId) => [
-          { equipeId: eqId },
-          { frentesAdicionais: { some: { equipeId: eqId } } },
-        ]),
-      };
+  // Quem conta pra essa(s) frente(s) NESSA competência: usa a equipe
+  // "congelada" na carteira (CarteiraParcela.tipoEquipe, gravada no momento da
+  // distribuição), não a equipe ATUAL do usuário -- senão, quando alguém troca
+  // de equipe, os recebimentos de um mês já fechado somem/reaparecem na frente
+  // errada. Linhas antigas (antes dessa migração, tipoEquipe null) caem no
+  // fallback pela equipe atual, igual ao comportamento de sempre.
+  let consultores: { id: string; nome: string }[];
+  let carteiraTeamOr: any[] | null = null; // extra filtro pra não vazar carteira de outra frente do mesmo consultor (frente adicional)
 
-  const consultores = await prisma.usuario.findMany({
-    where: filtroConsultor,
-    select: { id: true, nome: true },
-  });
+  if (semFiltro) {
+    consultores = await prisma.usuario.findMany({
+      where: { ativo: true, perfil: "CONSULTOR" },
+      select: { id: true, nome: true },
+    });
+  } else {
+    const equipesSelecionadas = await prisma.equipe.findMany({
+      where: { id: { in: equipeIds } },
+      select: { tipo: true },
+    });
+    const tipos = equipesSelecionadas.map((e) => e.tipo);
+    carteiraTeamOr = [{ tipoEquipe: { in: tipos } }, { tipoEquipe: null }];
+
+    const carteirasDasEquipes = await prisma.carteiraParcela.findMany({
+      where: {
+        competenciaId,
+        ativo: true,
+        OR: [
+          { tipoEquipe: { in: tipos } },
+          {
+            tipoEquipe: null,
+            consultor: {
+              OR: equipeIds.flatMap((eqId) => [
+                { equipeId: eqId },
+                { frentesAdicionais: { some: { equipeId: eqId } } },
+              ]),
+            },
+          },
+        ],
+      },
+      select: { consultorId: true },
+      distinct: ["consultorId"],
+    });
+    const consultorIdsDasEquipes = [...new Set(carteirasDasEquipes.map((c) => c.consultorId))];
+
+    consultores = await prisma.usuario.findMany({
+      where: { id: { in: consultorIdsDasEquipes }, ativo: true, perfil: "CONSULTOR" },
+      select: { id: true, nome: true },
+    });
+  }
 
   const consultorIds = consultores.map((c) => c.id);
 
@@ -321,13 +354,13 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     recAParteAgg,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
-      where: { consultorId: { in: consultorIds }, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
+      where: { consultorId: { in: consultorIds }, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false }, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) },
       select: { contrato: { select: { valorTotalAberto: true } } },
     }),
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
-        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } } },
         baixaOficial: false,
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
@@ -336,7 +369,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
-        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } } },
         baixaOficial: true,
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
@@ -346,7 +379,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
       by: ["consultorId"],
       where: {
         consultorId: { in: consultorIds },
-        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } } },
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
       _sum: { valor: true },
@@ -376,13 +409,14 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
         competenciaId,
         ativo: true,
         contrato: { statusRecuperacao: "RECUPERADO_INTEGRALMENTE" },
+        ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}),
       },
     }),
     // Recebido hoje para calcular eficiência
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
-        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } } },
         dataRecebimento: { gte: inicioHoje, lte: fimHoje },
       },
       _sum: { valor: true },
@@ -391,7 +425,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
-        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } } },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } } },
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
       _sum: { valorAParte: true },
@@ -438,7 +472,16 @@ async function dashboardExecutivo(competenciaId: string, equipeIds: string[] = [
   const iniExec = competenciaExec ? new Date(Date.UTC(competenciaExec.ano, competenciaExec.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
   const fimExec = competenciaExec ? new Date(Date.UTC(competenciaExec.ano, competenciaExec.mes,    1, 2, 59, 59, 999)) : new Date();
 
-  const frente = equipeIds.length > 0 ? { consultor: { equipeId: { in: equipeIds } } } : {};
+  // Usa a equipe "congelada" na carteira (tipoEquipe), não a equipe ATUAL do
+  // consultor -- senão, ao trocar alguém de equipe, os números de um mês já
+  // fechado mudam retroativamente pra frente errada (linhas antigas, sem
+  // tipoEquipe gravado, caem no fallback pela equipe atual de sempre).
+  let frente: any = {};
+  if (equipeIds.length > 0) {
+    const equipesSelecionadasExec = await prisma.equipe.findMany({ where: { id: { in: equipeIds } }, select: { tipo: true } });
+    const tiposExec = equipesSelecionadasExec.map((e) => e.tipo);
+    frente = { OR: [{ tipoEquipe: { in: tiposExec } }, { tipoEquipe: null, consultor: { equipeId: { in: equipeIds } } }] };
+  }
 
   const [carteiras, recebimentosPorContrato, parcelasCount, empresas, recAParte] = await Promise.all([
     // Seleção mínima — sem recebimentos

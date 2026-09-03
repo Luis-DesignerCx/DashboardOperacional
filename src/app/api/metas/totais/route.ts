@@ -21,6 +21,7 @@ export async function GET(req: NextRequest) {
   }
 
   let consultorIds: string[];
+  let carteiraTeamOr: any[] | null = null;
 
   if (consultorId) {
     consultorIds = [consultorId];
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest) {
     const equipe = await prisma.equipe.findUnique({
       where: { id: equipeId },
       select: {
+        tipo: true,
         usuarios: { where: { ativo: true, perfil: "CONSULTOR" }, select: { id: true } },
         consultoresAdic: { select: { consultor: { select: { id: true, ativo: true, perfil: true } } } },
       },
@@ -39,6 +41,9 @@ export async function GET(req: NextRequest) {
         .filter((ec) => ec.consultor.ativo && ec.consultor.perfil === "CONSULTOR")
         .map((ec) => ec.consultor.id),
     ];
+    // Usa a equipe "congelada" na carteira, não a equipe atual do usuário --
+    // mesma regra do dashboard/comissão (ver comentário no schema).
+    carteiraTeamOr = [{ tipoEquipe: equipe.tipo }, { tipoEquipe: null }];
   }
 
   // Mesma base do dashboard e da comissão: parcelas paga:false, equivocada:false
@@ -48,7 +53,7 @@ export async function GET(req: NextRequest) {
       equivocada: false,
       contrato: {
         inadimplenciaEquivocada: false,
-        carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true } },
+        carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } },
       },
     },
     _sum: { valorTotalAberto: true },

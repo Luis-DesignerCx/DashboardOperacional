@@ -19,12 +19,19 @@ export async function POST(req: NextRequest) {
   });
   if (existente) return NextResponse.json({ erro: "Contrato já está em uma carteira nessa competência" }, { status: 409 });
 
+  // Grava a equipe atual do consultor -- "congelada" pra essa competência,
+  // não muda se ele trocar de equipe depois (ver comentário no schema).
+  const equipe = session.user.equipeId
+    ? await prisma.equipe.findUnique({ where: { id: session.user.equipeId }, select: { tipo: true } })
+    : null;
+
   const carteira = await prisma.carteiraParcela.create({
     data: {
       id: randomUUID(),
       contratoId,
       consultorId: session.user.id,
       competenciaId,
+      tipoEquipe: equipe?.tipo ?? null,
     },
   });
 

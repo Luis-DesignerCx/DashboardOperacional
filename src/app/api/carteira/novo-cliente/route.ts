@@ -30,6 +30,13 @@ export async function POST(req: NextRequest) {
 
   const contratoExistente = await prisma.contrato.findUnique({ where: { numero: numeroContrato } });
 
+  // Equipe atual do consultor -- "congelada" pra essa competência, não muda
+  // se ele trocar de equipe depois (ver comentário no schema do CarteiraParcela).
+  const equipeAtual = session.user.equipeId
+    ? await prisma.equipe.findUnique({ where: { id: session.user.equipeId }, select: { tipo: true } })
+    : null;
+  const tipoEquipeAtual = equipeAtual?.tipo ?? null;
+
   // ── RECEBIMENTO A PARTE ────────────────────────────────────────────────────
   if (tipo === "a_parte") {
     if (!formaPagamento) {
@@ -89,7 +96,7 @@ export async function POST(req: NextRequest) {
     });
     if (!carteiraExistente) {
       await prisma.carteiraParcela.create({
-        data: { id: randomUUID(), contratoId, consultorId: session.user.id, competenciaId },
+        data: { id: randomUUID(), contratoId, consultorId: session.user.id, competenciaId, tipoEquipe: tipoEquipeAtual },
       });
     }
 
@@ -187,7 +194,7 @@ export async function POST(req: NextRequest) {
     });
     if (!carteiraExistente) {
       await prisma.carteiraParcela.create({
-        data: { id: randomUUID(), contratoId: contratoExistente.id, consultorId: session.user.id, competenciaId },
+        data: { id: randomUUID(), contratoId: contratoExistente.id, consultorId: session.user.id, competenciaId, tipoEquipe: tipoEquipeAtual },
       });
     }
 
@@ -239,7 +246,7 @@ export async function POST(req: NextRequest) {
       })
     ),
     prisma.carteiraParcela.create({
-      data: { id: randomUUID(), contratoId, consultorId: session.user.id, competenciaId },
+      data: { id: randomUUID(), contratoId, consultorId: session.user.id, competenciaId, tipoEquipe: tipoEquipeAtual },
     }),
   ]);
 

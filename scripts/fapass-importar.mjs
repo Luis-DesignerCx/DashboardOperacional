@@ -199,7 +199,7 @@ async function main() {
           const consultores = equipe.usuarios.map((u) => u.id);
           let idx = 0;
           for (let i = 0; i < lista.length; i++) {
-            novasAtribuicoes.push({ id: randomUUID(), contratoId: lista[i].contratoId, consultorId: consultores[idx % consultores.length], competenciaId: competencia.id });
+            novasAtribuicoes.push({ id: randomUUID(), contratoId: lista[i].contratoId, consultorId: consultores[idx % consultores.length], competenciaId: competencia.id, tipoEquipe: tipo });
             idx++;
           }
         }

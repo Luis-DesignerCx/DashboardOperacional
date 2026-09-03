@@ -11,6 +11,7 @@ import { identificarEmpresa } from "@/constants/empresas";
 import { obterEquipePorDiasAtraso } from "@/constants/equipes";
 import { distribuirCarteira } from "@/utils/distribuicao-carteira";
 import { fatorFerias } from "@/utils/dias-uteis";
+import { TipoEquipe } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { Prisma } from "@prisma/client";
 
@@ -233,7 +234,7 @@ function ehLinhaDeTotal(row: any[], colunaContrato: number, colunaNome: number):
 const LIMITE_PARCELAS_POR_CONTRATO = 300;
 
 // Mapeia texto da faixa da planilha para TipoEquipe
-function faixaParaTipoEquipe(faixa: string): string | null {
+function faixaParaTipoEquipe(faixa: string): TipoEquipe | null {
   const f = normalizar(faixa);
   if (f.includes("1 a 30") || f.includes("1a30"))   return "CRA_1_30";
   if (f.includes("31 a 90") || f.includes("31a90"))  return "CR_31_90";
@@ -714,25 +715,43 @@ async function distribuirCarteiraAutomatica(
     select: { id: true, clienteId: true, maiorDiasAtraso: true, valorTotalAberto: true },
   });
 
-  // Carrega todos os consultores ativos para match por nome
+  // Carrega TODAS as equipes de uma vez (evita N queries dentro do loop) --
+  // usada nas duas passagens, pra sempre gravar junto a equipe do consultor
+  // NO MOMENTO da distribuição (CarteiraParcela.tipoEquipe). Sem isso, se o
+  // consultor trocar de equipe depois, relatórios de mês fechado mudavam
+  // retroativamente (calculavam em cima da equipe atual, não da equipe de
+  // quando o dinheiro entrou).
+  const todasEquipes = await prisma.equipe.findMany({
+    where: { ativa: true },
+    include: {
+      usuarios: {
+        where: { ativo: true, perfil: "CONSULTOR", emFerias: false },
+        select: { id: true },
+      },
+    },
+  });
+  const equipeMap = new Map(todasEquipes.map((e) => [e.tipo, e]));
+
+  // Carrega todos os consultores ativos para match por nome, com a equipe atual
   const todosConsultores = await prisma.usuario.findMany({
     where: { ativo: true, perfil: "CONSULTOR" },
-    select: { id: true, nome: true },
+    select: { id: true, nome: true, equipeId: true },
   });
+  const equipeTipoPorId = new Map(todasEquipes.map((e) => [e.id, e.tipo]));
   const consultorPorNomeNorm = new Map(
-    todosConsultores.map((u) => [normalizar(u.nome), u.id])
+    todosConsultores.map((u) => [normalizar(u.nome), { id: u.id, tipoEquipe: u.equipeId ? equipeTipoPorId.get(u.equipeId) ?? null : null }])
   );
 
-  const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string }[] = [];
+  const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe | null }[] = [];
   const semConsultorDefinido: typeof contratos = [];
 
   // 1ª passagem: atribuições diretas da planilha
   for (const c of contratos) {
     const nomeRaw = nomeConsultorPorContrato.get(c.id);
     if (nomeRaw) {
-      const consultorId = consultorPorNomeNorm.get(normalizar(nomeRaw));
-      if (consultorId) {
-        novasAtribuicoes.push({ id: randomUUID(), contratoId: c.id, consultorId, competenciaId });
+      const consultor = consultorPorNomeNorm.get(normalizar(nomeRaw));
+      if (consultor) {
+        novasAtribuicoes.push({ id: randomUUID(), contratoId: c.id, consultorId: consultor.id, competenciaId, tipoEquipe: consultor.tipoEquipe });
         continue;
       }
     }
@@ -741,21 +760,10 @@ async function distribuirCarteiraAutomatica(
 
   // 2ª passagem: distribui automaticamente os que ficaram sem atribuição
   if (semConsultorDefinido.length > 0) {
-    // Carrega TODAS as equipes de uma vez (evita N queries dentro do loop)
-    const todasEquipes = await prisma.equipe.findMany({
-      where: { ativa: true },
-      include: {
-        usuarios: {
-          where: { ativo: true, perfil: "CONSULTOR", emFerias: false },
-          select: { id: true },
-        },
-      },
-    });
-    const equipeMap = new Map(todasEquipes.map((e) => [e.tipo as string, e]));
 
-    const porEquipe = new Map<string, typeof contratos>();
+    const porEquipe = new Map<TipoEquipe, typeof contratos>();
     for (const c of semConsultorDefinido) {
-      let tipo: string;
+      let tipo: TipoEquipe;
       if (isFlash) {
         tipo = "FLASH";
       } else {
@@ -783,7 +791,7 @@ async function distribuirCarteiraAutomatica(
 
       for (const at of atribuicoes) {
         for (const contratoId of at.contratoIds) {
-          novasAtribuicoes.push({ id: randomUUID(), contratoId, consultorId: at.consultorId, competenciaId });
+          novasAtribuicoes.push({ id: randomUUID(), contratoId, consultorId: at.consultorId, competenciaId, tipoEquipe: tipo });
         }
       }
     }

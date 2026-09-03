@@ -7,6 +7,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
 import { randomUUID } from "crypto";
+import { TipoEquipe } from "@prisma/client";
 
 // ─── Formato "Lote" ───────────────────────────────────────────────────────────
 // Ponte temporária enquanto a query oficial ("Base CAR Passaporte BC", ver
@@ -79,7 +80,7 @@ function isInadimplencia(tipo: string): boolean {
   return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t);
 }
 
-function obterEquipe(dias: number): string {
+function obterEquipe(dias: number): TipoEquipe {
   if (dias <= 0)  return "FLASH";
   if (dias <= 30) return "CRA_1_30";
   if (dias <= 90) return "CR_31_90";
@@ -179,12 +180,14 @@ export async function POST(req: NextRequest) {
     // Casa pelo primeiro nome, exato -- evita confundir "Gabriel" com "Gabriela".
     const nomesConsultorCitados = [...new Set([...gruposInad.values()].map((g) => g.consultorNome).filter((n): n is string => !!n))];
     const consultoresAtivos = nomesConsultorCitados.length
-      ? await prisma.usuario.findMany({ where: { perfil: "CONSULTOR", ativo: true }, select: { id: true, nome: true, emFerias: true } })
+      ? await prisma.usuario.findMany({ where: { perfil: "CONSULTOR", ativo: true }, select: { id: true, nome: true, emFerias: true, equipe: { select: { tipo: true } } } })
       : [];
-    const consultorPorPrimeiroNome = new Map<string, { id: string; nome: string; emFerias: boolean }>();
+    const consultorPorPrimeiroNome = new Map<string, { id: string; nome: string; emFerias: boolean; tipoEquipe: TipoEquipe | null }>();
     for (const c of consultoresAtivos) {
       const primeiroNome = normalizar(c.nome.split(" ")[0]);
-      if (!consultorPorPrimeiroNome.has(primeiroNome)) consultorPorPrimeiroNome.set(primeiroNome, c);
+      if (!consultorPorPrimeiroNome.has(primeiroNome)) {
+        consultorPorPrimeiroNome.set(primeiroNome, { id: c.id, nome: c.nome, emFerias: c.emFerias, tipoEquipe: c.equipe?.tipo ?? null });
+      }
     }
     const consultoresNaoEncontrados = new Set<string>();
 
@@ -196,9 +199,9 @@ export async function POST(req: NextRequest) {
     });
     const contratoMap = new Map(contratosExistentes.map((c) => [c.numero, c]));
 
-    const novosSnap: { id: string; competenciaId: string; contratoNumero: string; valor: number; vencimentoMaisAntigo: Date; faixa: string; isFlash: boolean; syncId: string }[] = [];
+    const novosSnap: { id: string; competenciaId: string; contratoNumero: string; valor: number; vencimentoMaisAntigo: Date; faixa: TipoEquipe; isFlash: boolean; syncId: string }[] = [];
     // consultorId != null quando a planilha já diz quem é o consultor (atribuição direta, sem round-robin)
-    const novosParaDistribuir: { contratoId: string; clienteId: string; valorTotalAberto: number; maiorDiasAtraso: number; isFlash: boolean; consultorId: string | null }[] = [];
+    const novosParaDistribuir: { contratoId: string; clienteId: string; valorTotalAberto: number; maiorDiasAtraso: number; isFlash: boolean; consultorId: string | null; consultorTipoEquipe: TipoEquipe | null }[] = [];
     let criados = 0, atualizados = 0;
 
     for (const [doc, grupo] of gruposInad) {
@@ -232,14 +235,15 @@ export async function POST(req: NextRequest) {
       }
 
       let consultorId: string | null = null;
+      let consultorTipoEquipe: TipoEquipe | null = null;
       if (grupo.consultorNome) {
         const encontrado = consultorPorPrimeiroNome.get(normalizar(grupo.consultorNome));
-        if (encontrado && !encontrado.emFerias) consultorId = encontrado.id;
+        if (encontrado && !encontrado.emFerias) { consultorId = encontrado.id; consultorTipoEquipe = encontrado.tipoEquipe; }
         else consultoresNaoEncontrados.add(grupo.consultorNome);
       }
 
       novosSnap.push({ id: randomUUID(), competenciaId, contratoNumero: doc, valor: valorTotal, vencimentoMaisAntigo: vencMaisAntigo, faixa: isFlash ? "FLASH" : obterEquipe(diasAtraso), isFlash, syncId: sync.id });
-      novosParaDistribuir.push({ contratoId, clienteId, valorTotalAberto: valorTotal, maiorDiasAtraso: diasAtraso, isFlash, consultorId });
+      novosParaDistribuir.push({ contratoId, clienteId, valorTotalAberto: valorTotal, maiorDiasAtraso: diasAtraso, isFlash, consultorId, consultorTipoEquipe });
     }
 
     if (novosSnap.length > 0) {
@@ -257,11 +261,11 @@ export async function POST(req: NextRequest) {
       );
       const semCarteira = novosParaDistribuir.filter((c) => !jaDistribuidos.has(c.contratoId));
 
-      const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string }[] = [];
+      const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe | null }[] = [];
 
       const comConsultorDaPlanilha = semCarteira.filter((c) => c.consultorId);
       for (const c of comConsultorDaPlanilha) {
-        novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: c.consultorId!, competenciaId });
+        novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: c.consultorId!, competenciaId, tipoEquipe: c.consultorTipoEquipe });
         atribuidosDaPlanilha++;
       }
 
@@ -272,7 +276,7 @@ export async function POST(req: NextRequest) {
           include: { usuarios: { where: { ativo: true, perfil: "CONSULTOR", emFerias: false }, select: { id: true } } },
         });
         const equipeMap = new Map(todasEquipes.map((e) => [e.tipo, e]));
-        const porEquipe = new Map<string, typeof semConsultor>();
+        const porEquipe = new Map<TipoEquipe, typeof semConsultor>();
         for (const c of semConsultor) {
           const tipo = c.isFlash ? "FLASH" : obterEquipe(c.maiorDiasAtraso);
           if (!porEquipe.has(tipo)) porEquipe.set(tipo, []);
@@ -283,7 +287,7 @@ export async function POST(req: NextRequest) {
           if (!equipe?.usuarios.length) continue;
           const consultores = equipe.usuarios.map((u) => u.id);
           lista.forEach((c, i) => {
-            novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId });
+            novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId, tipoEquipe: tipo });
             atribuidosAutomatico++;
           });
         }
