@@ -13,6 +13,19 @@ export async function GET(req: NextRequest) {
   const competenciaId = searchParams.get("competenciaId");
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
 
+  // Escopo de datas da competência -- os recebimentos exibidos/somados na
+  // carteira precisam ser só os DESSE mês. Sem isso, um pagamento de um mês
+  // anterior (recebido por OUTRO consultor, antes do cliente cair pra essa
+  // carteira) aparecia contado como se fosse recebimento do consultor atual
+  // nessa competência -- mesmo bug já corrigido no dashboard/comissão
+  // (ver commit c3080b7), faltava aqui.
+  const competenciaAtual = await prisma.competencia.findUnique({
+    where: { id: competenciaId },
+    select: { mes: true, ano: true },
+  });
+  const iniComp = competenciaAtual ? new Date(Date.UTC(competenciaAtual.ano, competenciaAtual.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+  const fimComp = competenciaAtual ? new Date(Date.UTC(competenciaAtual.ano, competenciaAtual.mes, 1, 2, 59, 59, 999)) : new Date();
+
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
   const busca = searchParams.get("busca")?.trim() || "";
   const sort = searchParams.get("sort") ?? "diasAtraso";
@@ -94,6 +107,7 @@ export async function GET(req: NextRequest) {
               take: 5,
             },
             recebimentos: {
+              where: { dataRecebimento: { gte: iniComp, lte: fimComp } },
               select: { id: true, valor: true, valorAParte: true, dataRecebimento: true, formaPagamento: true },
             },
             parcelas: {
