@@ -57,14 +57,20 @@ export async function GET(req: NextRequest) {
     where.contrato.situacao = situacao;
   }
 
-  // Ordenação
+  // Ordenação -- sempre com "id" como critério de desempate final. Sem isso,
+  // como MUITOS contratos empatam no campo principal (ex: vários com
+  // exatamente os mesmos "dias em atraso"), o Postgres não garante a MESMA
+  // ordem entre duas consultas separadas -- e como a carteira busca todas as
+  // páginas em sequência (uma consulta por página), isso podia fazer a
+  // mesma linha aparecer em duas páginas (duplicada) ou sumir entre elas,
+  // dependendo de como o banco decidiu ordenar os empates daquela vez.
   let orderBy: any;
   if (sort === "parcelasAtraso") {
-    orderBy = { contrato: { totalParcelasVencidas: "desc" } };
+    orderBy = [{ contrato: { totalParcelasVencidas: "desc" } }, { id: "asc" }];
   } else if (sort === "parcelasAberto") {
-    orderBy = { contrato: { valorTotalAberto: "desc" } };
+    orderBy = [{ contrato: { valorTotalAberto: "desc" } }, { id: "asc" }];
   } else {
-    orderBy = { contrato: { maiorDiasAtraso: "desc" } };
+    orderBy = [{ contrato: { maiorDiasAtraso: "desc" } }, { id: "asc" }];
   }
 
   // Filtro de parcelas vivas com o mesmo escopo da carteira (para totalizar corretamente)
