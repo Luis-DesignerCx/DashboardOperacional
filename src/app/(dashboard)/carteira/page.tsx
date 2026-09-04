@@ -8,6 +8,7 @@ import {
   Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2, RefreshCw,
 } from "lucide-react";
 import { formatarMoeda } from "@/lib/utils";
+import { usePersistedState } from "@/hooks/usePersistedState";
 import Link from "next/link";
 
 interface Contrato {
@@ -145,11 +146,11 @@ export default function CarteiraPage() {
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [competenciaId, setCompetenciaId] = useState("");
   const [competencias, setCompetencias] = useState<any[]>([]);
-  const [busca, setBusca] = useState("");
-  const [sort, setSort] = useState("diasAtraso");
-  const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
-  const [statusRecupFiltro, setStatusRecupFiltro] = useState<string | null>(null);
-  const [situacaoFiltro, setSituacaoFiltro] = useState<string | null>(null);
+  const [busca, setBusca] = usePersistedState("busca", "");
+  const [sort, setSort] = usePersistedState("sort", "diasAtraso");
+  const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string | null>("empresaFiltro", null);
+  const [statusRecupFiltro, setStatusRecupFiltro] = usePersistedState<string | null>("statusRecupFiltro", null);
+  const [situacaoFiltro, setSituacaoFiltro] = usePersistedState<string | null>("situacaoFiltro", null);
   const [situacaoPopover, setSituacaoPopover] = useState<string | null>(null);
   const [salvandoSituacao, setSalvandoSituacao] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);

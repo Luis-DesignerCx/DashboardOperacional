@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useFrente } from "@/contexts/FrenteContext";
 import { formatarMoeda } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Search, AlertCircle, TrendingUp, Palmtree, Activity } from "lucide-react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 // ── Frentes visíveis no sidebar ──────────────────────────────────────────────
 // CR_PDD_181 não aparece como frente separada; é sub-faixa de PDD 91+
@@ -64,9 +65,9 @@ export default function GestaoPage() {
   const [competenciaId, setCompetenciaId] = useState("");
   const [consultores, setConsultores] = useState<Consultor[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = usePersistedState("busca", "");
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
-  const [subFaixa, setSubFaixa] = useState(0); // índice em SUB_FAIXAS_MAP[tipo]
+  const [subFaixa, setSubFaixa] = usePersistedState("subFaixa", 0); // índice em SUB_FAIXAS_MAP[tipo]
 
   useEffect(() => {
     Promise.all([

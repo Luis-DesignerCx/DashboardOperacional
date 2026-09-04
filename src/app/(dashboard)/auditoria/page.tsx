@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { formatarDataHora } from "@/lib/utils";
 import { Shield, Search } from "lucide-react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 const COR_ACAO: Record<string, string> = {
   CREATE: "bg-emerald-500/10 text-emerald-400",
@@ -27,7 +28,7 @@ interface RegistroAuditoria {
 
 export default function AuditoriaPage() {
   const [registros, setRegistros] = useState<RegistroAuditoria[]>([]);
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = usePersistedState("busca", "");
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {

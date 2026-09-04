@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { formatarDataHora } from "@/lib/utils";
 import { ClipboardList, CheckCircle, XCircle, Clock, ArrowLeftRight, X, Search, Loader2 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 const LABEL_TIPO: Record<string, string> = {
   TRANSFERENCIA_CONTRATO: "Transferência de Contrato",
@@ -44,7 +45,7 @@ export default function SolicitacoesPage() {
   const isGestorOuAdmin = ["ADMINISTRADOR", "GESTOR"].includes((session?.user as any)?.perfil ?? "");
 
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
-  const [filtroStatus, setFiltroStatus] = useState("TODOS");
+  const [filtroStatus, setFiltroStatus] = usePersistedState("filtroStatus", "TODOS");
   const [carregando, setCarregando] = useState(true);
   const [modalTransf, setModalTransf] = useState(false);
 

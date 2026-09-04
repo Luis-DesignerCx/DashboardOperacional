@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
 import { Search, AlertCircle, ChevronRight, Phone, Loader2, History, X, MessageCircle, Mail, PhoneCall, DollarSign, CheckCircle2, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
+import { usePersistedState } from "@/hooks/usePersistedState";
 
 const STATUS_COR: Record<string, string> = {
   SEM_CONTATO: "bg-white/[0.12] text-slate-200",
@@ -104,8 +105,8 @@ export default function ClientesPage() {
   const [total, setTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
   const [carregandoMais, setCarregandoMais] = useState(false);
-  const [busca, setBusca] = useState("");
-  const [empresaFiltro, setEmpresaFiltro] = useState<string | null>(null);
+  const [busca, setBusca] = usePersistedState("busca", "");
+  const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string | null>("empresaFiltro", null);
   const [carregando, setCarregando] = useState(true);
   const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 

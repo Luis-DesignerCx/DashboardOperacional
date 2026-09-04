@@ -20,7 +20,7 @@ export default async function DashboardLayout({
         <Sidebar perfil={session.user.perfil} />
         <div className="flex flex-col flex-1 overflow-hidden">
           <Header user={session.user} />
-          <main className="flex-1 overflow-y-auto p-5 bg-surface-0">
+          <main id="dashboard-main" className="flex-1 overflow-y-auto p-5 bg-surface-0">
             {children}
           </main>
         </div>
