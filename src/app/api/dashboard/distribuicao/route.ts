@@ -11,7 +11,20 @@ const FRENTE_LABEL: Record<string, string> = {
   "eq-91-180": "91+ dias",
 };
 
-function derivarFrenteId(consultorEquipeId: string | null, diasAtraso: number): string {
+const TIPO_EQUIPE_PARA_FRENTE: Record<string, string> = {
+  FLASH:         "eq-flash",
+  CRA_1_30:      "eq-1-30",
+  CR_31_90:      "eq-31-90",
+  CR_PDD_91_180: "eq-91-180",
+};
+
+// Usa a frente "congelada" na carteira (tipoEquipe, gravada no momento da
+// distribuição) -- é o que define de qual frente aquele contrato É, não o
+// atraso atual dele. Sem isso, um contrato que envelhece muda de frente
+// sozinho e "puxa" o consultor pra uma aba que não é a dele. Só cai no
+// fallback por atraso pra linhas antigas (pré-migração, tipoEquipe null).
+function derivarFrenteId(tipoEquipe: string | null, consultorEquipeId: string | null, diasAtraso: number): string {
+  if (tipoEquipe && TIPO_EQUIPE_PARA_FRENTE[tipoEquipe]) return TIPO_EQUIPE_PARA_FRENTE[tipoEquipe];
   if (consultorEquipeId === "eq-flash") return "eq-flash";
   if (diasAtraso <= 30) return "eq-1-30";
   if (diasAtraso <= 90) return "eq-31-90";
@@ -63,6 +76,7 @@ export async function GET(req: NextRequest) {
       select: {
         contratoId: true,
         consultorId: true,
+        tipoEquipe: true,
         contrato: {
           select: {
             valorTotalAberto: true,
@@ -90,28 +104,35 @@ export async function GET(req: NextRequest) {
     });
 
     // 4. Acumular saldo e recebido por (frenteId, consultorId)
-    type Acum = { saldoAberto: number; recebido: number; contratos: number };
+    type Acum = { saldoAberto: number; recebido: number; contratos: number; contratosRecebidosSet: Set<string> };
     const frenteConsultorMap = new Map<string, Map<string, Acum>>();
     for (const fId of frentesAtivas) frenteConsultorMap.set(fId, new Map());
 
+    // Mapa (consultorId|contratoId) -> frenteId, pra recebimento herdar a
+    // MESMA frente da carteira que o originou -- em vez de recalcular pelo
+    // atraso atual do contrato, que pode já ter mudado de faixa.
+    const contratoFrenteMap = new Map<string, string>();
+
     for (const cp of carteiras) {
       const consultor = consultorMap.get(cp.consultorId);
-      const frenteId = derivarFrenteId(consultor?.equipeId ?? null, cp.contrato.maiorDiasAtraso ?? 0);
+      const frenteId = derivarFrenteId(cp.tipoEquipe, consultor?.equipeId ?? null, cp.contrato.maiorDiasAtraso ?? 0);
+      contratoFrenteMap.set(`${cp.consultorId}|${cp.contratoId}`, frenteId);
       if (!frenteConsultorMap.has(frenteId)) continue;
       const fMap = frenteConsultorMap.get(frenteId)!;
-      if (!fMap.has(cp.consultorId)) fMap.set(cp.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0 });
+      if (!fMap.has(cp.consultorId)) fMap.set(cp.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
       const d = fMap.get(cp.consultorId)!;
       d.saldoAberto += Number(cp.contrato.valorTotalAberto ?? 0);
       d.contratos += 1;
     }
 
     for (const r of recebimentos) {
-      const consultor = consultorMap.get(r.consultorId);
-      const frenteId = derivarFrenteId(consultor?.equipeId ?? null, r.contrato.maiorDiasAtraso ?? 0);
-      if (!frenteConsultorMap.has(frenteId)) continue;
+      const frenteId = contratoFrenteMap.get(`${r.consultorId}|${r.contratoId}`);
+      if (!frenteId || !frenteConsultorMap.has(frenteId)) continue;
       const fMap = frenteConsultorMap.get(frenteId)!;
-      if (!fMap.has(r.consultorId)) fMap.set(r.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0 });
-      fMap.get(r.consultorId)!.recebido += Number(r.valor ?? 0);
+      if (!fMap.has(r.consultorId)) fMap.set(r.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
+      const d = fMap.get(r.consultorId)!;
+      d.recebido += Number(r.valor ?? 0);
+      d.contratosRecebidosSet.add(r.contratoId);
     }
 
     // 5. Construir array de frentes
@@ -127,6 +148,7 @@ export async function GET(req: NextRequest) {
             saldoAberto: d.saldoAberto,
             recebido: d.recebido,
             contratos: d.contratos,
+            contratosRecebidos: d.contratosRecebidosSet.size,
           }))
           .sort((a, b) => b.saldoAberto - a.saldoAberto);
 
@@ -135,8 +157,9 @@ export async function GET(req: NextRequest) {
             saldoAberto: acc.saldoAberto + c.saldoAberto,
             recebido: acc.recebido + c.recebido,
             contratos: acc.contratos + c.contratos,
+            contratosRecebidos: acc.contratosRecebidos + c.contratosRecebidos,
           }),
-          { saldoAberto: 0, recebido: 0, contratos: 0 }
+          { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidos: 0 }
         );
 
         return { equipeId: eqId, label: FRENTE_LABEL[eqId], consultores: fConsultores, total };

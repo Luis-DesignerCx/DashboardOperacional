@@ -2,23 +2,42 @@
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
-import { AlertTriangle, Award, CheckCircle2, Clock, Users, TrendingUp } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Gauge, Info } from "lucide-react";
 import { useFrente } from "@/contexts/FrenteContext";
-import { TabelaDistribuicao } from "@/components/charts/TabelaDistribuicao";
-import Link from "next/link";
+import { MatrizPerformance } from "@/components/charts/MatrizPerformance";
+import { SaudeEmpreendimentos } from "@/components/charts/SaudeEmpreendimentos";
+import { PainelAgendamentos } from "@/components/charts/PainelAgendamentos";
+import { Select } from "@/components/ui/Select";
 
 interface DadosGestor {
-  inadimplenciaInicial: number; recebido: number; baixado: number;
+  inadimplenciaInicial: number; totalContratosInicial: number; totalClientesInicial: number;
+  recebido: number; baixado: number; contratosRecebidos: number;
   recebimentoAParte: number; percentualMeta: number; metaAlvo: number | null;
   aprovacoesPendentes: number; totalConsultores: number;
-  rankingConsultores: Array<{ id: string; nome: string; recebido: number }>;
-  clientesRegularizados: number; promessasHoje: number;
-  valorAgendadoHoje: number; promessasVencidas: number;
-  valorPromessasVencidas: number; eficienciaHoje: number;
+  clientesRegularizados: number;
+  promessasHoje: number; valorAgendadoHoje: number; clientesAgendadosHoje: number;
+  promessasVencidas: number; valorPromessasVencidas: number; clientesPromessasVencidas: number;
+  promessasFuturas: number; valorPromessasFuturas: number; clientesPromessasFuturas: number;
+  eficienciaHoje: number;
+}
+
+interface ConsultorDist {
+  consultorId: string; nome: string; saldoAberto: number; recebido: number;
+  contratos: number; contratosRecebidos: number;
+}
+interface FrenteDist {
+  equipeId: string; label: string; consultores: ConsultorDist[];
+  total: { saldoAberto: number; recebido: number; contratos: number; contratosRecebidos: number };
+}
+interface EmpresaDist {
+  empresaId: string; nome: string; saldoAberto: number; recebido: number;
+  contratos: number; percentual: number;
 }
 
 export function DashboardGestor() {
   const [dados, setDados] = useState<DadosGestor | null>(null);
+  const [frentes, setFrentes] = useState<FrenteDist[]>([]);
+  const [porEmpresa, setPorEmpresa] = useState<EmpresaDist[]>([]);
   const [competenciaId, setCompetenciaId] = useState("");
   const [competencias, setCompetencias] = useState<any[]>([]);
   const { equipeIds } = useFrente();
@@ -27,8 +46,16 @@ export function DashboardGestor() {
     setDados(null);
     const params = new URLSearchParams({ competenciaId: cId });
     if (eqIds.length > 0) params.set("equipeIds", eqIds.join(","));
-    const d = await fetch(`/api/dashboard?${params}`).then((r) => r.json()).catch(() => null);
+
+    const [d, dist] = await Promise.all([
+      fetch(`/api/dashboard?${params}`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/dashboard/distribuicao?${params}`).then((r) => r.json()).catch(() => null),
+    ]);
     if (d && !d.erro) setDados(d);
+    if (dist && !dist.erro) {
+      setFrentes(dist.frentes ?? []);
+      setPorEmpresa(dist.porEmpresa ?? []);
+    }
   }
 
   useEffect(() => {
@@ -44,7 +71,8 @@ export function DashboardGestor() {
 
   useEffect(() => {
     if (competenciaId) carregarDashboard(competenciaId, equipeIds);
-  }, [equipeIds]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [equipeIds.join(",")]);
 
   if (!dados) return (
     <div className="flex items-center justify-center h-64">
@@ -57,12 +85,23 @@ export function DashboardGestor() {
   return (
     <div className="space-y-5 animate-fade-in-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-bold text-white tracking-tight">Dashboard Gestor</h1>
           <p className="text-slate-500 text-xs mt-0.5">{dados.totalConsultores} consultores ativos</p>
         </div>
         <div className="flex items-center gap-2.5">
+          <div className="hidden md:flex items-center gap-3 text-xs text-slate-500 mr-1">
+            <span className="flex items-center gap-1.5">
+              <CheckCircle2 size={12} className="text-emerald-500" />
+              <span className="text-slate-300 font-medium tabular-nums">{dados.clientesRegularizados}</span> regularizados
+            </span>
+            <span className="w-1 h-1 rounded-full bg-white/[0.15]" />
+            <span className="flex items-center gap-1.5">
+              <Gauge size={12} className={dados.eficienciaHoje >= 80 ? "text-emerald-500" : dados.eficienciaHoje >= 50 ? "text-amber-500" : "text-slate-500"} />
+              <span className="text-slate-300 font-medium tabular-nums">{dados.eficienciaHoje.toFixed(0)}%</span> eficiência hoje
+            </span>
+          </div>
           {dados.aprovacoesPendentes > 0 && (
             <a
               href="/solicitacoes"
@@ -72,167 +111,66 @@ export function DashboardGestor() {
               {dados.aprovacoesPendentes} pendente{dados.aprovacoesPendentes !== 1 ? "s" : ""}
             </a>
           )}
-          <select
+          <Select
             value={competenciaId}
-            onChange={(e) => { setCompetenciaId(e.target.value); carregarDashboard(e.target.value, equipeIds); }}
-            className="bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 transition-all"
-          >
-            {competencias.map((c) => <option key={c.id} value={c.id}>{c.descricao}</option>)}
-          </select>
+            onValueChange={(v) => { setCompetenciaId(v); carregarDashboard(v, equipeIds); }}
+            className="w-44"
+            options={competencias.map((c) => ({ value: c.id, label: c.descricao }))}
+          />
         </div>
       </div>
 
-      {/* KPIs financeiros */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        {[
-          { label: "Inadimplência Inicial", valor: formatarMoeda(dados.inadimplenciaInicial), cor: "text-white" },
-          { label: "Recebido (Informado)",  valor: formatarMoeda(dados.recebido),              cor: "text-gr-400" },
-          { label: "Baixado (Oficial)",     valor: formatarMoeda(dados.baixado),               cor: "text-emerald-400" },
-          { label: "Rec. a Parte",          valor: formatarMoeda(dados.recebimentoAParte ?? 0), cor: "text-sky-400" },
-          { label: "% da Meta",             valor: `${pctMeta.toFixed(1)}%`,                   cor: pctMeta >= 100 ? "text-emerald-400" : pctMeta >= 70 ? "text-gr-400" : "text-slate-400" },
-        ].map((kpi) => (
-          <div key={kpi.label} className="bg-surface-2 border border-white/[0.06] rounded-2xl p-4 hover:border-white/[0.09] transition-colors">
-            <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide leading-tight">{kpi.label}</p>
-            <p className={`text-lg font-bold mt-1.5 tabular-nums leading-none ${kpi.cor}`}>{kpi.valor}</p>
-            {kpi.label === "Rec. a Parte" && <p className="text-xs text-slate-600 mt-1">pelo consultor</p>}
-            {kpi.label === "% da Meta" && dados.metaAlvo && <p className="text-xs text-slate-600 mt-1">meta {formatarMoeda(dados.metaAlvo)}</p>}
-          </div>
-        ))}
-      </div>
-
-      {/* KPIs operacionais */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="bg-surface-2 border border-emerald-500/20 rounded-2xl p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Regularizados</p>
-              <p className="text-2xl font-bold text-emerald-400 mt-1.5 tabular-nums">{dados.clientesRegularizados}</p>
-              <p className="text-xs text-slate-600 mt-1">100% quitados</p>
-            </div>
-            <div className="p-2 rounded-xl bg-emerald-500/10 flex-shrink-0">
-              <CheckCircle2 size={15} className="text-emerald-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-surface-2 border border-amber-500/20 rounded-2xl p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Promessas Hoje</p>
-              <p className="text-2xl font-bold text-amber-400 mt-1.5 tabular-nums">{dados.promessasHoje}</p>
-              <p className="text-xs text-slate-600 mt-1">{formatarMoeda(dados.valorAgendadoHoje)} agendado</p>
-            </div>
-            <div className="p-2 rounded-xl bg-amber-500/10 flex-shrink-0">
-              <Clock size={15} className="text-amber-400" />
-            </div>
-          </div>
+      {/* Bloco 1 — KPIs financeiros */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-4">
+          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Inadimplência Inicial</p>
+          <p className="text-xl font-bold text-white mt-1.5 tabular-nums leading-none">{formatarMoeda(dados.inadimplenciaInicial)}</p>
+          <p className="text-xs text-slate-500 mt-1.5">
+            {dados.totalContratosInicial} contrato{dados.totalContratosInicial !== 1 ? "s" : ""}
+          </p>
         </div>
 
         <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-4">
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Valor Agendado</p>
-              <p className="text-lg font-bold text-white mt-1.5 tabular-nums leading-tight">{formatarMoeda(dados.valorAgendadoHoje)}</p>
-              <p className="text-xs text-slate-600 mt-1">{dados.promessasHoje} promessa(s)</p>
-            </div>
-            <div className="p-2 rounded-xl bg-white/[0.06] flex-shrink-0">
-              <TrendingUp size={15} className="text-slate-400" />
+          <div className="flex items-center gap-1.5">
+            <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Recuperado no Mês</p>
+            <div className="relative group flex items-center">
+              <Info size={11} className="text-slate-600 cursor-help" />
+              <div className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover:block whitespace-nowrap bg-surface-3 border border-white/[0.08] text-slate-300 text-[10px] px-2 py-1 rounded-lg shadow-card z-10">
+                Baixado: {formatarMoeda(dados.baixado)}
+              </div>
             </div>
           </div>
+          <p className="text-xl font-bold text-white mt-1.5 tabular-nums leading-none">{formatarMoeda(dados.recebido)}</p>
+          <p className="text-xs text-slate-500 mt-1.5">
+            {dados.contratosRecebidos} contrato{dados.contratosRecebidos !== 1 ? "s" : ""} com recebimento
+          </p>
         </div>
 
-        <div className={`bg-surface-2 rounded-2xl p-4 border ${dados.eficienciaHoje >= 80 ? "border-emerald-500/20" : dados.eficienciaHoje >= 50 ? "border-amber-500/20" : "border-white/[0.06]"}`}>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Eficiência do Dia</p>
-              <p className={`text-2xl font-bold mt-1.5 tabular-nums ${dados.eficienciaHoje >= 80 ? "text-emerald-400" : dados.eficienciaHoje >= 50 ? "text-amber-400" : "text-slate-500"}`}>
-                {dados.eficienciaHoje.toFixed(1)}%
-              </p>
-              <p className="text-xs text-slate-600 mt-1">Recebido ÷ Agendado</p>
-            </div>
-            <div className={`p-2 rounded-xl flex-shrink-0 ${dados.eficienciaHoje >= 80 ? "bg-emerald-500/10" : dados.eficienciaHoje >= 50 ? "bg-amber-500/10" : "bg-white/[0.06]"}`}>
-              <Users size={15} className={dados.eficienciaHoje >= 80 ? "text-emerald-400" : dados.eficienciaHoje >= 50 ? "text-amber-400" : "text-slate-500"} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Barra de meta */}
-      {dados.metaAlvo && (
-        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
-          <div className="flex justify-between items-center mb-3">
-            <p className="text-sm font-semibold text-white">Meta da Equipe</p>
-            <span className={`text-sm font-bold tabular-nums ${pctMeta >= 100 ? "text-emerald-400" : "text-gr-400"}`}>{pctMeta.toFixed(1)}%</span>
-          </div>
-          <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+        <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-4">
+          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Meta do Mês</p>
+          <p className="text-xl font-bold text-white mt-1.5 tabular-nums leading-none">{pctMeta.toFixed(1)}%</p>
+          <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden mt-2.5">
             <div
-              className={`h-full rounded-full bg-gradient-to-r transition-all ${pctMeta >= 100 ? "from-emerald-600 to-emerald-400" : "from-gr-600 to-gr-400"}`}
-              style={{ width: `${Math.min(pctMeta, 160) / 1.6}%` }}
+              className={`h-full rounded-full transition-all ${pctMeta >= 100 ? "bg-emerald-500" : "bg-gr-500"}`}
+              style={{ width: `${Math.min(pctMeta, 100)}%` }}
             />
           </div>
-        </div>
-      )}
-
-      {/* Tarefas diárias */}
-      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
-        <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-4">Tarefas Diárias</h2>
-        <div className="space-y-2">
-          <Link href="/pendencias" className="flex items-center justify-between p-3.5 bg-amber-500/[0.07] border border-amber-500/20 rounded-xl hover:bg-amber-500/[0.11] transition-colors">
-            <div className="flex items-center gap-3">
-              <Clock size={14} className="text-amber-400 flex-shrink-0" />
-              <div>
-                <p className="text-white text-xs font-semibold">Promessas vencendo hoje</p>
-                <p className="text-slate-500 text-xs mt-0.5">{formatarMoeda(dados.valorAgendadoHoje)} agendado</p>
-              </div>
-            </div>
-            <span className={`text-base font-bold tabular-nums ${dados.promessasHoje > 0 ? "text-amber-400" : "text-slate-500"}`}>{dados.promessasHoje}</span>
-          </Link>
-
-          <Link href="/pendencias" className="flex items-center justify-between p-3.5 bg-red-500/[0.07] border border-red-500/20 rounded-xl hover:bg-red-500/[0.11] transition-colors">
-            <div className="flex items-center gap-3">
-              <AlertTriangle size={14} className="text-red-400 flex-shrink-0" />
-              <div>
-                <p className="text-white text-xs font-semibold">Promessas vencidas</p>
-                <p className="text-slate-500 text-xs mt-0.5">{formatarMoeda(dados.valorPromessasVencidas)} não recebido</p>
-              </div>
-            </div>
-            <span className={`text-base font-bold tabular-nums ${dados.promessasVencidas > 0 ? "text-red-400" : "text-slate-500"}`}>{dados.promessasVencidas}</span>
-          </Link>
-
-          {dados.promessasHoje === 0 && dados.promessasVencidas === 0 && (
-            <div className="flex items-center gap-2.5 p-3.5 bg-emerald-500/[0.07] border border-emerald-500/20 rounded-xl">
-              <CheckCircle2 size={14} className="text-emerald-400 flex-shrink-0" />
-              <p className="text-emerald-300 text-xs font-medium">Nenhuma pendência para hoje!</p>
-            </div>
-          )}
+          {dados.metaAlvo && <p className="text-xs text-slate-500 mt-1.5">meta {formatarMoeda(dados.metaAlvo)}</p>}
         </div>
       </div>
 
-      {/* Ranking consultores */}
-      <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
-        <div className="flex items-center gap-2 mb-4">
-          <Award size={14} className="text-amber-400" />
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Ranking de Consultores</h2>
-        </div>
-        <div className="space-y-2.5">
-          {dados.rankingConsultores.map((c, i) => (
-            <div key={c.id} className="flex items-center gap-3 px-1">
-              <span className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-bold flex-shrink-0 ${
-                i === 0 ? "bg-amber-500/20 text-amber-400" :
-                i === 1 ? "bg-white/[0.12]/40 text-slate-300" :
-                i === 2 ? "bg-orange-700/20 text-orange-400" : "bg-white/[0.04] text-slate-500"
-              }`}>{i + 1}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-200 truncate font-medium">{c.nome}</p>
-              </div>
-              <span className="text-xs font-semibold text-emerald-400 tabular-nums">{formatarMoeda(c.recebido)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Bloco 2 — Agendamentos e Promessas */}
+      <PainelAgendamentos
+        hoje={{ count: dados.promessasHoje, valor: dados.valorAgendadoHoje, clientes: dados.clientesAgendadosHoje }}
+        vencidas={{ count: dados.promessasVencidas, valor: dados.valorPromessasVencidas, clientes: dados.clientesPromessasVencidas }}
+        futuro={{ count: dados.promessasFuturas, valor: dados.valorPromessasFuturas, clientes: dados.clientesPromessasFuturas }}
+      />
 
-      {/* Distribuição */}
-      <TabelaDistribuicao competenciaId={competenciaId} equipeIds={equipeIds} unificar91Plus />
+      {/* Bloco 3 — Matriz de Performance da Equipe */}
+      <MatrizPerformance frentes={frentes} />
+
+      {/* Bloco 4 — Saúde dos Empreendimentos */}
+      <SaudeEmpreendimentos porEmpresa={porEmpresa} />
     </div>
   );
 }

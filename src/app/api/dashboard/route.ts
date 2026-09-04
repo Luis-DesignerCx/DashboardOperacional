@@ -347,15 +347,15 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     rankingAgg,
     meta,
     aprovacoesPendentes,
-    promessasHojeAgg,
-    promessasVencidasAgg,
+    promessasTodas,
     clientesRegularizados,
     recebidoHojeAgg,
     recAParteAgg,
+    contratosRecebidosRows,
   ] = await Promise.all([
     prisma.carteiraParcela.findMany({
       where: { consultorId: { in: consultorIds }, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false }, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) },
-      select: { contrato: { select: { valorTotalAberto: true } } },
+      select: { contrato: { select: { valorTotalAberto: true, clienteId: true } } },
     }),
     prisma.recebimento.aggregate({
       where: {
@@ -390,17 +390,10 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
         ? prisma.meta.findFirst({ where: { competenciaId }, select: { valorAlvo: true } })
         : prisma.meta.findFirst({ where: { equipeId: { in: equipeIds }, competenciaId }, select: { valorAlvo: true } }),
     prisma.solicitacao.count({ where: { status: "PENDENTE" } }),
-    // Promessas do dia
-    prisma.promessa.aggregate({
-      where: { consultorId: { in: consultorIds }, status: "ABERTA", dataPrometida: { gte: inicioHoje, lte: fimHoje } },
-      _count: true,
-      _sum: { valorPrometido: true },
-    }),
-    // Promessas vencidas
-    prisma.promessa.aggregate({
-      where: { consultorId: { in: consultorIds }, status: "ABERTA", dataPrometida: { lt: inicioHoje } },
-      _count: true,
-      _sum: { valorPrometido: true },
+    // Todas as promessas em aberto — bucketadas em hoje/vencidas/futuro abaixo
+    prisma.promessa.findMany({
+      where: { consultorId: { in: consultorIds }, status: "ABERTA" },
+      select: { valorPrometido: true, dataPrometida: true, contrato: { select: { clienteId: true } } },
     }),
     // Clientes regularizados (statusRecuperacao = RECUPERADO_INTEGRALMENTE na carteira)
     prisma.carteiraParcela.count({
@@ -430,12 +423,42 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
       },
       _sum: { valorAParte: true },
     }),
+    // Contratos distintos com recebimento (informado) na competência
+    prisma.recebimento.findMany({
+      where: {
+        consultorId: { in: consultorIds },
+        contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } } },
+        baixaOficial: false,
+        dataRecebimento: { gte: iniComp, lte: fimComp },
+      },
+      select: { contratoId: true },
+      distinct: ["contratoId"],
+    }),
   ]);
 
   const inadimplenciaInicial = carteiras.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
+  const totalContratosInicial = carteiras.length;
+  const totalClientesInicial = new Set(carteiras.map((c) => c.contrato.clienteId)).size;
   const recebido = Number(recebidoAgg._sum.valor ?? 0);
   const baixado = Number(baixadoAgg._sum.valorBaixado ?? 0);
-  const valorAgendadoHoje = Number(promessasHojeAgg._sum.valorPrometido ?? 0);
+  const contratosRecebidos = contratosRecebidosRows.length;
+
+  // Bucketa as promessas em aberto por Hoje / Vencidas / Futuro
+  const buckets = {
+    hoje:     { count: 0, valor: 0, clientes: new Set<string>() },
+    vencidas: { count: 0, valor: 0, clientes: new Set<string>() },
+    futuro:   { count: 0, valor: 0, clientes: new Set<string>() },
+  };
+  for (const p of promessasTodas) {
+    const d = p.dataPrometida;
+    const bucket = d < inicioHoje ? "vencidas" : d <= fimHoje ? "hoje" : "futuro";
+    const b = buckets[bucket];
+    b.count++;
+    b.valor += Number(p.valorPrometido ?? 0);
+    if (p.contrato?.clienteId) b.clientes.add(p.contrato.clienteId);
+  }
+
+  const valorAgendadoHoje = buckets.hoje.valor;
   const recebidoHoje = Number(recebidoHojeAgg._sum.valor ?? 0);
   const eficienciaHoje = valorAgendadoHoje > 0 ? Math.round((recebidoHoje / valorAgendadoHoje) * 10000) / 100 : 0;
 
@@ -446,8 +469,11 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
 
   return {
     inadimplenciaInicial,
+    totalContratosInicial,
+    totalClientesInicial,
     recebido,
     baixado,
+    contratosRecebidos,
     recebimentoAParte: Number(recAParteAgg._sum.valorAParte ?? 0),
     percentualMeta: (meta && meta.valorAlvo && Number(meta.valorAlvo) > 0) ? Math.round((baixado / Number(meta.valorAlvo)) * 10000) / 100 : 0,
     metaAlvo: (meta && meta.valorAlvo) ? Number(meta.valorAlvo) : null,
@@ -455,10 +481,15 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     totalConsultores: consultores.length,
     rankingConsultores,
     clientesRegularizados,
-    promessasHoje: promessasHojeAgg._count,
+    promessasHoje: buckets.hoje.count,
     valorAgendadoHoje,
-    promessasVencidas: promessasVencidasAgg._count,
-    valorPromessasVencidas: Number(promessasVencidasAgg._sum.valorPrometido ?? 0),
+    clientesAgendadosHoje: buckets.hoje.clientes.size,
+    promessasVencidas: buckets.vencidas.count,
+    valorPromessasVencidas: buckets.vencidas.valor,
+    clientesPromessasVencidas: buckets.vencidas.clientes.size,
+    promessasFuturas: buckets.futuro.count,
+    valorPromessasFuturas: buckets.futuro.valor,
+    clientesPromessasFuturas: buckets.futuro.clientes.size,
     eficienciaHoje,
   };
 }
