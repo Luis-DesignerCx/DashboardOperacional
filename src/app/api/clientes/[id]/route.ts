@@ -25,6 +25,28 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
+  // Consultor só vê os recebimentos da competência ABERTA -- não precisa ver
+  // (nem deve levar em conta) recebimentos de competências já fechadas. O
+  // dado continua salvo (auditoria, exportação); Gestor/Administrador
+  // continuam vendo o histórico completo.
+  let recebimentosWhere: any = undefined;
+  if (session.user.perfil === "CONSULTOR") {
+    const competenciaAberta = await prisma.competencia.findFirst({
+      where: { fechada: false },
+      orderBy: [{ ano: "desc" }, { mes: "desc" }],
+      select: { mes: true, ano: true },
+    });
+    recebimentosWhere = competenciaAberta
+      ? {
+          dataRecebimento: {
+            gte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes - 1, 1, 3, 0, 0, 0)),
+            lte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes, 1, 2, 59, 59, 999)),
+          },
+        }
+      : { id: "" }; // nenhuma competência aberta -- não mostra recebimento nenhum
+
+  }
+
   const cliente = await prisma.cliente.findUnique({
     where: { id: params.id },
     include: {
@@ -32,7 +54,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         include: {
           empresa: true,
           parcelas: { orderBy: { dataVencimento: "asc" } },
-          recebimentos: { orderBy: { dataRecebimento: "desc" } },
+          recebimentos: { where: recebimentosWhere, orderBy: { dataRecebimento: "desc" } },
           contatos: { orderBy: { criadoEm: "desc" }, take: 5 },
           promessas: { where: { status: "ABERTA" }, orderBy: { dataPrometida: "asc" } },
           carteiras: {

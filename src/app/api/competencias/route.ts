@@ -7,7 +7,13 @@ export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
+  // Consultor só enxerga a competência aberta -- não precisa (nem deve) ver
+  // ou selecionar competências já fechadas pelo gestor. Gestor/Administrador
+  // continuam vendo todas (histórico, relatórios, fechamento de ciclo etc).
+  const where = session.user.perfil === "CONSULTOR" ? { fechada: false } : {};
+
   const competencias = await prisma.competencia.findMany({
+    where,
     orderBy: [{ ano: "desc" }, { mes: "desc" }],
   });
 
