@@ -142,7 +142,6 @@ export default function CarteiraPage() {
   const [totalContratos, setTotalContratos] = useState(0);
   const [valorTotal, setValorTotal] = useState(0);
   const [pagina, setPagina] = useState(1);
-  const [temMais, setTemMais] = useState(false);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [competenciaId, setCompetenciaId] = useState("");
   const [competencias, setCompetencias] = useState<any[]>([]);
@@ -212,31 +211,46 @@ export default function CarteiraPage() {
 
   const buscaMainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function carregarPagina(cId: string, pg: number, append = false, buscaParam?: string, sortParam?: string, statusRecupParam?: string | null, situacaoParam?: string | null) {
-    if (!append) setCarregando(true); else setCarregandoMais(true);
+  // Busca TODAS as páginas em sequência (sem exigir clique em "Carregar
+  // mais") -- assim a busca e os filtros (o de empresa é client-side, ver
+  // `filtrados` abaixo) sempre enxergam a carteira inteira, não só o que já
+  // tinha sido carregado até então. Mesmo ajuste já feito em Clientes.
+  async function carregarTodos(cId: string, buscaParam?: string, sortParam?: string, statusRecupParam?: string | null, situacaoParam?: string | null) {
+    setCarregando(true);
     const b = buscaParam ?? busca;
     const s = sortParam ?? sort;
     const sr = statusRecupParam !== undefined ? statusRecupParam : statusRecupFiltro;
     const sit = situacaoParam !== undefined ? situacaoParam : situacaoFiltro;
-    const params = new URLSearchParams({ competenciaId: cId, page: String(pg), sort: s });
-    if (b) params.set("busca", b);
-    if (sr) params.set("statusRecuperacao", sr);
-    if (sit) params.set("situacao", sit);
-    const data = await fetch(`/api/carteira?${params}`).then((r) => r.json()).catch(() => ({}));
-    const contratos: ItemCarteira[] = Array.isArray(data.contratos) ? data.contratos : [];
-    if (append) setCarteira((prev) => [...prev, ...contratos]);
-    else { setCarteira(contratos); setTotalContratos(data.total ?? 0); setValorTotal(data.valorTotal ?? 0); }
-    setPagina(pg);
-    setTemMais(data.temMais ?? false);
+
+    let pg = 1;
+    let acumulado: ItemCarteira[] = [];
+    let totalAtual = 0;
+    let valorAtual = 0;
+    while (true) {
+      const params = new URLSearchParams({ competenciaId: cId, page: String(pg), sort: s });
+      if (b) params.set("busca", b);
+      if (sr) params.set("statusRecuperacao", sr);
+      if (sit) params.set("situacao", sit);
+      const data = await fetch(`/api/carteira?${params}`).then((r) => r.json()).catch(() => ({}));
+      const contratos: ItemCarteira[] = Array.isArray(data.contratos) ? data.contratos : [];
+      acumulado = acumulado.concat(contratos);
+      totalAtual = data.total ?? totalAtual;
+      valorAtual = data.valorTotal ?? valorAtual;
+      setCarteira(acumulado);
+      setTotalContratos(totalAtual);
+      setValorTotal(valorAtual);
+      setPagina(pg);
+      if (!data.temMais || contratos.length === 0) break;
+      pg++;
+      setCarregandoMais(true);
+    }
     setCarregando(false);
     setCarregandoMais(false);
   }
 
   useEffect(() => {
     if (!competenciaId) return;
-    setPagina(1);
-    setTemMais(false);
-    carregarPagina(competenciaId, 1, false, busca, sort);
+    carregarTodos(competenciaId, busca, sort);
   }, [competenciaId]);
 
   // Debounce busca — chama API server-side
@@ -244,23 +258,20 @@ export default function CarteiraPage() {
     if (!competenciaId) return;
     if (buscaMainTimer.current) clearTimeout(buscaMainTimer.current);
     buscaMainTimer.current = setTimeout(() => {
-      setPagina(1);
-      carregarPagina(competenciaId, 1, false, busca, sort);
+      carregarTodos(competenciaId, busca, sort);
     }, 350);
   }, [busca]);
 
   // Reload quando sort muda
   useEffect(() => {
     if (!competenciaId) return;
-    setPagina(1);
-    carregarPagina(competenciaId, 1, false, busca, sort);
+    carregarTodos(competenciaId, busca, sort);
   }, [sort]);
 
   // Reload quando filtros de status mudam (server-side, sem paginação)
   useEffect(() => {
     if (!competenciaId) return;
-    setPagina(1);
-    carregarPagina(competenciaId, 1, false, busca, sort, statusRecupFiltro, situacaoFiltro);
+    carregarTodos(competenciaId, busca, sort, statusRecupFiltro, situacaoFiltro);
   }, [statusRecupFiltro, situacaoFiltro]);
 
   // Lookup automático de contrato no modal a_parte
@@ -451,7 +462,7 @@ export default function CarteiraPage() {
     setSalvandoReceb(false);
     if (!res.ok) { setErroReceb(data.erro || "Erro ao registrar"); return; }
     setModal(null);
-    carregarPagina(competenciaId, 1);
+    carregarTodos(competenciaId, busca, sort);
   }
 
   async function abrirAtendimento(c: Contrato) {
@@ -492,7 +503,7 @@ export default function CarteiraPage() {
     if (!res.ok) { setErroAtend(data.erro || "Erro ao registrar"); return; }
     setModalAtend(null);
     setAtendForm({ tipo: "LIGACAO", status: "ACIONADO", observacao: "", agendadoPara: "" });
-    carregarPagina(competenciaId, 1, false, busca, sort);
+    carregarTodos(competenciaId, busca, sort);
   }
 
   function abrirPromessaRapida(c: Contrato, modo: "PROMESSA" | "LINK" = "PROMESSA") {
@@ -548,7 +559,7 @@ export default function CarteiraPage() {
       ));
     }
     setModalPromRap(null);
-    carregarPagina(competenciaId, 1, false, busca, sort);
+    carregarTodos(competenciaId, busca, sort);
   }
 
   async function salvarEdicaoAParte() {
@@ -573,7 +584,7 @@ export default function CarteiraPage() {
       ),
     } : null);
     setEditandoAParte(null);
-    carregarPagina(competenciaId, 1);
+    carregarTodos(competenciaId, busca, sort);
   }
 
   async function excluirAParte(id: string) {
@@ -584,7 +595,7 @@ export default function CarteiraPage() {
       ...prev,
       recebimentos: prev.recebimentos.filter((r) => r.id !== id),
     } : null);
-    carregarPagina(competenciaId, 1);
+    carregarTodos(competenciaId, busca, sort);
   }
 
   const NOVO_FORM_VAZIO = {
@@ -624,7 +635,7 @@ export default function CarteiraPage() {
     setModal(null);
     setNovoForm(NOVO_FORM_VAZIO);
     setNovoClienteEncontrado(false);
-    carregarPagina(competenciaId, 1);
+    carregarTodos(competenciaId, busca, sort);
   }
 
   const empresas = Array.from(new Set(carteira.map((i) => i.contrato.empresa.nome))).sort();
@@ -924,19 +935,11 @@ export default function CarteiraPage() {
         </div>
       )}
 
-      {/* Carregar mais */}
-      {!carregando && temMais && !empresaFiltro && (
-        <div className="flex justify-center pt-2">
-          <button
-            onClick={() => carregarPagina(competenciaId, pagina + 1, true, busca, sort)}
-            disabled={carregandoMais}
-            className="flex items-center gap-2 bg-surface-1 hover:bg-white/[0.04] disabled:opacity-50 text-slate-300 text-sm font-medium px-6 py-2.5 rounded-xl transition-colors"
-          >
-            {carregandoMais
-              ? <><Loader2 size={14} className="animate-spin" /> Carregando...</>
-              : <>Carregar mais · {carteira.length}/{totalContratos}</>
-            }
-          </button>
+      {/* A lista inteira já carrega automaticamente (sem botão) -- só um
+          indicador discreto enquanto as páginas seguintes ainda chegam. */}
+      {carregandoMais && (
+        <div className="flex justify-center items-center gap-2 pt-2 text-slate-500 text-xs">
+          <Loader2 size={13} className="animate-spin" /> Carregando mais contratos · {carteira.length}/{totalContratos}
         </div>
       )}
 
