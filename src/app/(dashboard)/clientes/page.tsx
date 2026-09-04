@@ -244,7 +244,7 @@ export default function ClientesPage() {
     : clientes;
 
   return (
-    <div className="space-y-5" data-scroll-loading={carregando ? "1" : "0"}>
+    <div className="space-y-5">
       <div>
         <h1 className="text-2xl font-bold text-white">Clientes</h1>
         <p className="text-slate-400 text-sm mt-1">{total.toLocaleString("pt-BR")} clientes na base</p>
