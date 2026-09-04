@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Target, Plus, X, CheckCircle2, Loader2, Trash2, TrendingUp, Users, ClipboardCheck, Pencil, Percent } from "lucide-react";
-import { formatarMoeda } from "@/lib/utils";
+import { formatarMoeda, parsearValorMonetario } from "@/lib/utils";
 
 interface Meta {
   id: string;
@@ -168,14 +168,14 @@ export default function MetasPage() {
 
     if (form.tipo === "FINANCEIRA") {
       if (form.modoAlvo === "PERCENTUAL") {
-        const pct = parseFloat(form.percentualAlvo.replace(",", ".") || "0");
+        const pct = parsearValorMonetario(form.percentualAlvo);
         if (!pct || pct <= 0) { setErro("Informe o percentual alvo"); return; }
         payload.percentualAlvo = pct;
         if (totalInadimplencia != null && totalInadimplencia > 0) {
           payload.valorAlvo = parseFloat(((pct / 100) * totalInadimplencia).toFixed(2));
         }
       } else {
-        const v = parseFloat(form.valorAlvo.replace(",", ".") || "0");
+        const v = parsearValorMonetario(form.valorAlvo);
         if (!v || v <= 0) { setErro("Informe o valor alvo em R$"); return; }
         payload.valorAlvo = v;
         payload.percentualAlvo = null;

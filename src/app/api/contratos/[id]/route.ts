@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { SituacaoContrato } from "@prisma/client";
+import { parsearValorMonetario } from "@/lib/utils";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -44,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       data.maiorDiasAtraso = parseInt(String(maiorDiasAtraso));
     }
     if (valorTotalAberto !== undefined && valorTotalAberto !== "") {
-      data.valorTotalAberto = new Decimal(String(valorTotalAberto).replace(",", "."));
+      data.valorTotalAberto = new Decimal(parsearValorMonetario(valorTotalAberto));
     }
     if (statusContrato !== undefined && statusContrato !== "") {
       data.statusContrato = statusContrato;
@@ -56,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       });
       if (contratoAtual) {
         const totalRecebido = contratoAtual.recebimentos.reduce((s, r) => s + Number(r.valor), 0);
-        const novoAberto = parseFloat(String(valorTotalAberto).replace(",", "."));
+        const novoAberto = parsearValorMonetario(valorTotalAberto);
         const novoStatus =
           totalRecebido >= novoAberto
             ? "RECUPERADO_INTEGRALMENTE"

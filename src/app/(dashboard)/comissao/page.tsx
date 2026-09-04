@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
-import { formatarMoeda } from "@/lib/utils";
+import { formatarMoeda, parsearValorMonetario } from "@/lib/utils";
 import {
   DollarSign, TrendingUp, Calculator, Pencil, Check, X,
   AlertCircle, ChevronDown, ChevronUp, Loader2, Save,
@@ -147,7 +147,7 @@ function GestorComissao({ equipeId }: { equipeId: string }) {
   }, [competenciaId, carregarDados]);
 
   async function salvarBase() {
-    const v = parseFloat(novoBase.replace(",", ".") || "0");
+    const v = parsearValorMonetario(novoBase);
     if (!v || v <= 0) return;
     setSalvandoBase(true);
     const res = await fetch(`/api/equipes/${equipeId}`, {

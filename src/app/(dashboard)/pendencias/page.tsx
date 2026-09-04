@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatarMoeda, formatarData } from "@/lib/utils";
+import { formatarMoeda, formatarData, parsearValorMonetario } from "@/lib/utils";
 import { Bell, AlertTriangle, Clock, CheckCircle2, Plus, Search, X, Loader2, Phone, CalendarDays, Trash2, Pencil, ChevronDown } from "lucide-react";
 
 const inputCls = "w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40 placeholder:text-slate-500";
@@ -95,7 +95,7 @@ export default function PendenciasPage() {
   async function salvarPromessa() {
     setErro("");
     if (!contratoSelecionado) { setErro("Selecione um contrato"); return; }
-    const valor = parseFloat(promessaForm.valor.replace(",", "."));
+    const valor = parsearValorMonetario(promessaForm.valor);
     if (!valor || valor <= 0) { setErro("Informe um valor válido"); return; }
     if (!promessaForm.data) { setErro("Informe a data da promessa"); return; }
     setSalvando(true);
@@ -130,7 +130,7 @@ export default function PendenciasPage() {
 
   async function salvarEdicao() {
     setErroEdit("");
-    const valor = parseFloat(editForm.valor.replace(",", "."));
+    const valor = parsearValorMonetario(editForm.valor);
     if (!valor || valor <= 0) { setErroEdit("Informe um valor válido"); return; }
     setSalvandoEdit(true);
     const res = await fetch("/api/promessas", {

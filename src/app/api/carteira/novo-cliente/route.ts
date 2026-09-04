@@ -6,6 +6,7 @@ import { randomUUID } from "crypto";
 import { Decimal } from "@prisma/client/runtime/library";
 import { FormaPagamento } from "@prisma/client";
 import { primeiroDiaUtilDoMes } from "@/utils/dias-uteis";
+import { parsearValorMonetario } from "@/lib/utils";
 
 interface ParcelaInput {
   dataVencimento: string; // YYYY-MM-DD
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ erro: "Informe ao menos uma parcela recebida a parte" }, { status: 400 });
     }
 
-    const valorTotal = parcelasAParte.reduce((s, p) => s + (parseFloat(String(p.valor).replace(",", ".")) || 0), 0);
+    const valorTotal = parcelasAParte.reduce((s, p) => s + (parsearValorMonetario(p.valor)), 0);
 
     let contratoId: string;
 
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
       .map((p) => {
         const d = new Date(p.dataVencimento + "T00:00:00.000Z");
         const data = `${String(d.getUTCDate()).padStart(2,"0")}/${String(d.getUTCMonth()+1).padStart(2,"0")}/${d.getUTCFullYear()}`;
-        const val = parseFloat(String(p.valor).replace(",", ".")) || 0;
+        const val = parsearValorMonetario(p.valor);
         return `${data} R$ ${val.toFixed(2).replace(".", ",")}`;
       })
       .join(", ");
@@ -151,7 +152,7 @@ export async function POST(req: NextRequest) {
     const venc = new Date(p.dataVencimento + "T00:00:00.000Z");
     const diffMs = refDate.getTime() - venc.getTime();
     const dias = Math.max(0, Math.round(diffMs / (1000 * 60 * 60 * 24)));
-    const valor = parseFloat(String(p.valor).replace(",", ".")) || 0;
+    const valor = parsearValorMonetario(p.valor);
     return { numero: i + 1, dataVencimento: venc, diasAtraso: dias, valor };
   });
 

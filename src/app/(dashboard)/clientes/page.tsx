@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { formatarMoeda } from "@/lib/utils";
+import { formatarMoeda, parsearValorMonetario } from "@/lib/utils";
 import { Search, AlertCircle, ChevronRight, Phone, Loader2, History, X, MessageCircle, Mail, PhoneCall, DollarSign, CheckCircle2, XCircle, Clock } from "lucide-react";
 import Link from "next/link";
 import { usePersistedState } from "@/hooks/usePersistedState";
@@ -207,7 +207,7 @@ export default function ClientesPage() {
   async function salvarPromessa() {
     if (!modalPromessas || !promContratoId) { setErroProm("Selecione o contrato"); return; }
     setErroProm("");
-    const valor = parseFloat(promForm.valor.replace(",", "."));
+    const valor = parsearValorMonetario(promForm.valor);
     if (!valor || valor <= 0) { setErroProm("Informe um valor válido"); return; }
     if (!promForm.data) { setErroProm("Informe a data da promessa"); return; }
     setSalvandoProm(true);

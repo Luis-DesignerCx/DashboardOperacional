@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { formatarMoeda } from "@/lib/utils";
+import { formatarMoeda, parsearValorMonetario } from "@/lib/utils";
 import {
   ArrowLeft, Phone, Mail, FileText,
   Calendar, Clock, CheckCircle2, AlertCircle, User, Pencil, Check, X, Trash2, AlertTriangle, Loader2,
@@ -190,7 +190,7 @@ export default function ClienteDetalhe() {
             contratos: prev.contratos.map(c => c.id !== contratoId ? c : {
               ...c,
               maiorDiasAtraso: contratoForm.maiorDiasAtraso !== "" ? parseInt(contratoForm.maiorDiasAtraso) : c.maiorDiasAtraso,
-              valorTotalAberto: contratoForm.valorTotalAberto !== "" ? parseFloat(contratoForm.valorTotalAberto.replace(",", ".")) : c.valorTotalAberto,
+              valorTotalAberto: contratoForm.valorTotalAberto !== "" ? parsearValorMonetario(contratoForm.valorTotalAberto) : c.valorTotalAberto,
               statusContrato: contratoForm.statusContrato || c.statusContrato,
             }),
           };
@@ -235,8 +235,8 @@ export default function ClienteDetalhe() {
               ...c,
               parcelas: c.parcelas.map(p => p.id !== parcelaId ? p : {
                 ...p,
-                valorParcela: parcelaForm.valorParcela !== "" ? parseFloat(parcelaForm.valorParcela.replace(",", ".")) : p.valorParcela,
-                valorTotalAberto: parcelaForm.valorTotalAberto !== "" ? parseFloat(parcelaForm.valorTotalAberto.replace(",", ".")) : p.valorTotalAberto,
+                valorParcela: parcelaForm.valorParcela !== "" ? parsearValorMonetario(parcelaForm.valorParcela) : p.valorParcela,
+                valorTotalAberto: parcelaForm.valorTotalAberto !== "" ? parsearValorMonetario(parcelaForm.valorTotalAberto) : p.valorTotalAberto,
                 diasAtraso: parcelaForm.diasAtraso !== "" ? parseInt(parcelaForm.diasAtraso) : p.diasAtraso,
                 dataVencimento: parcelaForm.dataVencimento ? parcelaForm.dataVencimento + "T00:00:00.000Z" : p.dataVencimento,
                 paga: parcelaForm.paga,
@@ -260,7 +260,7 @@ export default function ClienteDetalhe() {
         body: JSON.stringify({ id: recId, valor: recValor }),
       });
       if (res.ok) {
-        const valorNum = parseFloat(recValor.replace(",", "."));
+        const valorNum = parsearValorMonetario(recValor);
         setCliente(prev => {
           if (!prev) return null;
           return {

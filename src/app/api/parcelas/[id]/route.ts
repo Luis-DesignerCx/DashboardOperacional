@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
+import { parsearValorMonetario } from "@/lib/utils";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -14,8 +15,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const { valorParcela, valorTotalAberto, diasAtraso, dataVencimento, paga } = body;
 
   const data: any = {};
-  if (valorParcela !== undefined && valorParcela !== "") data.valorParcela = new Decimal(String(valorParcela).replace(",", "."));
-  if (valorTotalAberto !== undefined && valorTotalAberto !== "") data.valorTotalAberto = new Decimal(String(valorTotalAberto).replace(",", "."));
+  if (valorParcela !== undefined && valorParcela !== "") data.valorParcela = new Decimal(parsearValorMonetario(valorParcela));
+  if (valorTotalAberto !== undefined && valorTotalAberto !== "") data.valorTotalAberto = new Decimal(parsearValorMonetario(valorTotalAberto));
   if (diasAtraso !== undefined && diasAtraso !== "") data.diasAtraso = parseInt(String(diasAtraso));
   if (dataVencimento) data.dataVencimento = new Date(dataVencimento + "T00:00:00.000Z");
   if (paga !== undefined) data.paga = Boolean(paga);

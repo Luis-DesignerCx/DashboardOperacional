@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FormaPagamento } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
+import { parsearValorMonetario } from "@/lib/utils";
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -40,12 +41,12 @@ export async function PATCH(req: NextRequest) {
 
   const data: any = {};
   if (valor !== undefined) {
-    data.valor = new Decimal(String(valor).replace(",", "."));
+    data.valor = new Decimal(parsearValorMonetario(valor));
   }
   if (isGestorAdmin) {
     if (valorAParte !== undefined) {
       data.valorAParte = valorAParte != null && Number(valorAParte) > 0
-        ? new Decimal(String(valorAParte).replace(",", "."))
+        ? new Decimal(parsearValorMonetario(valorAParte))
         : null;
     }
     if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
@@ -55,7 +56,7 @@ export async function PATCH(req: NextRequest) {
   const rec = await prisma.recebimento.update({ where: { id }, data });
 
   if (valor !== undefined) {
-    const novoValor = parseFloat(String(valor).replace(",", "."));
+    const novoValor = parsearValorMonetario(valor);
     const contrato = recAtual.contrato;
     const totalRecebido = contrato.recebimentos.reduce((s, r) => {
       return s + (r.id === id ? novoValor : Number(r.valor));
@@ -157,9 +158,9 @@ export async function POST(req: NextRequest) {
   });
   if (!contrato) return NextResponse.json({ erro: "Contrato não encontrado" }, { status: 404 });
 
-  const valorDecimal = new Decimal(String(valor).replace(",", "."));
+  const valorDecimal = new Decimal(parsearValorMonetario(valor));
   const valorAParteDecimal = valorAParte && Number(valorAParte) > 0
-    ? new Decimal(String(valorAParte).replace(",", "."))
+    ? new Decimal(parsearValorMonetario(valorAParte))
     : null;
 
   const recebimento = await prisma.recebimento.create({

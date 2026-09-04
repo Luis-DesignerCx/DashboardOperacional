@@ -7,7 +7,7 @@ import {
   ChevronRight, UserPlus, Building2, Loader2, CheckCircle2, DollarSign, ArrowLeftRight, User,
   Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2, RefreshCw,
 } from "lucide-react";
-import { formatarMoeda } from "@/lib/utils";
+import { formatarMoeda, parsearValorMonetario } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/usePersistedState";
 import Link from "next/link";
 
@@ -442,7 +442,7 @@ export default function CarteiraPage() {
   async function salvarRecebimento() {
     if (!contratoRecebimento) return;
     setErroReceb("");
-    const valor = parseFloat(recebForm.valor.replace(",", "."));
+    const valor = parsearValorMonetario(recebForm.valor);
     if (!valor || valor <= 0) { setErroReceb("Informe um valor válido"); return; }
     setSalvandoReceb(true);
     const res = await fetch("/api/recebimentos", {
@@ -451,7 +451,7 @@ export default function CarteiraPage() {
       body: JSON.stringify({
         contratoId: contratoRecebimento.id,
         valor,
-        valorAParte: recebForm.valorAParte ? parseFloat(recebForm.valorAParte.replace(",", ".")) : null,
+        valorAParte: recebForm.valorAParte ? parsearValorMonetario(recebForm.valorAParte) : null,
         dataRecebimento: recebForm.data,
         formaPagamento: recebForm.formaPagamento,
         observacao: recebForm.observacao,
@@ -526,7 +526,7 @@ export default function CarteiraPage() {
   async function salvarPromessaRapida() {
     if (!modalPromRap) return;
     setErroPromRap("");
-    const valor = parseFloat(promRapForm.valor.replace(",", "."));
+    const valor = parsearValorMonetario(promRapForm.valor);
     if (!valor || valor <= 0) { setErroPromRap("Informe um valor válido"); return; }
     if (!promRapForm.data) { setErroPromRap("Informe a data da promessa"); return; }
     setSalvandoPromRap(true);
@@ -571,7 +571,7 @@ export default function CarteiraPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: editandoAParte.id,
-        valorAParte: parseFloat(editandoAParte.valor.replace(",", ".")) || 0,
+        valorAParte: parsearValorMonetario(editandoAParte.valor),
         formaPagamento: editandoAParte.formaPagamento,
       }),
     });
