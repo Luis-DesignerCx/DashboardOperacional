@@ -834,6 +834,16 @@ export default function CarteiraPage() {
                                   {SITUACAO_LABEL_EXTRA[c.situacao]}
                                 </span>
                               )}
+                              {/* Último contato registrado -- mostra direto na carteira, sem
+                                  precisar abrir o histórico pra saber se já foi acionado. */}
+                              {ultimoContato && (
+                                <span
+                                  className={`text-[10px] bg-white/[0.05] border border-white/[0.08] px-1.5 py-0.5 rounded font-medium flex items-center gap-1 ${STATUS_COR[ultimoContato.status] ?? "text-slate-400"}`}
+                                  title={new Date(ultimoContato.criadoEm).toLocaleString("pt-BR")}
+                                >
+                                  <Phone size={9} /> {STATUS_LABEL[ultimoContato.status] ?? ultimoContato.status}
+                                </span>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 mt-1 flex-wrap">
                               <span className="text-xs text-slate-500 font-mono">{c.numero}</span>
