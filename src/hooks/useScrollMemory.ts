@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 
 // Lembra até onde o usuário rolou cada tela do dashboard e restaura:
@@ -34,8 +34,22 @@ export function useScrollMemory(containerId: string) {
       }
     };
 
-    let alvo = lerSalvo();
+    let alvo = lerSalvo(); // posição que queremos manter
+    let alturaAnterior = el.scrollHeight;
     let cancelado = false;
+    // Enquanto true, ignora o evento de scroll gerado pela NOSSA PRÓPRIA
+    // correção -- senão, o clamp do navegador (quando o conteúdo encolhe e
+    // zera a rolagem) dispara um scroll que sobrescreve `alvo` com 0 antes
+    // da correção sequer rodar, apagando a posição que a gente queria voltar.
+    let corrigindo = false;
+
+    function forcarScroll(valor: number) {
+      corrigindo = true;
+      el!.scrollTop = valor;
+      requestAnimationFrame(() => {
+        corrigindo = false;
+      });
+    }
 
     // Restauração ao entrar na tela (navegação real) -- o conteúdo pode
     // carregar aos poucos (fetch assíncrono), então tenta em alguns
@@ -43,38 +57,54 @@ export function useScrollMemory(containerId: string) {
     const tentativas = [0, 60, 150, 300, 600, 1000, 1800, 3000];
     const timers = tentativas.map((delay) =>
       setTimeout(() => {
-        if (!cancelado) el.scrollTop = alvo;
+        if (!cancelado) forcarScroll(alvo);
       }, delay)
     );
 
     function onScroll() {
+      if (corrigindo) return; // eco da nossa própria correção -- ignora
       alvo = el!.scrollTop;
       gravar(alvo);
     }
     el.addEventListener("scroll", onScroll, { passive: true });
 
-    // Restauração quando a PRÓPRIA tela recarrega os dados no lugar: se o
-    // conteúdo mudar (ex: lista recarregada após uma ação) e isso zerar a
-    // rolagem enquanto o usuário estava rolado mais abaixo, devolve pro
-    // último ponto conhecido. Só age quando o reset veio de uma mutação no
-    // DOM (recarregamento), não de um scroll manual do usuário -- por isso
-    // reage a mutações, não ao evento de scroll.
-    let debounce: ReturnType<typeof setTimeout> | null = null;
-    const observer = new MutationObserver(() => {
-      if (debounce) clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        if (cancelado) return;
-        if (alvo > 20 && el.scrollTop < alvo * 0.5) {
-          el.scrollTop = alvo;
+    // Restauração quando a PRÓPRIA tela recarrega os dados no lugar: detecta
+    // "a altura rolável encolheu bastante" (sinal de que a lista foi
+    // substituída/recarregada, não só um item pequeno mudou) e insiste em
+    // devolver a rolagem por até alguns segundos -- cobre tanto um reload
+    // rápido quanto uma carteira grande que demora pra recarregar todas as
+    // páginas.
+    let correcaoTimer: ReturnType<typeof setTimeout> | null = null;
+    let correcaoAte = 0;
+
+    function agendarCorrecao() {
+      if (correcaoTimer) return;
+      correcaoTimer = setTimeout(() => {
+        correcaoTimer = null;
+        if (cancelado || Date.now() >= correcaoAte) return;
+        if (Math.abs(el!.scrollTop - alvo) > 20) {
+          forcarScroll(alvo);
+          agendarCorrecao();
         }
-      }, 80);
+      }, 100);
+    }
+
+    const observer = new MutationObserver(() => {
+      const alturaAtual = el!.scrollHeight;
+      const encolheuMuito = alturaAtual < alturaAnterior * 0.6;
+      alturaAnterior = alturaAtual;
+
+      if (encolheuMuito && alvo > 20) {
+        correcaoAte = Date.now() + 5000; // até 5s -- cobre carteiras grandes recarregando
+      }
+      if (Date.now() < correcaoAte) agendarCorrecao();
     });
     observer.observe(el, { childList: true, subtree: true });
 
     return () => {
       cancelado = true;
       timers.forEach(clearTimeout);
-      if (debounce) clearTimeout(debounce);
+      if (correcaoTimer) clearTimeout(correcaoTimer);
       el.removeEventListener("scroll", onScroll);
       observer.disconnect();
     };
