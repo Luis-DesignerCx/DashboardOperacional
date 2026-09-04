@@ -657,7 +657,7 @@ export default function CarteiraPage() {
   const faixasPresentes = ordemFaixas.filter((f) => porFaixa[f]?.length > 0);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-scroll-loading={carregando ? "1" : "0"}>
       {/* Cabeçalho */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">

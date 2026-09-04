@@ -9,6 +9,18 @@ import { usePathname } from "next/navigation";
 //    atendimento em "Minha Carteira" e a lista recarregar) -- sem isso, o
 //    consultor clica em "Acionado", a lista pisca e ele perde o lugar onde
 //    estava, tendo que rolar tudo de novo pra achar o próximo cliente.
+//
+// O caso (2) só reage a um sinal EXPLÍCITO de recarregamento -- um elemento
+// com `data-scroll-loading="1"/"0"` em algum lugar dentro do container,
+// que a própria tela atualiza a partir do seu estado de "carregando"
+// (fetch em andamento). Reagir a qualquer mudança no DOM (childList
+// genérico) parecia razoável, mas disparava até em filtros client-side
+// (ex: trocar o filtro de empresa) -- a lista encolhia, o código achava que
+// era um recarregamento e ficava insistindo em rolar de volta pra posição
+// antiga, "travando" a tela na visão anterior até o usuário recarregar a
+// página. Telas que não marcam esse atributo simplesmente não participam
+// da restauração em (2) -- só (1) continua valendo pra elas.
+//
 // Um único ponto (chamado no layout do dashboard, que não desmonta entre
 // navegações) cobre todas as telas, sem precisar mexer módulo por módulo.
 export function useScrollMemory(containerId: string) {
@@ -35,7 +47,6 @@ export function useScrollMemory(containerId: string) {
     };
 
     let alvo = lerSalvo(); // posição que queremos manter
-    let alturaAnterior = el.scrollHeight;
     let cancelado = false;
     // Enquanto true, ignora o evento de scroll gerado pela NOSSA PRÓPRIA
     // correção -- senão, o clamp do navegador (quando o conteúdo encolhe e
@@ -68,12 +79,9 @@ export function useScrollMemory(containerId: string) {
     }
     el.addEventListener("scroll", onScroll, { passive: true });
 
-    // Restauração quando a PRÓPRIA tela recarrega os dados no lugar: detecta
-    // "a altura rolável encolheu bastante" (sinal de que a lista foi
-    // substituída/recarregada, não só um item pequeno mudou) e insiste em
-    // devolver a rolagem por até alguns segundos -- cobre tanto um reload
-    // rápido quanto uma carteira grande que demora pra recarregar todas as
-    // páginas.
+    // Restauração quando a PRÓPRIA tela recarrega os dados no lugar --
+    // dispara só na transição explícita de "carregando" (1 -> 0) do
+    // atributo `data-scroll-loading`, não em qualquer mutação de conteúdo.
     let correcaoTimer: ReturnType<typeof setTimeout> | null = null;
     let correcaoAte = 0;
 
@@ -89,17 +97,18 @@ export function useScrollMemory(containerId: string) {
       }, 100);
     }
 
-    const observer = new MutationObserver(() => {
-      const alturaAtual = el!.scrollHeight;
-      const encolheuMuito = alturaAtual < alturaAnterior * 0.6;
-      alturaAnterior = alturaAtual;
-
-      if (encolheuMuito && alvo > 20) {
+    const observer = new MutationObserver((mutations) => {
+      const terminouCarregamento = mutations.some((m) => {
+        if (m.type !== "attributes" || m.attributeName !== "data-scroll-loading") return false;
+        const target = m.target as HTMLElement;
+        return target.getAttribute("data-scroll-loading") === "0";
+      });
+      if (terminouCarregamento && alvo > 20) {
         correcaoAte = Date.now() + 5000; // até 5s -- cobre carteiras grandes recarregando
+        agendarCorrecao();
       }
-      if (Date.now() < correcaoAte) agendarCorrecao();
     });
-    observer.observe(el, { childList: true, subtree: true });
+    observer.observe(el, { attributes: true, attributeFilter: ["data-scroll-loading"], subtree: true });
 
     return () => {
       cancelado = true;
