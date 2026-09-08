@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useSession } from "next-auth/react";
 import {
-  FolderOpen, Search, Plus, X, AlertCircle,
+  FolderOpen, Search, Plus, X, AlertCircle, AlertTriangle,
   ChevronRight, UserPlus, Building2, Loader2, CheckCircle2, DollarSign, ArrowLeftRight, User,
   Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2, RefreshCw,
 } from "lucide-react";
@@ -24,7 +24,7 @@ interface Contrato {
   contatos: { tipo: string; status: string; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string }[];
   recebimentos: { id: string; valor: number; valorAParte: number | null; dataRecebimento: string; formaPagamento: string }[];
-  parcelas: { id: string; numero: number; diasAtraso: number; valorTotalAberto: number; dataVencimento: string; remanejada: boolean }[];
+  parcelas: { id: string; numero: number; diasAtraso: number; valorTotalAberto: number; dataVencimento: string; remanejada: boolean; equivocada: boolean }[];
 }
 
 interface ItemCarteira {
@@ -138,6 +138,50 @@ export default function CarteiraPage() {
   const { data: session } = useSession();
   const perfil = (session?.user as any)?.perfil as string | undefined;
   const isGestorOuAdmin = perfil === "GESTOR" || perfil === "ADMINISTRADOR";
+
+  // Contestar inadimplência equivocada -- mesma ação que já existia no
+  // cadastro do cliente, mas faltava aqui em Minha Carteira (a tela que o
+  // consultor realmente usa no dia a dia; sem isso ele não tinha como
+  // contestar sem sair pra outra tela).
+  const [inadEquivContratoId, setInadEquivContratoId] = useState<string | null>(null);
+  const [inadEquivParcelasIds, setInadEquivParcelasIds] = useState<string[]>([]);
+  const [inadEquivJustificativa, setInadEquivJustificativa] = useState("");
+  const [erroInadEquiv, setErroInadEquiv] = useState("");
+  const [salvandoInadEquiv, setSalvandoInadEquiv] = useState(false);
+
+  async function submeterInadEquivocada(contrato: Contrato) {
+    if (!inadEquivContratoId) return;
+    if (!inadEquivJustificativa.trim()) { setErroInadEquiv("Informe o motivo da contestação"); return; }
+    if (!inadEquivParcelasIds.length) { setErroInadEquiv("Selecione ao menos uma parcela equivocada"); return; }
+    const totalNaoPagas = contrato.parcelas.filter((p) => !p.equivocada).length;
+    const todasParcelas = inadEquivParcelasIds.length === totalNaoPagas;
+    setSalvandoInadEquiv(true);
+    setErroInadEquiv("");
+    const res = await fetch(`/api/contratos/${inadEquivContratoId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        situacao: "INADIMPLENCIA_EQUIVOCADA",
+        justificativa: inadEquivJustificativa.trim(),
+        parcelasIds: inadEquivParcelasIds,
+        todasParcelas,
+      }),
+    });
+    setSalvandoInadEquiv(false);
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      setErroInadEquiv(d.erro || "Erro ao enviar solicitação");
+      return;
+    }
+    setCarteira((prev) => prev.map((item) =>
+      item.contrato.id === inadEquivContratoId
+        ? { ...item, contrato: { ...item.contrato, situacao: "INADIMPLENCIA_EQUIVOCADA" } }
+        : item
+    ));
+    setInadEquivContratoId(null);
+    setInadEquivParcelasIds([]);
+    setInadEquivJustificativa("");
+  }
 
   const [carteira, setCarteira] = useState<ItemCarteira[]>([]);
   const [totalContratos, setTotalContratos] = useState(0);
@@ -445,25 +489,30 @@ export default function CarteiraPage() {
     const valor = parsearValorMonetario(recebForm.valor);
     if (!valor || valor <= 0) { setErroReceb("Informe um valor válido"); return; }
     setSalvandoReceb(true);
-    const res = await fetch("/api/recebimentos", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contratoId: contratoRecebimento.id,
-        valor,
-        valorAParte: recebForm.valorAParte ? parsearValorMonetario(recebForm.valorAParte) : null,
-        dataRecebimento: recebForm.data,
-        formaPagamento: recebForm.formaPagamento,
-        observacao: recebForm.observacao,
-        parcelasIds: recebForm.parcelasIds,
-        parcelasRemanejadas: recebForm.parcelasRemanejadas,
-      }),
-    });
-    const data = await res.json();
-    setSalvandoReceb(false);
-    if (!res.ok) { setErroReceb(data.erro || "Erro ao registrar"); return; }
-    setModal(null);
-    carregarTodos(competenciaId, busca, sort);
+    try {
+      const res = await fetch("/api/recebimentos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contratoId: contratoRecebimento.id,
+          valor,
+          valorAParte: recebForm.valorAParte ? parsearValorMonetario(recebForm.valorAParte) : null,
+          dataRecebimento: recebForm.data,
+          formaPagamento: recebForm.formaPagamento,
+          observacao: recebForm.observacao,
+          parcelasIds: recebForm.parcelasIds,
+          parcelasRemanejadas: recebForm.parcelasRemanejadas,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErroReceb(data.erro || "Erro ao registrar"); return; }
+      setModal(null);
+      carregarTodos(competenciaId, busca, sort);
+    } catch {
+      setErroReceb("Erro de conexão ao registrar. Confira se já foi salvo antes de tentar de novo.");
+    } finally {
+      setSalvandoReceb(false);
+    }
   }
 
   async function abrirAtendimento(c: Contrato) {
@@ -625,18 +674,23 @@ export default function CarteiraPage() {
     const payload = novoForm.tipo === "inadimplencia"
       ? { nomeCliente: novoForm.nomeCliente, telefones: novoForm.telefones, emails: novoForm.emails, numeroContrato: novoForm.numeroContrato, tipo: novoForm.tipo, competenciaId, parcelas: parcelasValidas }
       : { nomeCliente: novoForm.nomeCliente, telefones: novoForm.telefones, emails: novoForm.emails, numeroContrato: novoForm.numeroContrato, tipo: novoForm.tipo, formaPagamento: novoForm.formaPagamento, dataRecebimento: novoForm.dataRecebimento, competenciaId, parcelas: parcelasValidas };
-    const res = await fetch("/api/carteira/novo-cliente", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const data = await res.json();
-    setSalvandoNovo(false);
-    if (!res.ok) { setErroNovo(data.erro || "Erro ao cadastrar"); return; }
-    setModal(null);
-    setNovoForm(NOVO_FORM_VAZIO);
-    setNovoClienteEncontrado(false);
-    carregarTodos(competenciaId, busca, sort);
+    try {
+      const res = await fetch("/api/carteira/novo-cliente", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) { setErroNovo(data.erro || "Erro ao cadastrar"); return; }
+      setModal(null);
+      setNovoForm(NOVO_FORM_VAZIO);
+      setNovoClienteEncontrado(false);
+      carregarTodos(competenciaId, busca, sort);
+    } catch {
+      setErroNovo("Erro de conexão ao salvar. Confira se já foi registrado antes de tentar de novo.");
+    } finally {
+      setSalvandoNovo(false);
+    }
   }
 
   const empresas = Array.from(new Set(carteira.map((i) => i.contrato.empresa.nome))).sort();
@@ -925,6 +979,30 @@ export default function CarteiraPage() {
                                 <DollarSign size={14} />
                               </button>
 
+                              {/* Slot 5: Contestar inadimplência equivocada — só consultor, contrato ainda inadimplente */}
+                              {perfil === "CONSULTOR"
+                                && c.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE"
+                                && c.situacao !== "INADIMPLENCIA_EQUIVOCADA" && (
+                                <button
+                                  onClick={() => {
+                                    const naoPagasIds = c.parcelas.filter((p) => !p.equivocada).map((p) => p.id);
+                                    setInadEquivContratoId(c.id);
+                                    setInadEquivParcelasIds(naoPagasIds);
+                                    setInadEquivJustificativa("");
+                                    setErroInadEquiv("");
+                                  }}
+                                  title="Contestar inadimplência equivocada"
+                                  className="p-1.5 rounded-lg text-slate-500 hover:text-orange-400 hover:bg-orange-500/10 transition-colors"
+                                >
+                                  <AlertTriangle size={14} />
+                                </button>
+                              )}
+                              {c.situacao === "INADIMPLENCIA_EQUIVOCADA" && (
+                                <span className="p-1.5" title="Aguardando aprovação do gestor">
+                                  <AlertTriangle size={14} className="text-orange-400" />
+                                </span>
+                              )}
+
                               {/* Slot 5: Ficha do cliente */}
                               <Link
                                 href={`/clientes/${c.cliente.id}`}
@@ -936,6 +1014,84 @@ export default function CarteiraPage() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Modal inline de inadimplência equivocada */}
+                        {inadEquivContratoId === c.id && (
+                          <div className="mt-3 bg-orange-500/5 border border-orange-500/20 rounded-xl p-4 space-y-3">
+                            <div>
+                              <p className="text-xs font-medium text-orange-400 mb-1">Contestar inadimplência</p>
+                              <p className="text-xs text-slate-400">Selecione as parcelas equivocadas e explique ao gestor o motivo. Após aprovação, essas parcelas sairão da inadimplência.</p>
+                            </div>
+
+                            {(() => {
+                              const naoPagas = c.parcelas.filter((p) => !p.equivocada);
+                              const todasSelecionadas = inadEquivParcelasIds.length === naoPagas.length && naoPagas.length > 0;
+                              return (
+                                <div className="space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <p className="text-[11px] font-medium text-slate-400">Parcelas equivocadas</p>
+                                    <button
+                                      type="button"
+                                      onClick={() => setInadEquivParcelasIds(todasSelecionadas ? [] : naoPagas.map((p) => p.id))}
+                                      className="text-[10px] text-orange-400 hover:text-orange-300 transition-colors"
+                                    >
+                                      {todasSelecionadas ? "Desmarcar todas" : "Selecionar todas"}
+                                    </button>
+                                  </div>
+                                  {naoPagas.length === 0 ? (
+                                    <p className="text-xs text-slate-500 italic py-1">Nenhuma parcela em aberto pra selecionar.</p>
+                                  ) : (
+                                    <div className="space-y-0.5 max-h-36 overflow-y-auto rounded-lg bg-surface-1 border border-white/[0.08]/50 p-2">
+                                      {naoPagas.map((p) => {
+                                        const selecionada = inadEquivParcelasIds.includes(p.id);
+                                        return (
+                                          <label key={p.id} className="flex items-center gap-2 cursor-pointer py-0.5 hover:bg-white/[0.04]/30 rounded px-1 transition-colors">
+                                            <input
+                                              type="checkbox"
+                                              checked={selecionada}
+                                              onChange={() => setInadEquivParcelasIds((prev) =>
+                                                selecionada ? prev.filter((x) => x !== p.id) : [...prev, p.id]
+                                              )}
+                                              className="w-3.5 h-3.5 accent-orange-500 flex-shrink-0"
+                                            />
+                                            <span className="text-xs text-slate-300">
+                                              Parcela {p.numero} · venc. {new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })} · <span className="text-white font-medium">{formatarMoeda(Number(p.valorTotalAberto))}</span>
+                                            </span>
+                                          </label>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
+
+                            <textarea
+                              rows={2}
+                              autoFocus
+                              className="w-full bg-surface-1 border border-white/[0.08] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-orange-500 placeholder:text-slate-500 resize-none"
+                              placeholder="Ex: O cliente solicitou cancelamento em xx/xx/xxxx..."
+                              value={inadEquivJustificativa}
+                              onChange={(e) => setInadEquivJustificativa(e.target.value)}
+                            />
+                            {erroInadEquiv && <p className="text-red-400 text-xs">{erroInadEquiv}</p>}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => setInadEquivContratoId(null)}
+                                className="flex-1 py-2 rounded-lg bg-white/[0.07] text-slate-300 text-xs font-medium hover:bg-white/[0.04] transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                              <button
+                                onClick={() => submeterInadEquivocada(c)}
+                                disabled={salvandoInadEquiv}
+                                className="flex-1 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-medium transition-colors flex items-center justify-center gap-1.5"
+                              >
+                                {salvandoInadEquiv ? <><Loader2 size={12} className="animate-spin" /> Enviando...</> : "Enviar contestação"}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

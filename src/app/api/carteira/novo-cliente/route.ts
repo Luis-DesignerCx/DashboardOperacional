@@ -17,6 +17,15 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
+  try {
+    return await processarNovoCliente(req, session);
+  } catch (err) {
+    console.error("[carteira/novo-cliente] Erro inesperado:", err);
+    return NextResponse.json({ erro: "Erro ao processar solicitação. Tente novamente." }, { status: 500 });
+  }
+}
+
+async function processarNovoCliente(req: NextRequest, session: any) {
   const body = await req.json();
   const {
     nomeCliente, telefones, emails,

@@ -118,7 +118,7 @@ export async function GET(req: NextRequest) {
             },
             parcelas: {
               where: { paga: false },
-              select: { id: true, numero: true, valorTotalAberto: true, diasAtraso: true, dataVencimento: true, remanejada: true },
+              select: { id: true, numero: true, valorTotalAberto: true, diasAtraso: true, dataVencimento: true, remanejada: true, equivocada: true },
               orderBy: { numero: "asc" },
             },
           },
