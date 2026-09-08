@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 const FRENTE_ORDER = ["eq-flash", "eq-1-30", "eq-31-90", "eq-91-180"];
 const FRENTE_LABEL: Record<string, string> = {
@@ -41,8 +42,22 @@ export async function GET(req: NextRequest) {
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
 
   const equipeIdsParam = searchParams.get("equipeIds") ?? "";
-  const equipeIds = equipeIdsParam ? equipeIdsParam.split(",").filter(Boolean) : [];
-  const frentesAtivas = equipeIds.length > 0 ? equipeIds : FRENTE_ORDER;
+  const equipeIdsSolicitadas = equipeIdsParam ? equipeIdsParam.split(",").filter(Boolean) : [];
+
+  // Isolamento total por frente: Gestor nunca vê frente fora das suas (mesma
+  // regra do /api/dashboard) -- sem essa checagem, qualquer gestor via
+  // "equipeIds" na URL (ou até sem passar nada, que caía em TODAS as
+  // frentes) enxergava a performance de consultores de outra gestão.
+  // Administrador continua sem restrição.
+  let frentesAtivas: string[];
+  if (session.user.perfil === "GESTOR") {
+    const gerenciadas = await getEquipesGerenciadas(session.user.id);
+    frentesAtivas = equipeIdsSolicitadas.length > 0
+      ? equipeIdsSolicitadas.filter((id) => gerenciadas.includes(id))
+      : gerenciadas;
+  } else {
+    frentesAtivas = equipeIdsSolicitadas.length > 0 ? equipeIdsSolicitadas : FRENTE_ORDER;
+  }
 
   try {
     // Escopo de datas da competência

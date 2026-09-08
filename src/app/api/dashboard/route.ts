@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -24,7 +25,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(await dashboardConsultor(session.user.id, competenciaId));
     }
     if (session.user.perfil === "GESTOR") {
-      const ids = equipeIds.length > 0 ? equipeIds : (session.user.equipeId ? [session.user.equipeId] : []);
+      // Isolamento total por frente: nunca confia cegamente no equipeIds vindo
+      // da URL -- sem essa checagem, um gestor podia ver os dados de OUTRA
+      // frente só trocando o parâmetro na requisição. `gerenciadas` é a lista
+      // real (frente principal + adicionais) de equipes que esse gestor tem
+      // permissão de ver; qualquer id fora dela é ignorado.
+      const gerenciadas = await getEquipesGerenciadas(session.user.id);
+      const ids = equipeIds.length > 0
+        ? equipeIds.filter((id) => gerenciadas.includes(id))
+        : gerenciadas;
       return NextResponse.json(await dashboardGestor(ids, competenciaId));
     }
     if (session.user.perfil === "ADMINISTRADOR") {
@@ -273,6 +282,23 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
 }
 
 async function dashboardGestor(equipeIds: string[], competenciaId: string) {
+  // Gestor sem NENHUMA frente autorizada (mal configurado, ou tentou passar
+  // só equipeIds que não são dele -- já filtrados antes de chegar aqui):
+  // retorna tudo zerado. NÃO cai no caminho "sem filtro" abaixo, que mostra
+  // o sistema inteiro -- isso violaria o isolamento total por frente.
+  if (equipeIds.length === 0) {
+    return {
+      inadimplenciaInicial: 0, totalContratosInicial: 0, totalClientesInicial: 0,
+      recebido: 0, baixado: 0, contratosRecebidos: 0, recebimentoAParte: 0,
+      percentualMeta: 0, metaAlvo: null, aprovacoesPendentes: 0,
+      totalConsultores: 0, rankingConsultores: [], clientesRegularizados: 0,
+      promessasHoje: 0, valorAgendadoHoje: 0, clientesAgendadosHoje: 0,
+      promessasVencidas: 0, valorPromessasVencidas: 0, clientesPromessasVencidas: 0,
+      promessasFuturas: 0, valorPromessasFuturas: 0, clientesPromessasFuturas: 0,
+      eficienciaHoje: 0,
+    };
+  }
+
   // Escopo de datas da competência (evita recebimentos de outros meses)
   const competencia = await prisma.competencia.findUnique({
     where: { id: competenciaId },
