@@ -114,7 +114,7 @@ async function main() {
       if (!vencMaisAntigo || valorTotal === 0) continue;
 
       const diasAtraso = calcDiasAtraso(vencMaisAntigo, hoje);
-      paraProcessar.push({ doc, fornecedor: grupo.fornecedor, vencMaisAntigo, valorTotal, isFlash, diasAtraso, existente: contratoMap.get(doc) ?? null });
+      paraProcessar.push({ doc, fornecedor: grupo.fornecedor, vencMaisAntigo, valorTotal, isFlash, diasAtraso, linhas: grupo.linhas, existente: contratoMap.get(doc) ?? null });
     }
 
     const paraCriar = paraProcessar.filter((p) => !p.existente);
@@ -158,13 +158,47 @@ async function main() {
     if (paraAtualizar.length > 0) console.log("");
     console.log(`  Criados: ${paraCriar.length} | Atualizados: ${paraAtualizar.length}`);
 
+    // Cria uma parcela por linha da query pra cada contrato tocado -- sem isso,
+    // o contrato só tem o valor agregado e não tem nada pra selecionar no
+    // fluxo de "inadimplência equivocada" (diferente dos outros
+    // empreendimentos, que sempre tiveram parcela por parcela). Preserva
+    // parcelas já pagas (histórico); só substitui as em aberto. Em lote, pra
+    // não repetir o problema de performance que já tivemos aqui antes.
+    const contratoIdsExistentesTocados = paraAtualizar.map((p) => p.existente.id);
+    const maxNumeros = contratoIdsExistentesTocados.length
+      ? await prisma.parcela.groupBy({ by: ["contratoId"], where: { contratoId: { in: contratoIdsExistentesTocados } }, _max: { numero: true } })
+      : [];
+    const maxNumeroPorContrato = new Map(maxNumeros.map((m) => [m.contratoId, m._max.numero ?? 0]));
+
     const novosSnap = [];
     const novosParaDistribuir = [];
+    const todosContratoIdsTocados = [];
+    const novasParcelas = [];
     for (const p of paraProcessar) {
       const resolvido = p.existente ?? contratoMap.get(p.doc);
       if (!resolvido) continue; // não deveria acontecer, mas evita quebrar a importação por 1 linha
       novosSnap.push({ id: randomUUID(), competenciaId: competencia.id, contratoNumero: p.doc, valor: p.valorTotal, vencimentoMaisAntigo: p.vencMaisAntigo, faixa: p.isFlash ? "FLASH" : obterEquipe(p.diasAtraso), isFlash: p.isFlash, syncId: sync.id });
       novosParaDistribuir.push({ contratoId: resolvido.id, clienteId: resolvido.clienteId, valorTotalAberto: p.valorTotal, maiorDiasAtraso: p.diasAtraso, isFlash: p.isFlash });
+
+      todosContratoIdsTocados.push(resolvido.id);
+      let proximoNumero = (maxNumeroPorContrato.get(resolvido.id) ?? 0) + 1;
+      for (const l of p.linhas) {
+        const venc = new Date(l.vencimento);
+        novasParcelas.push({
+          id: randomUUID(), contratoId: resolvido.id, numero: proximoNumero++,
+          dataVencimento: venc, diasAtraso: calcDiasAtraso(venc, hoje),
+          valorParcela: l.valor, valorTotalAberto: l.valor,
+        });
+      }
+    }
+    if (todosContratoIdsTocados.length > 0) {
+      for (const ck of chunks(todosContratoIdsTocados, 1000)) {
+        await prisma.parcela.deleteMany({ where: { contratoId: { in: ck }, paga: false } });
+      }
+    }
+    if (novasParcelas.length > 0) {
+      for (const ck of chunks(novasParcelas, 1000)) await prisma.parcela.createMany({ data: ck });
+      console.log(`  Parcelas gravadas: ${novasParcelas.length}`);
     }
 
     if (novosSnap.length > 0) {

@@ -234,6 +234,26 @@ export async function POST(req: NextRequest) {
         criados++;
       }
 
+      // Cria uma parcela por linha da planilha -- sem isso, o contrato só tem
+      // o valor agregado e não tem nada pra selecionar no fluxo de
+      // "inadimplência equivocada" (diferente dos outros empreendimentos,
+      // que sempre tiveram parcela por parcela). Preserva parcelas já pagas
+      // (histórico); só substitui as em aberto.
+      const numeroBase = await prisma.parcela.aggregate({ where: { contratoId }, _max: { numero: true } });
+      let proximoNumero = (numeroBase._max.numero ?? 0) + 1;
+      await prisma.parcela.deleteMany({ where: { contratoId, paga: false } });
+      await prisma.parcela.createMany({
+        data: grupo.linhas.map((l) => ({
+          id: randomUUID(),
+          contratoId,
+          numero: proximoNumero++,
+          dataVencimento: l.vencimento,
+          diasAtraso: Math.max(0, Math.floor((hoje.getTime() - l.vencimento.getTime()) / 86400000)),
+          valorParcela: l.valor,
+          valorTotalAberto: l.valor,
+        })),
+      });
+
       let consultorId: string | null = null;
       let consultorTipoEquipe: TipoEquipe | null = null;
       if (grupo.consultorNome) {
