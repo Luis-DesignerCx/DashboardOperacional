@@ -70,7 +70,13 @@ const FRENTE_CHIPS = [
   { id: "eq-91-180", label: "91+" },
 ];
 
-export function Sidebar({ perfil }: { perfil: Perfil }) {
+interface SidebarProps {
+  perfil: Perfil;
+  /** Frentes que o usuário pode filtrar. undefined = sem restrição (Admin vê todas). */
+  equipesGerenciadas?: string[];
+}
+
+export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [pendentes, setPendentes] = useState(0);
@@ -139,6 +145,12 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
       return next;
     });
   }
+
+  // Gestor só vê/filtra as próprias frentes; Administrador (equipesGerenciadas
+  // undefined) continua vendo as 4.
+  const chipsVisiveis = equipesGerenciadas
+    ? FRENTE_CHIPS.filter((c) => equipesGerenciadas.includes(c.id))
+    : FRENTE_CHIPS;
 
   function badgeDoItem(href: string) {
     const hasBadge = (href === "/solicitacoes" && pendentes > 0) || (href === "/pendencias" && promessasHoje > 0);
@@ -346,7 +358,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
       </nav>
 
       {/* Frente filter ─────────────────────────────────────────── */}
-      {["ADMINISTRADOR", "GESTOR"].includes(perfil) && (
+      {["ADMINISTRADOR", "GESTOR"].includes(perfil) && chipsVisiveis.length > 0 && (
         <div className={cn(
           "border-t border-white/[0.04]",
           collapsed ? "p-2" : "p-3"
@@ -365,7 +377,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                 )}
               </div>
               <div className="flex flex-wrap gap-1">
-                {FRENTE_CHIPS.map((chip) => {
+                {chipsVisiveis.map((chip) => {
                   const ativo = equipeIds.includes(chip.id);
                   return (
                     <button
@@ -391,7 +403,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
             <button
               title={
                 equipeIds.length > 0
-                  ? equipeIds.map((id) => FRENTE_CHIPS.find((c) => c.id === id)?.label).join(", ")
+                  ? equipeIds.map((id) => chipsVisiveis.find((c) => c.id === id)?.label).join(", ")
                   : "Todas as frentes"
               }
               className={cn(
