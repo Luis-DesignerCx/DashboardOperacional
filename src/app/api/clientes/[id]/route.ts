@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           contatos: { orderBy: { criadoEm: "desc" }, take: 5 },
           promessas: { where: { status: "ABERTA" }, orderBy: { dataPrometida: "asc" } },
           carteiras: {
-            include: { consultor: { select: { nome: true } }, competencia: true },
+            select: { tipoEquipe: true, consultor: { select: { nome: true } }, competencia: true },
             orderBy: { atribuidoEm: "desc" },
             take: 1,
           },

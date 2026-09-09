@@ -90,6 +90,7 @@ export async function GET(req: NextRequest) {
       ...(temFiltroAtivo ? {} : { skip, take: PAGE_SIZE }),
       select: {
         id: true,
+        tipoEquipe: true,
         contrato: {
           select: {
             id: true,

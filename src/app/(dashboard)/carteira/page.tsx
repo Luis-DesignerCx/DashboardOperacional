@@ -29,6 +29,7 @@ interface Contrato {
 
 interface ItemCarteira {
   id: string;
+  tipoEquipe: string | null;
   contrato: Contrato;
   consultor: { nome: string };
 }
@@ -123,6 +124,33 @@ function getFaixa(dias: number | null): { label: string; cor: string } {
   if (dias <= 150) return { label: "CR PDD — 121 a 150 dias", cor: "text-orange-400" };
   if (dias <= 180) return { label: "CR PDD — 151 a 180 dias", cor: "text-red-400" };
   return { label: "CR PDD — 181+ dias", cor: "text-red-400" };
+}
+
+// Agrupa pela equipe CONGELADA na distribuição (tipoEquipe), não pelos dias em
+// atraso atuais do contrato -- um contrato distribuído como Flash continua
+// Flash mesmo depois que os dias em atraso sobem (ele só ainda não foi pago),
+// senão o card migrava sozinho pra faixa errada (ex: apareceu pro consultor
+// como "CRA — 1 a 30 dias" mesmo ele sendo da equipe Flash). Dentro de
+// CR_31_90/CR_PDD_91_180 ainda sub-divide por dias, só pra leitura -- isso
+// nunca muda a que equipe o contrato pertence.
+function getFaixaPorEquipe(tipoEquipe: string | null, dias: number | null): { label: string; cor: string } {
+  const d = dias ?? 0;
+  switch (tipoEquipe) {
+    case "FLASH": return { label: "FLASH", cor: "text-sky-400" };
+    case "CRA_1_30": return { label: "CRA — 1 a 30 dias", cor: "text-sky-400" };
+    case "CR_31_90":
+      return d <= 60
+        ? { label: "CR — 31 a 60 dias", cor: "text-amber-400" }
+        : { label: "CR — 61 a 90 dias", cor: "text-amber-400" };
+    case "CR_PDD_91_180":
+      if (d <= 120) return { label: "CR PDD — 91 a 120 dias", cor: "text-orange-400" };
+      if (d <= 150) return { label: "CR PDD — 121 a 150 dias", cor: "text-orange-400" };
+      if (d <= 180) return { label: "CR PDD — 151 a 180 dias", cor: "text-red-400" };
+      return { label: "CR PDD — 181+ dias", cor: "text-red-400" };
+    default:
+      // Sem tipoEquipe (não deveria acontecer em dado novo) -- cai pro critério antigo
+      return getFaixa(dias);
+  }
 }
 
 function diasAtrasoColor(dias: number | null) {
@@ -708,7 +736,7 @@ export default function CarteiraPage() {
 
   // Agrupar por faixa de inadimplência
   const porFaixa = filtrados.reduce<Record<string, ItemCarteira[]>>((acc, item) => {
-    const faixaLabel = getFaixa(item.contrato.maiorDiasAtraso).label;
+    const faixaLabel = getFaixaPorEquipe(item.tipoEquipe, item.contrato.maiorDiasAtraso).label;
     if (!acc[faixaLabel]) acc[faixaLabel] = [];
     acc[faixaLabel].push(item);
     return acc;
@@ -840,7 +868,7 @@ export default function CarteiraPage() {
       ) : (
         <div className="space-y-6">
           {faixasPresentes.map((faixaLabel) => {
-            const faixaInfo = getFaixa(porFaixa[faixaLabel][0].contrato.maiorDiasAtraso);
+            const faixaInfo = getFaixaPorEquipe(porFaixa[faixaLabel][0].tipoEquipe, porFaixa[faixaLabel][0].contrato.maiorDiasAtraso);
             return (
               <div key={faixaLabel}>
                 <div className="flex items-center gap-2 mb-2">

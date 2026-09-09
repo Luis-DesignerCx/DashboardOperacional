@@ -43,7 +43,7 @@ interface Contrato {
   }[];
   contatos: { id: string; tipo: string; status: string; observacao: string | null; criadoEm: string }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string; formaPagamento: string }[];
-  carteiras: { consultor: { nome: string }; competencia: { descricao: string } }[];
+  carteiras: { tipoEquipe: string | null; consultor: { nome: string }; competencia: { descricao: string } }[];
 }
 
 interface Cliente {
@@ -69,6 +69,21 @@ function labelDias(dias: number) {
   if (dias <= 90) return "31–90 dias";
   if (dias <= 180) return "91–180 dias";
   return "181+ dias";
+}
+
+// Usa a equipe CONGELADA na distribuição (tipoEquipe), não os dias em atraso
+// atuais -- um contrato Flash continua Flash mesmo depois que os dias sobem
+// (só ainda não foi pago). Sem isso a "Faixa de Atraso" mostrava "1-30 dias"
+// pra um contrato que na verdade é da equipe Flash, confundindo com a equipe
+// CRA (que tem esse mesmo nome de faixa).
+function labelDiasPorEquipe(tipoEquipe: string | null, dias: number) {
+  switch (tipoEquipe) {
+    case "FLASH": return "Flash";
+    case "CRA_1_30": return "1–30 dias";
+    case "CR_31_90": return "31–90 dias";
+    case "CR_PDD_91_180": return "91–180 dias";
+    default: return labelDias(dias);
+  }
 }
 
 const INPUT = "w-full bg-surface-1 border border-white/[0.08] rounded-xl px-2.5 py-1.5 text-white text-xs focus:outline-none focus:border-gr-500";
@@ -506,7 +521,7 @@ export default function ClienteDetalhe() {
                 <div>
                   <p className="text-slate-500 text-xs mb-1">Faixa de Atraso</p>
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badgeDias(contrato.maiorDiasAtraso ?? 0)}`}>
-                    {contrato.maiorDiasAtraso ?? 0}d — {labelDias(contrato.maiorDiasAtraso ?? 0)}
+                    {contrato.maiorDiasAtraso ?? 0}d — {labelDiasPorEquipe(contrato.carteiras[0]?.tipoEquipe ?? null, contrato.maiorDiasAtraso ?? 0)}
                   </span>
                 </div>
               </div>
