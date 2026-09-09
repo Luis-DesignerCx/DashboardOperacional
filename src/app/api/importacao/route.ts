@@ -131,12 +131,14 @@ const ORIGENS_PERMITIDAS = new Set([
 const TAGS_PROIBIDAS = new Set([
   "7dias", "jud", "pos7n", "judsemlim", "audtdist", "pro", "proclim", "raq", "expirado", "pdd181+",
 ]);
+// Exceção: qualquer tag que MENCIONE "canc" (substring, ex: "CANC.PG.MULTA")
+// remove a linha, mesmo sem ser um token exato -- diferente das demais acima.
 function temTagProibida(tagsCell: string): boolean {
   if (!tagsCell) return false;
   return tagsCell
     .split(",")
     .map((t) => normalizar(t).replace(/\s+/g, ""))
-    .some((t) => t && TAGS_PROIBIDAS.has(t));
+    .some((t) => t && (TAGS_PROIBIDAS.has(t) || t.includes("canc")));
 }
 
 // 5. Meio de pagamento — mantém só Boleto/Cartão/Pix, agrupando os valores
@@ -575,8 +577,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 7. Substitui parcelas (deleteMany + createMany) ──────────────────────
+    // Usa existingMap (já filtrado) e não existingContratos (lista original) --
+    // contratos removidos em "ignoradosPorBaseMensal" saíram do existingMap
+    // pra não serem tocados, mas o array original ainda os incluía aqui,
+    // apagando as parcelas deles sem recriar (elas nunca entram em
+    // allParcelas, já que o contrato foi excluído de "grupos").
     const allContratoIds = [
-      ...existingContratos.map((c) => c.id),
+      ...[...existingMap.values()].map((c) => c.id),
       ...newContratos.map((c) => c.id),
     ];
     await prisma.parcela.deleteMany({ where: { contratoId: { in: allContratoIds } } });
