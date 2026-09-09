@@ -25,27 +25,24 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
-  // Consultor só vê os recebimentos da competência ABERTA -- não precisa ver
-  // (nem deve levar em conta) recebimentos de competências já fechadas. O
-  // dado continua salvo (auditoria, exportação); Gestor/Administrador
-  // continuam vendo o histórico completo.
-  let recebimentosWhere: any = undefined;
-  if (session.user.perfil === "CONSULTOR") {
-    const competenciaAberta = await prisma.competencia.findFirst({
-      where: { fechada: false },
-      orderBy: [{ ano: "desc" }, { mes: "desc" }],
-      select: { mes: true, ano: true },
-    });
-    recebimentosWhere = competenciaAberta
-      ? {
-          dataRecebimento: {
-            gte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes - 1, 1, 3, 0, 0, 0)),
-            lte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes, 1, 2, 59, 59, 999)),
-          },
-        }
-      : { id: "" }; // nenhuma competência aberta -- não mostra recebimento nenhum
-
-  }
+  // Só mostra recebimento da competência ABERTA (vigente) -- pra QUALQUER
+  // perfil, inclusive Gestor/Administrador. Recebimento de mês já fechado
+  // (cliente que já quitou e agora tem uma parcela nova) não deve aparecer
+  // misturado com o "Total Recebido" do mês atual. O dado continua salvo
+  // (auditoria, exportação, histórico), só não entra nesta tela.
+  const competenciaAberta = await prisma.competencia.findFirst({
+    where: { fechada: false },
+    orderBy: [{ ano: "desc" }, { mes: "desc" }],
+    select: { mes: true, ano: true },
+  });
+  const recebimentosWhere: any = competenciaAberta
+    ? {
+        dataRecebimento: {
+          gte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes - 1, 1, 3, 0, 0, 0)),
+          lte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes, 1, 2, 59, 59, 999)),
+        },
+      }
+    : { id: "" }; // nenhuma competência aberta -- não mostra recebimento nenhum
 
   const cliente = await prisma.cliente.findUnique({
     where: { id: params.id },
