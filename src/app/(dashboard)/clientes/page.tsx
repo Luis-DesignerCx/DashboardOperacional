@@ -109,6 +109,12 @@ export default function ClientesPage() {
   const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string | null>("empresaFiltro", null);
   const [carregando, setCarregando] = useState(true);
   const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Evita corrida entre buscas: se o usuário digitar de novo antes da busca
+  // anterior terminar de paginar, a resposta antiga (mais lenta) sobrescrevia
+  // a lista da busca nova -- cliente "aparecia e sumia". Cada chamada de
+  // carregarTodos recebe um número de sequência; só a MAIS RECENTE tem
+  // permissão de atualizar o estado.
+  const buscaSeqRef = useRef(0);
 
   // Modal histórico + novo contato
   const [modalHistorico, setModalHistorico] = useState<{ clienteId: string; nome: string; contratos: Cliente["contratos"] } | null>(null);
@@ -133,6 +139,7 @@ export default function ClientesPage() {
   // client-side, ver `filtrados` abaixo) sempre enxergam a lista inteira, não
   // só o que já tinha sido carregado até então.
   async function carregarTodos(q: string) {
+    const minhaSeq = ++buscaSeqRef.current;
     setCarregando(true);
     let pg = 1;
     let acumulado: Cliente[] = [];
@@ -141,6 +148,7 @@ export default function ClientesPage() {
       const params = new URLSearchParams({ page: String(pg) });
       if (q) params.set("q", q);
       const data = await fetch(`/api/clientes?${params}`).then((r) => r.json()).catch(() => ({}));
+      if (buscaSeqRef.current !== minhaSeq) return; // uma busca mais nova já assumiu -- descarta esta
       const lista: Cliente[] = Array.isArray(data.clientes) ? data.clientes : [];
       acumulado = acumulado.concat(lista);
       totalAtual = data.total ?? totalAtual;

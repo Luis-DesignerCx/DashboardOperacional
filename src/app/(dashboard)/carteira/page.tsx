@@ -255,12 +255,17 @@ export default function CarteiraPage() {
   }, []);
 
   const buscaMainTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Evita corrida entre carregamentos: trocar busca/filtro rápido antes da
+  // paginação anterior terminar fazia a resposta antiga (mais lenta)
+  // sobrescrever a lista já filtrada certa -- contrato "aparecia e sumia".
+  const carregarSeqRef = useRef(0);
 
   // Busca TODAS as páginas em sequência (sem exigir clique em "Carregar
   // mais") -- assim a busca e os filtros (o de empresa é client-side, ver
   // `filtrados` abaixo) sempre enxergam a carteira inteira, não só o que já
   // tinha sido carregado até então. Mesmo ajuste já feito em Clientes.
   async function carregarTodos(cId: string, buscaParam?: string, sortParam?: string, statusRecupParam?: string | null, situacaoParam?: string | null) {
+    const minhaSeq = ++carregarSeqRef.current;
     setCarregando(true);
     const b = buscaParam ?? busca;
     const s = sortParam ?? sort;
@@ -277,6 +282,7 @@ export default function CarteiraPage() {
       if (sr) params.set("statusRecuperacao", sr);
       if (sit) params.set("situacao", sit);
       const data = await fetch(`/api/carteira?${params}`).then((r) => r.json()).catch(() => ({}));
+      if (carregarSeqRef.current !== minhaSeq) return; // um carregamento mais novo já assumiu -- descarta este
       const contratos: ItemCarteira[] = Array.isArray(data.contratos) ? data.contratos : [];
       acumulado = acumulado.concat(contratos);
       totalAtual = data.total ?? totalAtual;
