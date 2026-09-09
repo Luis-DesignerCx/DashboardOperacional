@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, FolderOpen, Upload, Target, DollarSign,
   BarChart3, ClipboardList, Settings, Shield, Bell, ChevronLeft,
   ChevronRight, History, Layers, UserCog, PieChart, Search,
-  SlidersHorizontal,
+  SlidersHorizontal, Briefcase, ChevronDown,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -21,23 +21,46 @@ interface NavItem {
   perfis: Perfil[];
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard",           href: "/dashboard",    icon: LayoutDashboard, perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
-  { label: "Consulta",            href: "/consulta",     icon: Search,          perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
-  { label: "Minha Carteira",      href: "/carteira",     icon: FolderOpen,      perfis: ["CONSULTOR"] },
-  { label: "Clientes",            href: "/clientes",     icon: Users,           perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Minhas Tarefas",      href: "/pendencias",   icon: Bell,            perfis: ["CONSULTOR", "GESTOR"] },
-  { label: "Importação",          href: "/importacao",   icon: Upload,          perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Histórico",           href: "/historico",    icon: History,         perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Usuários",            href: "/usuarios",     icon: UserCog,         perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Gestão de Carteiras", href: "/gestao",       icon: PieChart,        perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Frentes",             href: "/equipes",      icon: Layers,          perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Metas",               href: "/metas",        icon: Target,          perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Comissão",            href: "/comissao",     icon: DollarSign,      perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
-  { label: "Relatórios",          href: "/relatorios",   icon: BarChart3,       perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Solicitações",        href: "/solicitacoes", icon: ClipboardList,   perfis: ["ADMINISTRADOR", "GESTOR"] },
-  { label: "Auditoria",           href: "/auditoria",    icon: Shield,          perfis: ["ADMINISTRADOR"] },
-  { label: "Configurações",       href: "/configuracoes",icon: Settings,        perfis: ["ADMINISTRADOR"] },
+interface NavGroup {
+  label: string;
+  icon: React.ElementType;
+  perfis: Perfil[];
+  href?: string;
+  children: NavItem[];
+}
+
+type NavEntry = NavItem | NavGroup;
+
+function isGroup(item: NavEntry): item is NavGroup {
+  return Array.isArray((item as NavGroup).children);
+}
+
+const NAV_ITEMS: NavEntry[] = [
+  { label: "Dashboard",      href: "/dashboard",  icon: LayoutDashboard, perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
+  { label: "Consulta",       href: "/consulta",   icon: Search,          perfis: ["ADMINISTRADOR", "CONSULTOR"] },
+  { label: "Minha Carteira", href: "/carteira",   icon: FolderOpen,      perfis: ["CONSULTOR"] },
+  { label: "Clientes",       href: "/clientes",   icon: Users,           perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Minhas Tarefas", href: "/pendencias", icon: Bell,            perfis: ["CONSULTOR"] },
+  {
+    label: "Importação", href: "/importacao", icon: Upload, perfis: ["ADMINISTRADOR", "GESTOR"],
+    children: [
+      { label: "Histórico", href: "/historico", icon: History, perfis: ["ADMINISTRADOR", "GESTOR"] },
+    ],
+  },
+  {
+    label: "Gestão", icon: Briefcase, perfis: ["ADMINISTRADOR", "GESTOR"],
+    children: [
+      { label: "Gestão de Carteiras", href: "/gestao",   icon: PieChart, perfis: ["ADMINISTRADOR", "GESTOR"] },
+      { label: "Frentes",             href: "/equipes",  icon: Layers,   perfis: ["ADMINISTRADOR", "GESTOR"] },
+      { label: "Metas",               href: "/metas",    icon: Target,   perfis: ["ADMINISTRADOR", "GESTOR"] },
+      { label: "Usuários",            href: "/usuarios", icon: UserCog,  perfis: ["ADMINISTRADOR", "GESTOR"] },
+    ],
+  },
+  { label: "Comissão",     href: "/comissao",     icon: DollarSign,    perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
+  { label: "Relatórios",   href: "/relatorios",   icon: BarChart3,     perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Solicitações", href: "/solicitacoes", icon: ClipboardList, perfis: ["ADMINISTRADOR", "GESTOR"] },
+  { label: "Auditoria",    href: "/auditoria",    icon: Shield,        perfis: ["ADMINISTRADOR"] },
+  { label: "Configurações",href: "/configuracoes",icon: Settings,      perfis: ["ADMINISTRADOR"] },
 ];
 
 const FRENTE_CHIPS = [
@@ -96,7 +119,29 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
     }
   }, [pathname]);
 
+  const [gruposAbertos, setGruposAbertos] = useState<Set<string>>(new Set());
+
   const itensVisiveis = NAV_ITEMS.filter((i) => i.perfis.includes(perfil));
+
+  function ehAtivo(href: string) {
+    return pathname === href || pathname.startsWith(href + "/");
+  }
+
+  function toggleGrupo(label: string) {
+    setGruposAbertos((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  }
+
+  function badgeDoItem(href: string) {
+    const hasBadge = (href === "/solicitacoes" && pendentes > 0) || (href === "/pendencias" && promessasHoje > 0);
+    if (!hasBadge) return null;
+    const count = href === "/solicitacoes" ? pendentes : promessasHoje;
+    const color = href === "/solicitacoes" ? "bg-amber-500" : "bg-red-500";
+    return { count, color };
+  }
 
   return (
     <aside
@@ -156,12 +201,87 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
       <nav className="relative flex-1 py-3 overflow-y-auto overflow-x-hidden">
         <ul className={cn("space-y-0.5", collapsed ? "px-2" : "px-2.5")}>
           {itensVisiveis.map((item) => {
-            const ativo = pathname === item.href || pathname.startsWith(item.href + "/");
-            const hasBadge =
-              (item.href === "/solicitacoes" && pendentes > 0) ||
-              (item.href === "/pendencias"   && promessasHoje > 0);
-            const badgeCount = item.href === "/solicitacoes" ? pendentes : promessasHoje;
-            const badgeColor = item.href === "/solicitacoes" ? "bg-amber-500" : "bg-red-500";
+            if (isGroup(item)) {
+              const filhosVisiveis = item.children.filter((c) => c.perfis.includes(perfil));
+              if (filhosVisiveis.length === 0) return null;
+              const filhoAtivo = filhosVisiveis.some((c) => ehAtivo(c.href));
+              const ativo = filhoAtivo || (item.href ? ehAtivo(item.href) : false);
+              const aberto = gruposAbertos.has(item.label) || filhoAtivo;
+
+              const conteudoLinha = (
+                <>
+                  {ativo && !collapsed && (
+                    <span className="absolute left-0 inset-y-2 w-[2px] rounded-full bg-gr-400 shadow-[0_0_8px_rgba(100,96,228,0.6)]" />
+                  )}
+                  <item.icon
+                    size={15}
+                    className={cn("flex-shrink-0 transition-all duration-200", ativo ? "text-gr-400" : "text-slate-500 group-hover:text-slate-300")}
+                  />
+                  {!collapsed && <span className="flex-1 truncate text-left">{item.label}</span>}
+                </>
+              );
+              const classeLinha = cn(
+                "relative flex items-center rounded-xl text-sm transition-all duration-200 group",
+                collapsed ? "justify-center p-2.5" : "gap-2 px-3 py-2.5",
+                ativo ? "bg-gr-500/[0.12] text-white font-medium" : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
+              );
+
+              return (
+                <li key={item.label}>
+                  <div className={collapsed ? undefined : "flex items-center gap-0.5"}>
+                    {item.href ? (
+                      <Link href={item.href} title={collapsed ? item.label : undefined} className={cn(classeLinha, "flex-1 min-w-0")}>
+                        {conteudoLinha}
+                      </Link>
+                    ) : (
+                      <button
+                        type="button"
+                        title={collapsed ? item.label : undefined}
+                        onClick={() => { if (collapsed) setCollapsed(false); toggleGrupo(item.label); }}
+                        className={cn(classeLinha, "flex-1 min-w-0")}
+                      >
+                        {conteudoLinha}
+                      </button>
+                    )}
+                    {!collapsed && (
+                      <button
+                        type="button"
+                        aria-label={aberto ? `Recolher ${item.label}` : `Expandir ${item.label}`}
+                        onClick={() => toggleGrupo(item.label)}
+                        className="flex-shrink-0 p-2 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/[0.03] transition-all"
+                      >
+                        <ChevronDown size={13} className={cn("transition-transform duration-200", aberto && "rotate-180")} />
+                      </button>
+                    )}
+                  </div>
+
+                  {!collapsed && aberto && (
+                    <ul className="mt-0.5 ml-[13px] pl-4 border-l border-white/[0.06] space-y-0.5">
+                      {filhosVisiveis.map((filho) => {
+                        const ativoFilho = ehAtivo(filho.href);
+                        return (
+                          <li key={filho.href}>
+                            <Link
+                              href={filho.href}
+                              className={cn(
+                                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all duration-200 group",
+                                ativoFilho ? "text-white font-medium bg-white/[0.04]" : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.03]"
+                              )}
+                            >
+                              <filho.icon size={13} className={cn("flex-shrink-0", ativoFilho ? "text-gr-400" : "text-slate-600 group-hover:text-slate-400")} />
+                              <span className="flex-1 truncate">{filho.label}</span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </li>
+              );
+            }
+
+            const ativo = ehAtivo(item.href);
+            const badge = badgeDoItem(item.href);
 
             return (
               <li key={item.href}>
@@ -196,20 +316,20 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                   )}
 
                   {/* Badge expanded */}
-                  {!collapsed && hasBadge && (
+                  {!collapsed && badge && (
                     <span className={cn(
                       "ml-auto text-[10px] font-bold text-white px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none",
-                      badgeColor
+                      badge.color
                     )}>
-                      {badgeCount > 99 ? "99+" : badgeCount}
+                      {badge.count > 99 ? "99+" : badge.count}
                     </span>
                   )}
 
                   {/* Badge collapsed dot */}
-                  {collapsed && hasBadge && (
+                  {collapsed && badge && (
                     <span className={cn(
                       "absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full",
-                      badgeColor
+                      badge.color
                     )} />
                   )}
                 </Link>
