@@ -45,7 +45,7 @@ export function SaudeEmpreendimentos({ porEmpresa }: Props) {
                 <tr key={e.empresaId} className="hover:bg-white/[0.02] transition-colors">
                   <td className="py-2.5 text-slate-200 font-medium">{e.nome}</td>
                   <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.saldoAberto)}</td>
-                  <td className="py-2.5 text-right text-slate-100 font-semibold tabular-nums">{formatarMoeda(e.recebido)}</td>
+                  <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(e.recebido)}</td>
                   <td className="py-2.5 text-right text-slate-500 tabular-nums">{e.contratos}</td>
                   <td className="py-2.5 text-right">
                     <span className={cn(

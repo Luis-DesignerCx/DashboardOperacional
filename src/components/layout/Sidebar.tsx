@@ -241,7 +241,7 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
               const classeLinha = cn(
                 "relative flex items-center rounded-xl text-sm transition-all duration-200 group",
                 collapsed ? "justify-center p-2.5" : "gap-2 px-3 py-2.5",
-                ativo ? "bg-gr-500/[0.12] text-white font-medium" : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
+                ativo ? "bg-gr-500/[0.12] text-white font-medium" : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
               );
 
               return (
@@ -311,7 +311,7 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
                     collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
                     ativo
                       ? "bg-gr-500/[0.12] text-white font-medium"
-                      : "text-slate-400 hover:text-slate-100 hover:bg-white/[0.03]"
+                      : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
                   )}
                 >
                   {/* Left accent line on active */}

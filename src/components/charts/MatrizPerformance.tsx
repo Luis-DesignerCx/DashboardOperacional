@@ -130,7 +130,7 @@ export function MatrizPerformance({ frentes }: Props) {
                     </span>
                   </td>
                   <td className="py-2.5 text-slate-200 font-medium truncate max-w-[160px]">{c.nome}</td>
-                  <td className="py-2.5 text-right text-slate-100 font-semibold tabular-nums">{formatarMoeda(c.recebido)}</td>
+                  <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(c.recebido)}</td>
                   <td className="py-2.5 text-right text-slate-500 tabular-nums">{c.contratosRecebidos}</td>
                   <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(c.saldoAberto)}</td>
                   <td className="py-2.5 text-right">
