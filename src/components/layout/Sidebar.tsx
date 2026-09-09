@@ -119,7 +119,12 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
     }
   }, [pathname]);
 
-  const [gruposAbertos, setGruposAbertos] = useState<Set<string>>(new Set());
+  // Por padrão, um grupo abre sozinho quando você está numa página filha dele.
+  // Um clique manual no chevron grava aqui uma preferência explícita (aberto
+  // ou fechado) que passa a mandar mais que essa regra automática -- senão
+  // clicar pra fechar não tinha efeito nenhum enquanto a rota ativa
+  // continuasse sendo uma das filhas do grupo.
+  const [gruposOverride, setGruposOverride] = useState<Map<string, boolean>>(new Map());
 
   const itensVisiveis = NAV_ITEMS.filter((i) => i.perfis.includes(perfil));
 
@@ -127,10 +132,10 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
     return pathname === href || pathname.startsWith(href + "/");
   }
 
-  function toggleGrupo(label: string) {
-    setGruposAbertos((prev) => {
-      const next = new Set(prev);
-      if (next.has(label)) next.delete(label); else next.add(label);
+  function toggleGrupo(label: string, abertoAtual: boolean) {
+    setGruposOverride((prev) => {
+      const next = new Map(prev);
+      next.set(label, !abertoAtual);
       return next;
     });
   }
@@ -206,7 +211,8 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
               if (filhosVisiveis.length === 0) return null;
               const filhoAtivo = filhosVisiveis.some((c) => ehAtivo(c.href));
               const ativo = filhoAtivo || (item.href ? ehAtivo(item.href) : false);
-              const aberto = gruposAbertos.has(item.label) || filhoAtivo;
+              const override = gruposOverride.get(item.label);
+              const aberto = override !== undefined ? override : filhoAtivo;
 
               const conteudoLinha = (
                 <>
@@ -237,7 +243,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                       <button
                         type="button"
                         title={collapsed ? item.label : undefined}
-                        onClick={() => { if (collapsed) setCollapsed(false); toggleGrupo(item.label); }}
+                        onClick={() => { if (collapsed) setCollapsed(false); toggleGrupo(item.label, aberto); }}
                         className={cn(classeLinha, "flex-1 min-w-0")}
                       >
                         {conteudoLinha}
@@ -247,7 +253,7 @@ export function Sidebar({ perfil }: { perfil: Perfil }) {
                       <button
                         type="button"
                         aria-label={aberto ? `Recolher ${item.label}` : `Expandir ${item.label}`}
-                        onClick={() => toggleGrupo(item.label)}
+                        onClick={() => toggleGrupo(item.label, aberto)}
                         className="flex-shrink-0 p-2 rounded-lg text-slate-600 hover:text-slate-300 hover:bg-white/[0.03] transition-all"
                       >
                         <ChevronDown size={13} className={cn("transition-transform duration-200", aberto && "rotate-180")} />
