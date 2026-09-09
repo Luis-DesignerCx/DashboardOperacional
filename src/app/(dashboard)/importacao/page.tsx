@@ -861,6 +861,7 @@ export default function ImportacaoPage() {
           <div>
             <h2 className="text-base font-semibold text-white">Fã Pass</h2>
             <p className="text-xs text-slate-400 mt-0.5">Base de inadimplência — Passaporte BC</p>
+            <p className="text-[11px] text-slate-500 mt-1">Suba a qualquer momento (base geral ou atualização semanal) — só adiciona o que for novo, nunca duplica.</p>
           </div>
           {fpStatus?.ultimaSync && (
             <div className="text-right">
