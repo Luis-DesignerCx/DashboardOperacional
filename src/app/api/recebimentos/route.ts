@@ -167,7 +167,33 @@ async function processarRecebimento(req: NextRequest, session: any) {
   });
   if (!contrato) return NextResponse.json({ erro: "Contrato não encontrado" }, { status: 404 });
 
-  const valorDecimal = new Decimal(parsearValorMonetario(valor));
+  const valorNumerico = parsearValorMonetario(valor);
+
+  // Teto de multa/juros: o consultor só pode registrar um valor acima do
+  // valor original da parcela em até 2% de multa (uma vez, se está
+  // atrasada) + 1% de juros ao mês pro-rata (do vencimento até hoje).
+  // GESTOR/ADMINISTRADOR podem sobrescrever (ex: acordo renegociado).
+  if (session.user.perfil === "CONSULTOR" && Array.isArray(parcelasIds) && parcelasIds.length > 0) {
+    const parcelasSelecionadas = await prisma.parcela.findMany({
+      where: { id: { in: parcelasIds } },
+      select: { valorParcela: true, dataVencimento: true },
+    });
+    const hoje = new Date();
+    let valorMaximoTotal = 0;
+    for (const p of parcelasSelecionadas) {
+      const diasAtraso = Math.max(0, Math.floor((hoje.getTime() - new Date(p.dataVencimento).getTime()) / 86400000));
+      const multa = diasAtraso > 0 ? 0.02 : 0;
+      const juros = 0.01 * (diasAtraso / 30);
+      valorMaximoTotal += Number(p.valorParcela ?? 0) * (1 + multa + juros);
+    }
+    if (valorNumerico > valorMaximoTotal + 0.02) {
+      return NextResponse.json({
+        erro: `Valor informado (${formatarMoeda(valorNumerico)}) excede o máximo permitido para as parcelas selecionadas: ${formatarMoeda(valorMaximoTotal)} (valor original + até 2% de multa + 1% de juros ao mês pro-rata).`,
+      }, { status: 400 });
+    }
+  }
+
+  const valorDecimal = new Decimal(valorNumerico);
   const valorAParteDecimal = valorAParte && Number(valorAParte) > 0
     ? new Decimal(parsearValorMonetario(valorAParte))
     : null;
