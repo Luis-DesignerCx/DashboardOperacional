@@ -3,16 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-function getDiasFilter(tipo: string): { gte?: number; lte?: number } | undefined {
-  switch (tipo) {
-    case "FLASH":         return { lte: 0 };
-    case "CRA_1_30":      return { gte: 1,  lte: 30  };
-    case "CR_31_90":      return { gte: 31, lte: 90  };
-    case "CR_PDD_91_180": return { gte: 91 };
-    default:              return undefined;
-  }
-}
-
 export async function GET(req: NextRequest, { params }: { params: { equipeId: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
@@ -25,7 +15,18 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
   const competenciaId = searchParams.get("competenciaId");
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
 
-  // Permite sobrescrever o range de dias via query params (para sub-faixas)
+  // Escopo de datas da competência -- recebimentos somados abaixo precisam
+  // ser só os DESSE mês (mesmo bug de vazamento entre competências já
+  // corrigido em /api/carteira, ver commit c3080b7, faltava aqui).
+  const competencia = await prisma.competencia.findUnique({
+    where: { id: competenciaId },
+    select: { mes: true, ano: true },
+  });
+  const iniComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+  const fimComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes, 1, 2, 59, 59, 999)) : new Date();
+
+  // Permite refinar por sub-faixa de dias via query params (drill-down DENTRO
+  // da equipe já selecionada -- nunca substitui o escopo por equipe abaixo)
   const diasMinParam = searchParams.get("diasMin");
   const diasMaxParam = searchParams.get("diasMax");
 
@@ -34,22 +35,24 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     select: { tipo: true },
   });
 
-  let diasFilter: { gte?: number; lte?: number } | undefined;
-
-  if (diasMinParam || diasMaxParam) {
-    // Sub-faixa explícita passada via query params
-    diasFilter = {};
-    if (diasMinParam) diasFilter.gte = Number(diasMinParam);
-    if (diasMaxParam) diasFilter.lte = Number(diasMaxParam);
-  } else {
-    diasFilter = equipeInfo ? getDiasFilter(equipeInfo.tipo) : undefined;
-  }
-
+  // Escopo por tipoEquipe CONGELADO (CarteiraParcela.tipoEquipe), não pelos
+  // dias em atraso atuais do contrato nem pela equipe atual do consultor.
+  // Sem isso, um contrato distribuído para a equipe Flash/CRA que continua
+  // vencido (dias em atraso só cresce com o tempo) passava a aparecer na
+  // faixa PDD 91+ mesmo continuando corretamente contado na equipe original
+  // -- mesmo bug de "equipe congelada" já corrigido em outros pontos do
+  // sistema (ver distribuicao-carteira.ts), faltava aqui.
   const carteiraWhere: any = { competenciaId, ativo: true };
-  if (diasFilter) {
-    carteiraWhere.contrato = { maiorDiasAtraso: diasFilter };
+  if (equipeInfo) {
+    carteiraWhere.tipoEquipe = equipeInfo.tipo;
   } else {
     carteiraWhere.consultor = { equipeId };
+  }
+  if (diasMinParam || diasMaxParam) {
+    const diasFilter: { gte?: number; lte?: number } = {};
+    if (diasMinParam) diasFilter.gte = Number(diasMinParam);
+    if (diasMaxParam) diasFilter.lte = Number(diasMaxParam);
+    carteiraWhere.contrato = { maiorDiasAtraso: diasFilter };
   }
 
   const carteiraData = await prisma.carteiraParcela.findMany({
@@ -89,6 +92,7 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
           where: {
             consultorId: { in: consultorIds },
             contrato: { carteiras: { some: { competenciaId, ativo: true } } },
+            dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: {
             consultorId: true,
