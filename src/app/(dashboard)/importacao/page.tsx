@@ -875,11 +875,16 @@ export default function ImportacaoPage() {
 
         {/* Status cards */}
         {fpStatus && (
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-white/[0.03] rounded-xl p-3">
               <p className="text-xs text-slate-400">Inadimplência</p>
               <p className="text-sm font-bold text-white mt-0.5">{formatarMoeda(fpStatus.totalInadimplencia)}</p>
               <p className="text-xs text-slate-500">{fpStatus.totalContratos} contratos</p>
+            </div>
+            <div className="bg-sky-500/10 border border-sky-500/20 rounded-xl p-3">
+              <p className="text-xs text-slate-400">Flash</p>
+              <p className="text-sm font-bold text-sky-400 mt-0.5">{formatarMoeda(fpStatus.totalInadimplenciaFlash ?? 0)}</p>
+              <p className="text-xs text-slate-500">{fpStatus.totalContratosFlash ?? 0} contratos</p>
             </div>
             <div className="bg-white/[0.03] rounded-xl p-3">
               <p className="text-xs text-slate-400">Baixado</p>

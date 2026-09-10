@@ -45,11 +45,18 @@ export async function GET(req: NextRequest) {
     : [];
   const numerosEquivocados = equivocados.map((c) => c.numero);
 
-  const totalInad = await prisma.faPassInadimplencia.aggregate({
-    where: { competenciaId, contratoNumero: { notIn: numerosEquivocados } },
-    _sum: { valor: true },
-    _count: true,
-  });
+  const [totalInad, totalFlash] = await Promise.all([
+    prisma.faPassInadimplencia.aggregate({
+      where: { competenciaId, contratoNumero: { notIn: numerosEquivocados } },
+      _sum: { valor: true },
+      _count: true,
+    }),
+    prisma.faPassInadimplencia.aggregate({
+      where: { competenciaId, contratoNumero: { notIn: numerosEquivocados }, isFlash: true },
+      _sum: { valor: true },
+      _count: true,
+    }),
+  ]);
 
   return NextResponse.json({
     ultimaSync,
@@ -57,5 +64,7 @@ export async function GET(req: NextRequest) {
     totalContratos: totalInad._count,
     totalBaixado: Number(totalBaixas._sum.valor ?? 0),
     divergenciasPendentes: totalDiverg,
+    totalInadimplenciaFlash: Number(totalFlash._sum.valor ?? 0),
+    totalContratosFlash: totalFlash._count,
   });
 }
