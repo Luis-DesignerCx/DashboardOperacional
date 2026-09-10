@@ -572,6 +572,14 @@ export async function POST(req: NextRequest) {
       // nova depois -- escondendo o botão de registrar recebimento do
       // consultor (achado real: 152 contratos assim, em todos os
       // empreendimentos).
+      //
+      // "inadimplenciaEquivocada" também reseta pra false (e "situacao" sai
+      // de INADIMPLENCIA_EQUIVOCADA) -- decisão explícita do usuário: se o
+      // contrato voltar numa base nova com dívida nova, ele deve reaparecer
+      // na carteira/inadimplência geral; cabe ao consultor marcar de novo
+      // como equivocada (pela tela normal) se ainda for a mesma cobrança
+      // errada. Sem isso, uma disputa resolvida numa competência escondia
+      // pra sempre qualquer dívida nova e não relacionada do mesmo contrato.
       await prisma.$executeRaw`
         UPDATE "contratos" AS c
         SET "statusContrato"        = v.sc,
@@ -580,7 +588,9 @@ export async function POST(req: NextRequest) {
             "valorTotalAberto"      = v.vta,
             "empresaId"             = v.eid,
             "valorContrato"         = COALESCE(v.vc, c."valorContrato"),
-            "statusRecuperacao"     = 'INADIMPLENTE'::"StatusRecuperacao"
+            "statusRecuperacao"     = 'INADIMPLENTE'::"StatusRecuperacao",
+            "inadimplenciaEquivocada" = false,
+            "situacao"              = CASE WHEN c."situacao" = 'INADIMPLENCIA_EQUIVOCADA'::"SituacaoContrato" THEN 'INADIMPLENTE'::"SituacaoContrato" ELSE c."situacao" END
         FROM (VALUES ${ctRows}) AS v(id, sc, tpv, mda, vta, eid, vc)
         WHERE c.id = v.id
       `;

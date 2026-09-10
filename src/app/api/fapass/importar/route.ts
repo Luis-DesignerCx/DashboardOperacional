@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     const todosDocumentos = [...gruposInad.keys()];
     const contratosExistentes = await prisma.contrato.findMany({
       where: { numero: { in: todosDocumentos }, empresaId: empresaFaPass.id },
-      select: { id: true, numero: true, clienteId: true },
+      select: { id: true, numero: true, clienteId: true, situacao: true },
     });
     const contratoMap = new Map(contratosExistentes.map((c) => [c.numero, c]));
 
@@ -201,14 +201,23 @@ export async function POST(req: NextRequest) {
         // statusRecuperacao volta pra INADIMPLENTE -- sem isso, um contrato já
         // quitado numa competência anterior ficava preso como "Adimplente"
         // pra sempre, escondendo o botão de recebimento do consultor mesmo
-        // com dívida nova.
-        await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal, statusRecuperacao: "INADIMPLENTE" } });
+        // com dívida nova. inadimplenciaEquivocada também reseta -- dívida
+        // nova traz o contrato de volta pra carteira; cabe ao consultor
+        // marcar de novo como equivocada se ainda for a mesma cobrança errada.
+        await prisma.contrato.update({
+          where: { id: contratoId },
+          data: {
+            maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal,
+            statusRecuperacao: "INADIMPLENTE", inadimplenciaEquivocada: false,
+            ...(existente.situacao === "INADIMPLENCIA_EQUIVOCADA" ? { situacao: "INADIMPLENTE" as const } : {}),
+          },
+        });
         atualizados++;
       } else {
         clienteId = randomUUID(); contratoId = randomUUID();
         await prisma.cliente.create({ data: { id: clienteId, nome: grupo.fornecedor || doc } });
         await prisma.contrato.create({ data: { id: contratoId, numero: doc, clienteId, empresaId: empresaFaPass.id, maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
-        contratoMap.set(doc, { id: contratoId, numero: doc, clienteId });
+        contratoMap.set(doc, { id: contratoId, numero: doc, clienteId, situacao: "INADIMPLENTE" });
         criados++;
       }
 

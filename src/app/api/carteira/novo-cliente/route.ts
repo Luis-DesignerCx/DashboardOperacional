@@ -199,9 +199,11 @@ async function processarNovoCliente(req: NextRequest, session: any) {
         where: { id: contratoExistente.id },
         data: {
           valorTotalAberto: { increment: new Decimal(valorTotal.toFixed(2)) },
-          // statusRecuperacao volta pra INADIMPLENTE -- ver comentário
-          // equivalente em /api/importacao.
+          // statusRecuperacao/inadimplenciaEquivocada resetam -- ver
+          // comentário equivalente em /api/importacao.
           statusRecuperacao: "INADIMPLENTE",
+          inadimplenciaEquivocada: false,
+          ...(contratoExistente.situacao === "INADIMPLENCIA_EQUIVOCADA" ? { situacao: "INADIMPLENTE" as const } : {}),
           maiorDiasAtraso: Math.max(contratoExistente.maiorDiasAtraso ?? 0, maiorDiasAtraso),
         },
       }),

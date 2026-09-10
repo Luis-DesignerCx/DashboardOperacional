@@ -90,7 +90,7 @@ async function main() {
     const todosDocumentos = [...gruposInad.keys()];
     const contratosExistentes = await prisma.contrato.findMany({
       where: { numero: { in: todosDocumentos } },
-      select: { id: true, numero: true, clienteId: true },
+      select: { id: true, numero: true, clienteId: true, situacao: true },
     });
     const contratoMap = new Map(contratosExistentes.map((c) => [c.numero, c]));
 
@@ -151,9 +151,16 @@ async function main() {
     for (let i = 0; i < paraAtualizar.length; i += CONCORRENCIA) {
       const lote = paraAtualizar.slice(i, i + CONCORRENCIA);
       await Promise.all(lote.map((p) =>
-        // statusRecuperacao volta pra INADIMPLENTE -- ver comentário
+        // statusRecuperacao/inadimplenciaEquivocada resetam -- ver comentário
         // equivalente em src/app/api/fapass/importar/route.ts.
-        prisma.contrato.update({ where: { id: p.existente.id }, data: { maiorDiasAtraso: p.diasAtraso, valorTotalAberto: p.valorTotal, statusRecuperacao: "INADIMPLENTE" } })
+        prisma.contrato.update({
+          where: { id: p.existente.id },
+          data: {
+            maiorDiasAtraso: p.diasAtraso, valorTotalAberto: p.valorTotal,
+            statusRecuperacao: "INADIMPLENTE", inadimplenciaEquivocada: false,
+            ...(p.existente.situacao === "INADIMPLENCIA_EQUIVOCADA" ? { situacao: "INADIMPLENTE" } : {}),
+          },
+        })
       ));
       process.stdout.write(`\r  Contratos atualizados: ${Math.min(i + CONCORRENCIA, paraAtualizar.length)}/${paraAtualizar.length}`);
     }
