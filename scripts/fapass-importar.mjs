@@ -22,7 +22,9 @@ function obterEquipe(dias) {
 function isInadimplencia(tipo) {
   const t = String(tipo ?? "").trim();
   if (/^cart[aã]o/i.test(t)) return false;
-  return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t);
+  // "Credito Recorrente" (ex: "Credito Recorrente - A Informar") conta como
+  // inadimplência normal -- regra confirmada com o gestor.
+  return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t) || /cr[eé]dito\s+recorrente/i.test(t);
 }
 function isBaixaNormal(tipo) { return /boleto|pix|dinheiro|dep[oó]sito|transfer[eê]ncia|ted/i.test(String(tipo ?? "")); }
 function isBaixaCartao(tipo) { return /^cart[aã]o/i.test(String(tipo ?? "").trim()); }

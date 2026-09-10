@@ -77,7 +77,9 @@ function parsearData(val: unknown): Date | null {
 function isInadimplencia(tipo: string): boolean {
   const t = String(tipo ?? "").trim();
   if (/^cart[aã]o/i.test(t)) return false;
-  return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t);
+  // "Credito Recorrente" (ex: "Credito Recorrente - A Informar") conta como
+  // inadimplência normal -- regra confirmada com o gestor.
+  return /boleto/i.test(t) || /\brec\b|\brec\./i.test(t) || /cr[eé]dito\s+recorrente/i.test(t);
 }
 
 function obterEquipe(dias: number): TipoEquipe {
