@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FormaPagamento } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
-import { parsearValorMonetario } from "@/lib/utils";
+import { parsearValorMonetario, parseDataLocalBrasil } from "@/lib/utils";
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -50,7 +50,7 @@ export async function PATCH(req: NextRequest) {
         : null;
     }
     if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
-    if (dataRecebimento) data.dataRecebimento = new Date(dataRecebimento);
+    if (dataRecebimento) data.dataRecebimento = parseDataLocalBrasil(dataRecebimento);
   }
 
   const rec = await prisma.recebimento.update({ where: { id }, data });
@@ -213,7 +213,7 @@ async function processarRecebimento(req: NextRequest, session: any) {
       consultorId: session.user.id,
       valor: valorDecimal,
       valorAParte: valorAParteDecimal,
-      dataRecebimento: new Date(dataRecebimento),
+      dataRecebimento: parseDataLocalBrasil(dataRecebimento),
       formaPagamento: formaPagamento as FormaPagamento,
       justificativa: observacao || "Recebimento registrado pelo consultor",
       parcelasIds: Array.isArray(parcelasIds) ? parcelasIds : [],

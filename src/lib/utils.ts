@@ -12,6 +12,17 @@ export function formatarMoeda(valor: number | string): string {
   }).format(Number(valor));
 }
 
+// Interpreta uma data "YYYY-MM-DD" (vinda de <input type="date">) como meia-
+// noite no horário do Brasil (UTC-3), não meia-noite UTC. Sem isso,
+// `new Date("2026-09-01")` vira 2026-09-01T00:00:00Z, que já é 3h ANTES do
+// início da competência de Setembro (definido em todo o sistema como
+// 2026-09-01T03:00:00Z = meia-noite local) -- um recebimento lançado no
+// dia 1 do mês ficava classificado como se fosse do mês anterior, e sumia
+// de qualquer total "desta competência" (carteira, gestão, comissão).
+export function parseDataLocalBrasil(data: string): Date {
+  return new Date(`${data}T03:00:00.000Z`);
+}
+
 // Interpreta valor monetário digitado em qualquer formato comum -- vírgula
 // decimal (1234,56), ponto decimal (1234.56), ou os dois juntos como
 // separador de milhar + decimal (1.234,56). Antes, telas diferentes faziam

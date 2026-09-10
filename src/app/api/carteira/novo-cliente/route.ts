@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import { Decimal } from "@prisma/client/runtime/library";
 import { FormaPagamento } from "@prisma/client";
 import { primeiroDiaUtilDoMes } from "@/utils/dias-uteis";
-import { parsearValorMonetario } from "@/lib/utils";
+import { parsearValorMonetario, parseDataLocalBrasil } from "@/lib/utils";
 
 interface ParcelaInput {
   dataVencimento: string; // YYYY-MM-DD
@@ -132,7 +132,7 @@ async function processarNovoCliente(req: NextRequest, session: any) {
         consultorId: session.user.id,
         valor: new Decimal("0"),
         valorAParte: new Decimal(valorTotal.toFixed(2)),
-        dataRecebimento: new Date(dataRecebimento),
+        dataRecebimento: parseDataLocalBrasil(dataRecebimento),
         formaPagamento: formaPagamento as FormaPagamento,
         justificativa: `Lançamento a parte — parcelas: ${detalhesParcelas}`,
       },
