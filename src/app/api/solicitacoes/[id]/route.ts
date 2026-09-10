@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -13,10 +14,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const solicitacaoAtual = await prisma.solicitacao.findUnique({
     where: { id: params.id },
-    select: { tipo: true, contratoId: true, solicitanteId: true, status: true, dados: true },
+    select: { tipo: true, contratoId: true, solicitanteId: true, status: true, dados: true, solicitante: { select: { equipeId: true } } },
   });
 
   if (!solicitacaoAtual) return NextResponse.json({ erro: "Não encontrada" }, { status: 404 });
+
+  // Gestor só pode decidir solicitação de consultor de uma frente que ele
+  // gerencia -- mesma regra aplicada na listagem, validada aqui de novo pra
+  // não depender só da tela esconder a solicitação.
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!solicitacaoAtual.solicitante.equipeId || !equipesGerenciadas.includes(solicitacaoAtual.solicitante.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para decidir sobre esta solicitação" }, { status: 403 });
+    }
+  }
 
   const solicitacao = await prisma.solicitacao.update({
     where: { id: params.id },

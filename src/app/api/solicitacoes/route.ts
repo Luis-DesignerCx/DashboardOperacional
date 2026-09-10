@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const where: any = {};
-  if (session.user.perfil === "CONSULTOR") where.solicitanteId = session.user.id;
+  if (session.user.perfil === "CONSULTOR") {
+    where.solicitanteId = session.user.id;
+  } else if (session.user.perfil === "GESTOR") {
+    // Gestor só vê solicitações de consultores das frentes que ele gerencia --
+    // Administrador continua vendo todas.
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    where.solicitante = { equipeId: { in: equipesGerenciadas } };
+  }
 
   const solicitacoes = await prisma.solicitacao.findMany({
     where,
