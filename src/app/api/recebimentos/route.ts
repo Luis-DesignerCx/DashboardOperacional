@@ -90,10 +90,11 @@ export async function DELETE(req: NextRequest) {
       contratoId: true,
       valor: true,
       consultorId: true,
+      parcelasIds: true,
       contrato: {
         select: {
           valorTotalAberto: true,
-          recebimentos: { select: { id: true, valor: true } },
+          recebimentos: { select: { id: true, valor: true, parcelasIds: true } },
           parcelas: { select: { id: true, paga: true } },
         },
       },
@@ -104,9 +105,8 @@ export async function DELETE(req: NextRequest) {
   await prisma.recebimento.delete({ where: { id } });
 
   // Recalcula statusRecuperacao excluindo o recebimento removido
-  const totalRecebido = rec.contrato.recebimentos
-    .filter((r) => r.id !== id)
-    .reduce((s, r) => s + Number(r.valor), 0);
+  const recebimentosRestantes = rec.contrato.recebimentos.filter((r) => r.id !== id);
+  const totalRecebido = recebimentosRestantes.reduce((s, r) => s + Number(r.valor), 0);
   const valorAberto = Number(rec.contrato.valorTotalAberto ?? 0);
   const statusRecuperacao =
     totalRecebido >= valorAberto && valorAberto > 0
@@ -115,11 +115,21 @@ export async function DELETE(req: NextRequest) {
       ? "RECUPERACAO_PARCIAL"
       : "INADIMPLENTE";
 
-  // Reverte TODAS as parcelas do contrato para não-pagas (sem FK recebimento→parcela não sabemos qual foi marcada)
-  await prisma.parcela.updateMany({
-    where: { contratoId: rec.contratoId, paga: true },
-    data: { paga: false },
-  });
+  // Reverte pra não-paga só as parcelas que ESTE recebimento marcou -- e só as
+  // que nenhum OUTRO recebimento restante ainda cobre. Antes revertia TODAS
+  // as parcelas pagas do contrato (comentário dizia "sem FK não sabemos qual
+  // foi marcada", mas o vínculo existe em Recebimento.parcelasIds) -- isso
+  // desfazia pagamento de recebimentos que sobraram intactos (ex: duas
+  // parcelas duplicadas, apaga uma, a outra cobria a mesma parcela e ficava
+  // revertida à toa).
+  const parcelasAindaCobertas = new Set(recebimentosRestantes.flatMap((r) => r.parcelasIds));
+  const parcelasParaReverter = rec.parcelasIds.filter((pid) => !parcelasAindaCobertas.has(pid));
+  if (parcelasParaReverter.length > 0) {
+    await prisma.parcela.updateMany({
+      where: { id: { in: parcelasParaReverter } },
+      data: { paga: false },
+    });
+  }
 
   await prisma.contrato.update({
     where: { id: rec.contratoId },
