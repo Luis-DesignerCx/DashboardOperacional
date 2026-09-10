@@ -95,9 +95,14 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const arquivo = form.get("arquivo") as File | null;
   const competenciaId = form.get("competenciaId") as string | null;
+  const baseVencimentoRaw = form.get("baseVencimento") as string | null;
+  const baseVencimento = baseVencimentoRaw ? parseInt(baseVencimentoRaw) : null;
 
   if (!arquivo || !competenciaId) {
     return NextResponse.json({ erro: "arquivo e competenciaId são obrigatórios" }, { status: 400 });
+  }
+  if (!baseVencimento || ![5, 10, 15, 20, 25].includes(baseVencimento)) {
+    return NextResponse.json({ erro: "Selecione a base de vencimento (05, 10, 15, 20 ou 25)" }, { status: 400 });
   }
 
   const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
@@ -275,12 +280,15 @@ export async function POST(req: NextRequest) {
           if (!porEquipe.has(tipo)) porEquipe.set(tipo, []);
           porEquipe.get(tipo)!.push(c);
         }
-        const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe }[] = [];
+        const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe; baseVencimento: number | null }[] = [];
         for (const [tipo, lista] of porEquipe) {
           const equipe = equipeMap.get(tipo);
           if (!equipe?.usuarios.length) continue;
           const consultores = equipe.usuarios.map((u) => u.id);
-          lista.forEach((c, i) => novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId, tipoEquipe: tipo }));
+          lista.forEach((c, i) => novasAtribuicoes.push({
+            id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId, tipoEquipe: tipo,
+            baseVencimento: tipo === "FLASH" ? baseVencimento : null,
+          }));
         }
         for (const ck of chunks(novasAtribuicoes, 500)) {
           await prisma.carteiraParcela.createMany({ data: ck, skipDuplicates: true });

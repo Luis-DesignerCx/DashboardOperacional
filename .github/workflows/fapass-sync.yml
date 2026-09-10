@@ -51,6 +51,7 @@ jobs:
           DIRECT_URL: ${{ secrets.DIRECT_URL }}
           FAPASS_COMPETENCIA_ID: ${{ github.event.client_payload.competenciaId }}
           FAPASS_SYNC_ID: ${{ github.event.client_payload.syncId }}
+          FAPASS_BASE_VENCIMENTO: ${{ github.event.client_payload.baseVencimento }}
         run: node scripts/fapass-importar.mjs
 
       - name: Marcar sync como erro (se alguma etapa anterior falhou)

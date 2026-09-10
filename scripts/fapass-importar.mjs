@@ -38,6 +38,10 @@ async function main() {
   // Suporte a FAPASS_COMPETENCIA_ID passado pelo GitHub Actions
   const competenciaIdEnv = process.env.FAPASS_COMPETENCIA_ID;
   const syncIdEnv        = process.env.FAPASS_SYNC_ID;
+  const baseVencimento   = process.env.FAPASS_BASE_VENCIMENTO ? parseInt(process.env.FAPASS_BASE_VENCIMENTO) : null;
+  if (!baseVencimento || ![5, 10, 15, 20, 25].includes(baseVencimento)) {
+    throw new Error("FAPASS_BASE_VENCIMENTO ausente ou inválido (esperado 5, 10, 15, 20 ou 25)");
+  }
 
   const competencia = competenciaIdEnv
     ? await prisma.competencia.findUnique({ where: { id: competenciaIdEnv } })
@@ -244,7 +248,10 @@ async function main() {
           const consultores = equipe.usuarios.map((u) => u.id);
           let idx = 0;
           for (let i = 0; i < lista.length; i++) {
-            novasAtribuicoes.push({ id: randomUUID(), contratoId: lista[i].contratoId, consultorId: consultores[idx % consultores.length], competenciaId: competencia.id, tipoEquipe: tipo });
+            novasAtribuicoes.push({
+              id: randomUUID(), contratoId: lista[i].contratoId, consultorId: consultores[idx % consultores.length], competenciaId: competencia.id, tipoEquipe: tipo,
+              baseVencimento: tipo === "FLASH" ? baseVencimento : null,
+            });
             idx++;
           }
         }

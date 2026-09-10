@@ -41,6 +41,7 @@ export default function ImportacaoPage() {
   const [competenciaId, setCompetenciaId] = useState("");
   const [competencias, setCompetencias] = useState<Competencia[]>([]);
   const [tipoImport, setTipoImport] = useState<"BASE" | "FLASH" | null>(null);
+  const [baseVencimento, setBaseVencimento] = useState<string>("");
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState<{ processadas: number; erros: number; tipoDetectado?: string } | null>(null);
   const [erro, setErro] = useState("");
@@ -61,6 +62,7 @@ export default function ImportacaoPage() {
   const [fpStatus, setFpStatus] = useState<any | null>(null);
   const [fpFechando, setFpFechando] = useState(false);
   const [fpModoLote, setFpModoLote] = useState(false);
+  const [fpBaseVencimento, setFpBaseVencimento] = useState("");
 
   // Baixas confirmadas (empreendimentos gerais)
   const [bxArquivo, setBxArquivo] = useState<File | null>(null);
@@ -177,6 +179,7 @@ export default function ImportacaoPage() {
   // planilhas são pequenas, não passam pelo limite da Vercel).
   async function handleFpImportarLote() {
     if (!fpArquivo || !competenciaId) return;
+    if (!fpBaseVencimento) { setFpErro("Selecione a base de vencimento"); return; }
     setFpCarregando(true);
     setFpErro("");
     setFpResultado(null);
@@ -184,6 +187,7 @@ export default function ImportacaoPage() {
       const form = new FormData();
       form.append("arquivo", fpArquivo);
       form.append("competenciaId", competenciaId);
+      form.append("baseVencimento", fpBaseVencimento);
       const res = await fetch("/api/fapass/importar-lote", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) throw new Error(data.erro || "Erro ao importar");
@@ -199,6 +203,7 @@ export default function ImportacaoPage() {
 
   async function handleFpSync() {
     if (!fpArquivo || !competenciaId) return;
+    if (!fpBaseVencimento) { setFpErro("Selecione a base de vencimento"); return; }
     setFpCarregando(true);
     setFpErro("");
     setFpResultado(null);
@@ -209,6 +214,7 @@ export default function ImportacaoPage() {
         const form = new FormData();
         form.append("arquivo", fpArquivo);
         form.append("competenciaId", competenciaId);
+        form.append("baseVencimento", fpBaseVencimento);
 
         const res = await fetch("/api/fapass/importar", { method: "POST", body: form });
         const data = await res.json();
@@ -252,7 +258,7 @@ export default function ImportacaoPage() {
       const trigRes = await fetch("/api/fapass/trigger", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ syncId: urlData.syncId, filePath: urlData.filePath, competenciaId }),
+        body: JSON.stringify({ syncId: urlData.syncId, filePath: urlData.filePath, competenciaId, baseVencimento: fpBaseVencimento }),
       });
       const trigData = await trigRes.json();
       if (!trigRes.ok) throw new Error(trigData.erro || "Erro ao disparar processamento");
@@ -424,6 +430,7 @@ export default function ImportacaoPage() {
 
   async function handleImportar() {
     if (!arquivo || !competenciaId) return;
+    if (tipoImport === "FLASH" && !baseVencimento) { setErro("Selecione a base de vencimento"); return; }
     setCarregando(true);
     setErro("");
     setResultado(null);
@@ -432,6 +439,7 @@ export default function ImportacaoPage() {
     form.append("arquivo", arquivo);
     form.append("competenciaId", competenciaId);
     form.append("tipoBase", tipoImport!);
+    if (tipoImport === "FLASH") form.append("baseVencimento", baseVencimento);
 
     const res = await fetch("/api/importacao", { method: "POST", body: form });
     const data = await res.json();
@@ -587,6 +595,30 @@ export default function ImportacaoPage() {
               ))}
             </div>
           </div>
+
+          {/* Base de vencimento Flash (05/10/15/20/25) */}
+          {tipoImport === "FLASH" && (
+            <div className="mt-3">
+              <label className="block text-sm text-slate-400 mb-2">Base de vencimento *</label>
+              <div className="grid grid-cols-5 gap-2">
+                {["5", "10", "15", "20", "25"].map((dia) => (
+                  <button
+                    key={dia}
+                    type="button"
+                    onClick={() => setBaseVencimento(dia)}
+                    className={`py-2 rounded-xl border text-sm font-medium transition-colors ${
+                      baseVencimento === dia
+                        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+                        : "bg-surface-1 border-white/[0.08] text-slate-400 hover:border-white/[0.12]"
+                    }`}
+                  >
+                    Dia {dia.padStart(2, "0")}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1.5">Qual onda de vencimento Flash este arquivo traz -- usado pro consultor filtrar depois.</p>
+            </div>
+          )}
         </div>
 
         {/* Férias desta competência */}
@@ -724,7 +756,7 @@ export default function ImportacaoPage() {
 
         <button
           onClick={handleImportar}
-          disabled={!arquivo || !competenciaId || !tipoImport || carregando}
+          disabled={!arquivo || !competenciaId || !tipoImport || (tipoImport === "FLASH" && !baseVencimento) || carregando}
           className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 disabled:bg-sky-500/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
         >
           {carregando ? (
@@ -913,6 +945,26 @@ export default function ImportacaoPage() {
             </label>
 
             <div>
+              <label className="block text-xs text-slate-400 mb-1.5">Base de vencimento *</label>
+              <div className="grid grid-cols-5 gap-2">
+                {["5", "10", "15", "20", "25"].map((dia) => (
+                  <button
+                    key={dia}
+                    type="button"
+                    onClick={() => setFpBaseVencimento(dia)}
+                    className={`py-2 rounded-xl border text-sm font-medium transition-colors ${
+                      fpBaseVencimento === dia
+                        ? "bg-emerald-500/15 border-emerald-500/50 text-emerald-300"
+                        : "bg-surface-1 border-white/[0.08] text-slate-400 hover:border-white/[0.12]"
+                    }`}
+                  >
+                    Dia {dia.padStart(2, "0")}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
               <label className="block text-sm text-slate-400 mb-1.5">{fpModoLote ? "Arquivo do Lote" : "Arquivo da QUERY"}</label>
               <label className="flex items-center gap-3 w-full border border-dashed border-white/[0.08] rounded-xl px-4 py-3 cursor-pointer hover:border-gr-500 hover:bg-gr-500/5 transition-colors">
                 <FileSpreadsheet size={18} className="text-slate-500 flex-shrink-0" />
@@ -968,7 +1020,7 @@ export default function ImportacaoPage() {
             <div className="flex gap-3">
               <button
                 onClick={fpModoLote ? handleFpImportarLote : handleFpSync}
-                disabled={!fpArquivo || fpCarregando}
+                disabled={!fpArquivo || !fpBaseVencimento || fpCarregando}
                 className="flex-1 flex items-center justify-center gap-2 bg-gr-500 hover:bg-gr-600 disabled:bg-gr-500/30 disabled:cursor-not-allowed text-white font-medium py-2.5 rounded-lg transition-colors text-sm"
               >
                 {fpCarregando ? <><Loader2 size={15} className="animate-spin" /> Processando...</> : <><RefreshCw size={15} /> {fpModoLote ? "Importar Lote" : "Importar Fã Pass"}</>}

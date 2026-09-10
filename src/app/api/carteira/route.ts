@@ -31,13 +31,15 @@ export async function GET(req: NextRequest) {
   const sort = searchParams.get("sort") ?? "diasAtraso";
   const statusRecuperacao = searchParams.get("statusRecuperacao") || "";
   const situacao = searchParams.get("situacao") || "";
+  const baseVencimentoParam = searchParams.get("baseVencimento") || "";
   const skip = (page - 1) * PAGE_SIZE;
 
   // Quando qualquer filtro de status está ativo, retorna tudo sem paginação
-  const temFiltroAtivo = !!(statusRecuperacao || situacao);
+  const temFiltroAtivo = !!(statusRecuperacao || situacao || baseVencimentoParam);
 
   const where: any = { competenciaId, ativo: true };
   if (session.user.perfil === "CONSULTOR") where.consultorId = session.user.id;
+  if (baseVencimentoParam) where.baseVencimento = parseInt(baseVencimentoParam);
 
   where.contrato = { inadimplenciaEquivocada: false };
   if (busca) {
@@ -91,6 +93,7 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         tipoEquipe: true,
+        baseVencimento: true,
         contrato: {
           select: {
             id: true,

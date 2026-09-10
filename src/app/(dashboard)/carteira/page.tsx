@@ -30,6 +30,7 @@ interface Contrato {
 interface ItemCarteira {
   id: string;
   tipoEquipe: string | null;
+  baseVencimento: number | null;
   contrato: Contrato;
   consultor: { nome: string };
 }
@@ -223,6 +224,7 @@ export default function CarteiraPage() {
   const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string | null>("empresaFiltro", null);
   const [statusRecupFiltro, setStatusRecupFiltro] = usePersistedState<string | null>("statusRecupFiltro", null);
   const [situacaoFiltro, setSituacaoFiltro] = usePersistedState<string | null>("situacaoFiltro", null);
+  const [baseVencimentoFiltro, setBaseVencimentoFiltro] = usePersistedState<string | null>("baseVencimentoFiltro", null);
   const [situacaoPopover, setSituacaoPopover] = useState<string | null>(null);
   const [salvandoSituacao, setSalvandoSituacao] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -292,13 +294,14 @@ export default function CarteiraPage() {
   // mais") -- assim a busca e os filtros (o de empresa é client-side, ver
   // `filtrados` abaixo) sempre enxergam a carteira inteira, não só o que já
   // tinha sido carregado até então. Mesmo ajuste já feito em Clientes.
-  async function carregarTodos(cId: string, buscaParam?: string, sortParam?: string, statusRecupParam?: string | null, situacaoParam?: string | null) {
+  async function carregarTodos(cId: string, buscaParam?: string, sortParam?: string, statusRecupParam?: string | null, situacaoParam?: string | null, baseVencimentoParam?: string | null) {
     const minhaSeq = ++carregarSeqRef.current;
     setCarregando(true);
     const b = buscaParam ?? busca;
     const s = sortParam ?? sort;
     const sr = statusRecupParam !== undefined ? statusRecupParam : statusRecupFiltro;
     const sit = situacaoParam !== undefined ? situacaoParam : situacaoFiltro;
+    const bv = baseVencimentoParam !== undefined ? baseVencimentoParam : baseVencimentoFiltro;
 
     let pg = 1;
     let acumulado: ItemCarteira[] = [];
@@ -309,6 +312,7 @@ export default function CarteiraPage() {
       if (b) params.set("busca", b);
       if (sr) params.set("statusRecuperacao", sr);
       if (sit) params.set("situacao", sit);
+      if (bv) params.set("baseVencimento", bv);
       const data = await fetch(`/api/carteira?${params}`).then((r) => r.json()).catch(() => ({}));
       if (carregarSeqRef.current !== minhaSeq) return; // um carregamento mais novo já assumiu -- descarta este
       const contratos: ItemCarteira[] = Array.isArray(data.contratos) ? data.contratos : [];
@@ -350,8 +354,8 @@ export default function CarteiraPage() {
   // Reload quando filtros de status mudam (server-side, sem paginação)
   useEffect(() => {
     if (!competenciaId) return;
-    carregarTodos(competenciaId, busca, sort, statusRecupFiltro, situacaoFiltro);
-  }, [statusRecupFiltro, situacaoFiltro]);
+    carregarTodos(competenciaId, busca, sort, statusRecupFiltro, situacaoFiltro, baseVencimentoFiltro);
+  }, [statusRecupFiltro, situacaoFiltro, baseVencimentoFiltro]);
 
   // Lookup automático de contrato no modal a_parte
   useEffect(() => {
@@ -727,6 +731,13 @@ export default function CarteiraPage() {
     }
   }
 
+  // Filtro de base de vencimento (05/10/15/20/25) só faz sentido pra quem
+  // cobra Flash -- mostra pro próprio consultor Flash, ou pra Gestor/Admin
+  // quando a carteira carregada (ex: "Outra carteira") já tem itens Flash.
+  const mostrarFiltroBaseVencimento =
+    (perfil === "CONSULTOR" && (session?.user as any)?.equipe?.tipo === "FLASH") ||
+    carteira.some((i) => i.tipoEquipe === "FLASH");
+
   const empresas = Array.from(new Set(carteira.map((i) => i.contrato.empresa.nome))).sort();
 
   // Apenas empresa permanece client-side (status/situação são server-side)
@@ -813,6 +824,20 @@ export default function CarteiraPage() {
           <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
           <option value="LIGAR_DEPOIS">Ligar depois</option>
         </select>
+        {mostrarFiltroBaseVencimento && (
+          <select
+            value={baseVencimentoFiltro ?? ""}
+            onChange={(e) => setBaseVencimentoFiltro(e.target.value || null)}
+            className="bg-surface-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
+          >
+            <option value="">Vencimento Flash — todos</option>
+            <option value="5">Dia 05</option>
+            <option value="10">Dia 10</option>
+            <option value="15">Dia 15</option>
+            <option value="20">Dia 20</option>
+            <option value="25">Dia 25</option>
+          </select>
+        )}
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Ordenar por</span>
           <select

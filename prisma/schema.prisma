@@ -316,6 +316,11 @@ model CarteiraParcela {
   // não da equipe de quando o dinheiro entrou. Nullable só pra não quebrar
   // linhas antigas (pré-migração), que caem no fallback da equipe atual.
   tipoEquipe    TipoEquipe?
+  // Dia do vencimento da onda Flash (05, 10, 15, 20 ou 25) -- só relevante
+  // quando tipoEquipe = FLASH. Selecionado pelo gestor no momento da
+  // importação (cada onda Flash do mês é um arquivo separado), não derivado
+  // automaticamente da data de vencimento de cada parcela.
+  baseVencimento Int?
   ativo         Boolean     @default(true)
   atribuidoEm   DateTime    @default(now())
 

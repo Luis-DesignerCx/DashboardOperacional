@@ -12,9 +12,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
   }
 
-  const { syncId, filePath, competenciaId } = await req.json();
+  const { syncId, filePath, competenciaId, baseVencimento } = await req.json();
   if (!syncId || !filePath || !competenciaId) {
     return NextResponse.json({ erro: "syncId, filePath e competenciaId são obrigatórios" }, { status: 400 });
+  }
+  if (!baseVencimento || ![5, 10, 15, 20, 25].includes(Number(baseVencimento))) {
+    return NextResponse.json({ erro: "Selecione a base de vencimento (05, 10, 15, 20 ou 25)" }, { status: 400 });
   }
 
   const ghToken = process.env.GH_PAT_TOKEN;
@@ -40,7 +43,7 @@ export async function POST(req: NextRequest) {
     },
     body: JSON.stringify({
       event_type: "fapass-sync",
-      client_payload: { competenciaId, syncId, filePath },
+      client_payload: { competenciaId, syncId, filePath, baseVencimento: String(baseVencimento) },
     }),
   });
 

@@ -263,9 +263,14 @@ export async function POST(req: NextRequest) {
   const arquivo  = formData.get("arquivo")      as File;
   const competenciaId = formData.get("competenciaId") as string;
   const isFlash  = (formData.get("tipoBase") as string | null) === "FLASH";
+  const baseVencimentoRaw = formData.get("baseVencimento") as string | null;
+  const baseVencimento = baseVencimentoRaw ? parseInt(baseVencimentoRaw) : null;
 
   if (!arquivo || !competenciaId) {
     return NextResponse.json({ erro: "Arquivo e competência são obrigatórios" }, { status: 400 });
+  }
+  if (isFlash && ![5, 10, 15, 20, 25].includes(baseVencimento ?? -1)) {
+    return NextResponse.json({ erro: "Selecione a base de vencimento (05, 10, 15, 20 ou 25) para importação Flash" }, { status: 400 });
   }
 
   const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
@@ -693,7 +698,8 @@ export async function POST(req: NextRequest) {
         isFlash,
         nomeConsultorPorContrato,
         faixaPorContrato,
-        fatoresFerias
+        fatoresFerias,
+        baseVencimento
       );
     }
 
@@ -733,7 +739,8 @@ async function distribuirCarteiraAutomatica(
   isFlash = false,
   nomeConsultorPorContrato: Map<string, string> = new Map(),
   faixaPorContrato: Map<string, string> = new Map(),
-  fatoresFerias: Map<string, number> = new Map()
+  fatoresFerias: Map<string, number> = new Map(),
+  baseVencimento: number | null = null
 ) {
   if (!paraDistribuir.length) return;
 
@@ -769,7 +776,7 @@ async function distribuirCarteiraAutomatica(
     todosConsultores.map((u) => [normalizar(u.nome), { id: u.id, tipoEquipe: u.equipeId ? equipeTipoPorId.get(u.equipeId) ?? null : null }])
   );
 
-  const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe | null }[] = [];
+  const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe | null; baseVencimento: number | null }[] = [];
   const semConsultorDefinido: typeof contratos = [];
 
   // 1ª passagem: atribuições diretas da planilha
@@ -778,7 +785,10 @@ async function distribuirCarteiraAutomatica(
     if (nomeRaw) {
       const consultor = consultorPorNomeNorm.get(normalizar(nomeRaw));
       if (consultor) {
-        novasAtribuicoes.push({ id: randomUUID(), contratoId: c.id, consultorId: consultor.id, competenciaId, tipoEquipe: consultor.tipoEquipe });
+        novasAtribuicoes.push({
+          id: randomUUID(), contratoId: c.id, consultorId: consultor.id, competenciaId, tipoEquipe: consultor.tipoEquipe,
+          baseVencimento: consultor.tipoEquipe === "FLASH" ? baseVencimento : null,
+        });
         continue;
       }
     }
@@ -818,7 +828,10 @@ async function distribuirCarteiraAutomatica(
 
       for (const at of atribuicoes) {
         for (const contratoId of at.contratoIds) {
-          novasAtribuicoes.push({ id: randomUUID(), contratoId, consultorId: at.consultorId, competenciaId, tipoEquipe: tipo });
+          novasAtribuicoes.push({
+            id: randomUUID(), contratoId, consultorId: at.consultorId, competenciaId, tipoEquipe: tipo,
+            baseVencimento: tipo === "FLASH" ? baseVencimento : null,
+          });
         }
       }
     }

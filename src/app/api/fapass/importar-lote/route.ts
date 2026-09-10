@@ -104,8 +104,13 @@ export async function POST(req: NextRequest) {
   const form = await req.formData();
   const arquivo = form.get("arquivo") as File | null;
   const competenciaId = form.get("competenciaId") as string | null;
+  const baseVencimentoRaw = form.get("baseVencimento") as string | null;
+  const baseVencimento = baseVencimentoRaw ? parseInt(baseVencimentoRaw) : null;
   if (!arquivo || !competenciaId) {
     return NextResponse.json({ erro: "arquivo e competenciaId são obrigatórios" }, { status: 400 });
+  }
+  if (!baseVencimento || ![5, 10, 15, 20, 25].includes(baseVencimento)) {
+    return NextResponse.json({ erro: "Selecione a base de vencimento (05, 10, 15, 20 ou 25)" }, { status: 400 });
   }
 
   const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
@@ -292,11 +297,14 @@ export async function POST(req: NextRequest) {
       );
       const semCarteira = novosParaDistribuir.filter((c) => !jaDistribuidos.has(c.contratoId));
 
-      const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe | null }[] = [];
+      const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe | null; baseVencimento: number | null }[] = [];
 
       const comConsultorDaPlanilha = semCarteira.filter((c) => c.consultorId);
       for (const c of comConsultorDaPlanilha) {
-        novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: c.consultorId!, competenciaId, tipoEquipe: c.consultorTipoEquipe });
+        novasAtribuicoes.push({
+          id: randomUUID(), contratoId: c.contratoId, consultorId: c.consultorId!, competenciaId, tipoEquipe: c.consultorTipoEquipe,
+          baseVencimento: c.consultorTipoEquipe === "FLASH" ? baseVencimento : null,
+        });
         atribuidosDaPlanilha++;
       }
 
@@ -318,7 +326,10 @@ export async function POST(req: NextRequest) {
           if (!equipe?.usuarios.length) continue;
           const consultores = equipe.usuarios.map((u) => u.id);
           lista.forEach((c, i) => {
-            novasAtribuicoes.push({ id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId, tipoEquipe: tipo });
+            novasAtribuicoes.push({
+              id: randomUUID(), contratoId: c.contratoId, consultorId: consultores[i % consultores.length], competenciaId, tipoEquipe: tipo,
+              baseVencimento: tipo === "FLASH" ? baseVencimento : null,
+            });
             atribuidosAutomatico++;
           });
         }
