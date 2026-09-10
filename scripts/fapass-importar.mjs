@@ -151,7 +151,9 @@ async function main() {
     for (let i = 0; i < paraAtualizar.length; i += CONCORRENCIA) {
       const lote = paraAtualizar.slice(i, i + CONCORRENCIA);
       await Promise.all(lote.map((p) =>
-        prisma.contrato.update({ where: { id: p.existente.id }, data: { maiorDiasAtraso: p.diasAtraso, valorTotalAberto: p.valorTotal } })
+        // statusRecuperacao volta pra INADIMPLENTE -- ver comentário
+        // equivalente em src/app/api/fapass/importar/route.ts.
+        prisma.contrato.update({ where: { id: p.existente.id }, data: { maiorDiasAtraso: p.diasAtraso, valorTotalAberto: p.valorTotal, statusRecuperacao: "INADIMPLENTE" } })
       ));
       process.stdout.write(`\r  Contratos atualizados: ${Math.min(i + CONCORRENCIA, paraAtualizar.length)}/${paraAtualizar.length}`);
     }

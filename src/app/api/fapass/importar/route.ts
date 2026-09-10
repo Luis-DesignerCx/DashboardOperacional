@@ -198,7 +198,11 @@ export async function POST(req: NextRequest) {
       if (existente) {
         contratoId = existente.id;
         clienteId = existente.clienteId;
-        await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
+        // statusRecuperacao volta pra INADIMPLENTE -- sem isso, um contrato já
+        // quitado numa competência anterior ficava preso como "Adimplente"
+        // pra sempre, escondendo o botão de recebimento do consultor mesmo
+        // com dívida nova.
+        await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal, statusRecuperacao: "INADIMPLENTE" } });
         atualizados++;
       } else {
         clienteId = randomUUID(); contratoId = randomUUID();

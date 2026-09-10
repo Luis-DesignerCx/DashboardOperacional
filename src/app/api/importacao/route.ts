@@ -563,6 +563,15 @@ export async function POST(req: NextRequest) {
                       ${op.ctData.valorContrato ?? null}::numeric)`
         )
       );
+      // "statusRecuperacao" volta pra INADIMPLENTE -- todo contrato que chega
+      // aqui tem pelo menos uma parcela em aberto válida nesta importação (ver
+      // "rowsFiltradas.length === 0" acima, que pula o contrato antes de
+      // chegar em updateOps). Sem isso, um contrato que já tinha sido pago
+      // integralmente numa competência anterior ficava PRA SEMPRE marcado
+      // como "Adimplente"/RECUPERADO_INTEGRALMENTE mesmo recebendo dívida
+      // nova depois -- escondendo o botão de registrar recebimento do
+      // consultor (achado real: 152 contratos assim, em todos os
+      // empreendimentos).
       await prisma.$executeRaw`
         UPDATE "contratos" AS c
         SET "statusContrato"        = v.sc,
@@ -570,7 +579,8 @@ export async function POST(req: NextRequest) {
             "maiorDiasAtraso"       = v.mda,
             "valorTotalAberto"      = v.vta,
             "empresaId"             = v.eid,
-            "valorContrato"         = COALESCE(v.vc, c."valorContrato")
+            "valorContrato"         = COALESCE(v.vc, c."valorContrato"),
+            "statusRecuperacao"     = 'INADIMPLENTE'::"StatusRecuperacao"
         FROM (VALUES ${ctRows}) AS v(id, sc, tpv, mda, vta, eid, vc)
         WHERE c.id = v.id
       `;

@@ -224,7 +224,9 @@ export async function POST(req: NextRequest) {
       if (existente) {
         contratoId = existente.id;
         clienteId = existente.clienteId;
-        await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal } });
+        // statusRecuperacao volta pra INADIMPLENTE -- ver comentário
+        // equivalente em /api/fapass/importar.
+        await prisma.contrato.update({ where: { id: contratoId }, data: { maiorDiasAtraso: diasAtraso, valorTotalAberto: valorTotal, statusRecuperacao: "INADIMPLENTE" } });
         atualizados++;
       } else {
         clienteId = randomUUID(); contratoId = randomUUID();
