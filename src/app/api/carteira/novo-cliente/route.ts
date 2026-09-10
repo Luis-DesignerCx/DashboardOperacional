@@ -69,9 +69,14 @@ async function processarNovoCliente(req: NextRequest, session: any) {
       contratoId = contratoExistente.id;
     } else {
       const empresas = await prisma.empresa.findMany();
+      // Empresa sem prefixo cadastrado (Mydest) é o fallback -- sem isso,
+      // nenhum contrato dela passava por aqui (prefixos.some em array vazio
+      // é sempre false), igual acontece no import geral (ver empresaFallbackId
+      // em /api/importacao).
+      const empresaFallback = empresas.find((e) => e.prefixos.length === 0);
       const empresa = empresas.find((e) =>
         e.prefixos.some((p) => numeroContrato.toUpperCase().startsWith(p.toUpperCase()))
-      );
+      ) ?? empresaFallback;
       if (!empresa) {
         return NextResponse.json({ erro: "Não foi possível identificar a empresa pelo número do contrato" }, { status: 400 });
       }
@@ -213,9 +218,12 @@ async function processarNovoCliente(req: NextRequest, session: any) {
 
   // Contrato novo — cria tudo
   const empresas = await prisma.empresa.findMany();
+  // Empresa sem prefixo cadastrado (Mydest) é o fallback -- ver comentário
+  // equivalente na branch "a_parte" acima.
+  const empresaFallback = empresas.find((e) => e.prefixos.length === 0);
   const empresa = empresas.find((e) =>
     e.prefixos.some((p) => numeroContrato.toUpperCase().startsWith(p.toUpperCase()))
-  );
+  ) ?? empresaFallback;
   if (!empresa) {
     return NextResponse.json({ erro: "Não foi possível identificar a empresa pelo número do contrato" }, { status: 400 });
   }
