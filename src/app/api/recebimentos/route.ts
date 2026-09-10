@@ -173,6 +173,14 @@ async function processarRecebimento(req: NextRequest, session: any) {
   // valor original da parcela em até 2% de multa (uma vez, se está
   // atrasada) + 1% de juros ao mês pro-rata (do vencimento até hoje).
   // GESTOR/ADMINISTRADOR podem sobrescrever (ex: acordo renegociado).
+  //
+  // Dias usados no cálculo = dias corridos real + 1 (o sistema financeiro da
+  // empresa sempre calcula um dia a mais que a contagem corrida simples --
+  // ajustado aqui pra bater com ele) + 3 de brecha (folga proposital que a
+  // empresa decidiu dar ao consultor, pra não travar por pequena diferença
+  // de data entre sistemas).
+  const DIAS_AJUSTE_SISTEMA_FINANCEIRO = 1;
+  const DIAS_BRECHA_CONSULTOR = 3;
   if (session.user.perfil === "CONSULTOR" && Array.isArray(parcelasIds) && parcelasIds.length > 0) {
     const parcelasSelecionadas = await prisma.parcela.findMany({
       where: { id: { in: parcelasIds } },
@@ -181,9 +189,10 @@ async function processarRecebimento(req: NextRequest, session: any) {
     const hoje = new Date();
     let valorMaximoTotal = 0;
     for (const p of parcelasSelecionadas) {
-      const diasAtraso = Math.max(0, Math.floor((hoje.getTime() - new Date(p.dataVencimento).getTime()) / 86400000));
-      const multa = diasAtraso > 0 ? 0.02 : 0;
-      const juros = 0.01 * (diasAtraso / 30);
+      const diasCorridos = Math.max(0, Math.floor((hoje.getTime() - new Date(p.dataVencimento).getTime()) / 86400000));
+      const diasParaCalculo = diasCorridos > 0 ? diasCorridos + DIAS_AJUSTE_SISTEMA_FINANCEIRO + DIAS_BRECHA_CONSULTOR : 0;
+      const multa = diasParaCalculo > 0 ? 0.02 : 0;
+      const juros = 0.01 * (diasParaCalculo / 30);
       valorMaximoTotal += Number(p.valorParcela ?? 0) * (1 + multa + juros);
     }
     if (valorNumerico > valorMaximoTotal + 0.02) {
