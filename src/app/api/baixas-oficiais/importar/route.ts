@@ -60,10 +60,15 @@ export async function POST(req: NextRequest) {
   }
 
   const form = await req.formData();
-  const arquivo = form.get("arquivo") as File | null;
+  // Aceita 1+ arquivos (ex: planilha "multi" + "mydest" de empreendimentos
+  // diferentes) -- mantém compat com o campo singular "arquivo" de clientes
+  // antigos.
+  const arquivos = [...form.getAll("arquivos"), form.get("arquivo")].filter(
+    (f): f is File => f instanceof File
+  );
   const competenciaId = form.get("competenciaId") as string | null;
 
-  if (!arquivo || !competenciaId) {
+  if (arquivos.length === 0 || !competenciaId) {
     return NextResponse.json({ erro: "arquivo e competenciaId são obrigatórios" }, { status: 400 });
   }
 
@@ -73,38 +78,43 @@ export async function POST(req: NextRequest) {
   const iniComp = new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1));
   const fimComp = new Date(Date.UTC(competencia.ano, competencia.mes, 1));
 
-  // ── 1. Parse planilha → mapa por número de contrato ──────────────────────────
-  const buffer = Buffer.from(await arquivo.arrayBuffer());
-  const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
-  const linhas = (rows as unknown[][]).slice(1).filter((r) => r && r.length > C.valorAReceber);
-
+  // ── 1. Parse de todas as planilhas → um único mapa por número de contrato ────
+  // Mescladas ANTES do cruzamento (não uma chamada por arquivo): assim um
+  // contrato que só está no arquivo A não vira "divergência" por não constar
+  // no arquivo B -- o cruzamento roda uma vez só, com a base completa.
   const planilhaMap = new Map<string, { cliente: string; valor: number; dataLiquidacao: Date }>();
 
-  for (const row of linhas) {
-    const contrato = String(row[C.contrato] ?? "").trim();
-    if (!contrato) continue;
+  for (const arquivo of arquivos) {
+    const buffer = Buffer.from(await arquivo.arrayBuffer());
+    const wb = XLSX.read(buffer, { type: "buffer", cellDates: false });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null });
+    const linhas = (rows as unknown[][]).slice(1).filter((r) => r && r.length > C.valorAReceber);
 
-    const origem = String(row[C.origem] ?? "").trim().toUpperCase();
-    if (!ORIGENS_VALIDAS.has(origem)) continue;
+    for (const row of linhas) {
+      const contrato = String(row[C.contrato] ?? "").trim();
+      if (!contrato) continue;
 
-    const meio = String(row[C.meioPagamento] ?? "").trim();
-    if (!ehPIXouBoleto(meio)) continue;
+      const origem = String(row[C.origem] ?? "").trim().toUpperCase();
+      if (!ORIGENS_VALIDAS.has(origem)) continue;
 
-    const dataLiq = parsearSerial(row[C.dataLiquidacao]);
-    if (!dataLiq || dataLiq < iniComp || dataLiq >= fimComp) continue;
+      const meio = String(row[C.meioPagamento] ?? "").trim();
+      if (!ehPIXouBoleto(meio)) continue;
 
-    const valor = parsearValor(row[C.valorAReceber]);
-    if (valor === 0) continue;
+      const dataLiq = parsearSerial(row[C.dataLiquidacao]);
+      if (!dataLiq || dataLiq < iniComp || dataLiq >= fimComp) continue;
 
-    const cliente = String(row[C.cliente] ?? "").trim();
-    const entry = planilhaMap.get(contrato);
-    if (entry) {
-      entry.valor += valor;
-      if (dataLiq > entry.dataLiquidacao) entry.dataLiquidacao = dataLiq;
-    } else {
-      planilhaMap.set(contrato, { cliente, valor, dataLiquidacao: dataLiq });
+      const valor = parsearValor(row[C.valorAReceber]);
+      if (valor === 0) continue;
+
+      const cliente = String(row[C.cliente] ?? "").trim();
+      const entry = planilhaMap.get(contrato);
+      if (entry) {
+        entry.valor += valor;
+        if (dataLiq > entry.dataLiquidacao) entry.dataLiquidacao = dataLiq;
+      } else {
+        planilhaMap.set(contrato, { cliente, valor, dataLiquidacao: dataLiq });
+      }
     }
   }
 
@@ -204,6 +214,7 @@ export async function POST(req: NextRequest) {
   await Promise.all(atualizacoes);
 
   return NextResponse.json({
+    arquivosProcessados: arquivos.length,
     totalCarteira: todosContratos.length,
     confirmados: confirmados.length,
     divergencias: divergencias.length,
