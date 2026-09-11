@@ -73,7 +73,7 @@ export default function RelatorioDiarioPage() {
       </div>
 
       <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
-        <p className="text-slate-400 text-sm">Total recebido no dia (todos abaixo)</p>
+        <p className="text-slate-400 text-sm">Total recebido no dia (todos abaixo, já inclui "a parte")</p>
         <p className="text-3xl font-bold text-emerald-400 mt-1">{formatarMoeda(totalGeral)}</p>
       </div>
 
@@ -85,6 +85,14 @@ export default function RelatorioDiarioPage() {
         <div className="text-center py-16 text-slate-500 text-sm">Nenhum consultor neste escopo.</div>
       ) : (
         <div className="space-y-2">
+          {/* Cabeçalho das colunas */}
+          <div className="flex items-center justify-between px-5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            <span>Consultor</span>
+            <div className="flex items-center gap-4">
+              <span className="w-28 text-right">A parte</span>
+              <span className="w-28 text-right">Total recebido</span>
+            </div>
+          </div>
           {consultores.map((c) => {
             const total = c.totalRecebido + c.totalAParte;
             const aberto = expandido === c.id;
@@ -101,13 +109,11 @@ export default function RelatorioDiarioPage() {
                       {c.itens.length} recebimento{c.itens.length !== 1 ? "s" : ""}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4 text-right">
-                    {c.totalAParte > 0 && (
-                      <span className="text-xs text-sky-400">
-                        {formatarMoeda(c.totalAParte)} a parte
-                      </span>
-                    )}
-                    <span className={`text-sm font-bold tabular-nums ${total > 0 ? "text-emerald-400" : "text-slate-500"}`}>
+                  <div className="flex items-center gap-4">
+                    <span className="w-28 text-right text-xs text-sky-400">
+                      {c.totalAParte > 0 ? formatarMoeda(c.totalAParte) : "—"}
+                    </span>
+                    <span className={`w-28 text-right text-sm font-bold tabular-nums ${total > 0 ? "text-emerald-400" : "text-slate-500"}`}>
                       {formatarMoeda(total)}
                     </span>
                   </div>
