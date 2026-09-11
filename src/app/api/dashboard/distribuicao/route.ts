@@ -86,8 +86,13 @@ export async function GET(req: NextRequest) {
     const consultorMap = new Map(consultores.map((c) => [c.id, c]));
 
     // 2. Carteiras para a competência (inclui diasAtraso e empresa para derivar frente)
+    // "inadimplenciaEquivocada: false" -- sem isso, contratos com disputa
+    // aprovada continuavam contados aqui mesmo já removidos de todo o resto
+    // do sistema (carteira, dashboard do consultor, comissão), causando o
+    // card do topo (via /api/dashboard) e esta tabela (via este endpoint)
+    // mostrarem contagens/valores diferentes pro mesmo gestor.
     const carteiras = await prisma.carteiraParcela.findMany({
-      where: { consultorId: { in: consultorIds }, competenciaId, ativo: true },
+      where: { consultorId: { in: consultorIds }, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
       select: {
         contratoId: true,
         consultorId: true,
@@ -203,12 +208,14 @@ export async function GET(req: NextRequest) {
     const porEmpresa = Array.from(empresaMap.entries())
       .map(([id, e]) => {
         const recebido = Array.from(e.contratos).reduce((sum, cId) => sum + (recContMap.get(cId) ?? 0), 0);
+        const contratosRecebidos = Array.from(e.contratos).filter((cId) => (recContMap.get(cId) ?? 0) > 0).length;
         return {
           empresaId: id,
           nome: e.nome,
           saldoAberto: e.saldoAberto,
           recebido,
           contratos: e.contratos.size,
+          contratosRecebidos,
           percentual: e.saldoAberto > 0 ? Math.min((recebido / e.saldoAberto) * 100, 100) : 0,
         };
       })

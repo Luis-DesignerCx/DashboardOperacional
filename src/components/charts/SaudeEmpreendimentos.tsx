@@ -6,7 +6,7 @@ import { Building2 } from "lucide-react";
 
 interface EmpresaDist {
   empresaId: string; nome: string; saldoAberto: number; recebido: number;
-  contratos: number; percentual: number;
+  contratos: number; contratosRecebidos: number; percentual: number;
 }
 
 interface Props {
@@ -15,8 +15,13 @@ interface Props {
 
 export function SaudeEmpreendimentos({ porEmpresa }: Props) {
   const total = porEmpresa.reduce(
-    (acc, e) => ({ saldoAberto: acc.saldoAberto + e.saldoAberto, recebido: acc.recebido + e.recebido, contratos: acc.contratos + e.contratos }),
-    { saldoAberto: 0, recebido: 0, contratos: 0 }
+    (acc, e) => ({
+      saldoAberto: acc.saldoAberto + e.saldoAberto,
+      recebido: acc.recebido + e.recebido,
+      contratos: acc.contratos + e.contratos,
+      contratosRecebidos: acc.contratosRecebidos + e.contratosRecebidos,
+    }),
+    { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidos: 0 }
   );
 
   return (
@@ -35,8 +40,9 @@ export function SaudeEmpreendimentos({ porEmpresa }: Props) {
               <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.05]">
                 <th className="text-left pb-2.5 font-semibold">Empreendimento</th>
                 <th className="text-right pb-2.5 font-semibold">Saldo em Aberto</th>
+                <th className="text-right pb-2.5 font-semibold">Qtd. Contratos</th>
                 <th className="text-right pb-2.5 font-semibold">Recebido no Mês</th>
-                <th className="text-right pb-2.5 font-semibold">Contratos</th>
+                <th className="text-right pb-2.5 font-semibold">Qtd. Contratos</th>
                 <th className="text-right pb-2.5 font-semibold">% Recuperação</th>
               </tr>
             </thead>
@@ -45,8 +51,9 @@ export function SaudeEmpreendimentos({ porEmpresa }: Props) {
                 <tr key={e.empresaId} className="hover:bg-white/[0.02] transition-colors">
                   <td className="py-2.5 text-slate-200 font-medium">{e.nome}</td>
                   <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.saldoAberto)}</td>
-                  <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(e.recebido)}</td>
                   <td className="py-2.5 text-right text-slate-500 tabular-nums">{e.contratos}</td>
+                  <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(e.recebido)}</td>
+                  <td className="py-2.5 text-right text-slate-500 tabular-nums">{e.contratosRecebidos}</td>
                   <td className="py-2.5 text-right">
                     <span className={cn(
                       "px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums",
@@ -62,8 +69,9 @@ export function SaudeEmpreendimentos({ porEmpresa }: Props) {
               <tr className="border-t border-white/[0.07]">
                 <td className="pt-3 pb-0.5 text-white font-semibold">Total</td>
                 <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(total.saldoAberto)}</td>
-                <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(total.recebido)}</td>
                 <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{total.contratos}</td>
+                <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(total.recebido)}</td>
+                <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{total.contratosRecebidos}</td>
                 <td className="pt-3 pb-0.5 text-right text-slate-500 text-[10px] tabular-nums">
                   {total.saldoAberto > 0 ? ((total.recebido / total.saldoAberto) * 100).toFixed(1) + "%" : "—"}
                 </td>

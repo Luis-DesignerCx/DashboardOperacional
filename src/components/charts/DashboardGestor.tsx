@@ -31,7 +31,7 @@ interface FrenteDist {
 }
 interface EmpresaDist {
   empresaId: string; nome: string; saldoAberto: number; recebido: number;
-  contratos: number; percentual: number;
+  contratos: number; contratosRecebidos: number; percentual: number;
 }
 
 export function DashboardGestor() {

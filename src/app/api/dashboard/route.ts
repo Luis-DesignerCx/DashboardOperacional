@@ -588,17 +588,18 @@ async function dashboardExecutivo(competenciaId: string, equipeIds: string[] = [
   const totalContratos = new Set(carteiras.map((c) => c.contratoId)).size;
   const contratosRecuperados = carteiras.filter((c) => (recebMap.get(c.contratoId) ?? 0) > 0).length;
 
-  const porEmpresa = new Map<string, { nome: string; inadimplencia: number; recuperado: number; clientes: Set<string>; contratos: Set<string> }>();
+  const porEmpresa = new Map<string, { nome: string; inadimplencia: number; recuperado: number; clientes: Set<string>; contratos: Set<string>; contratosRecebidos: Set<string> }>();
   for (const c of carteiras) {
     const empId = c.contrato.empresaId;
     if (!porEmpresa.has(empId)) {
-      porEmpresa.set(empId, { nome: empresaMap.get(empId) ?? empId, inadimplencia: 0, recuperado: 0, clientes: new Set(), contratos: new Set() });
+      porEmpresa.set(empId, { nome: empresaMap.get(empId) ?? empId, inadimplencia: 0, recuperado: 0, clientes: new Set(), contratos: new Set(), contratosRecebidos: new Set() });
     }
     const reg = porEmpresa.get(empId)!;
     reg.inadimplencia += Number(c.contrato.valorTotalAberto ?? 0);
     reg.recuperado += recebMap.get(c.contratoId) ?? 0;
     reg.clientes.add(c.contrato.clienteId);
     reg.contratos.add(c.contratoId);
+    if ((recebMap.get(c.contratoId) ?? 0) > 0) reg.contratosRecebidos.add(c.contratoId);
   }
 
   const rankingEmpresas = Array.from(porEmpresa.values())
@@ -608,6 +609,7 @@ async function dashboardExecutivo(competenciaId: string, equipeIds: string[] = [
       recuperado: e.recuperado,
       clientes: e.clientes.size,
       contratos: e.contratos.size,
+      contratosRecebidos: e.contratosRecebidos.size,
       percentual: e.inadimplencia ? Math.min((e.recuperado / e.inadimplencia) * 100, 100) : 0,
     }))
     .sort((a, b) => b.percentual - a.percentual);
