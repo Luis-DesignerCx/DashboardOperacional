@@ -850,6 +850,20 @@ export default function CarteiraPage() {
             <option value="parcelasAberto">Valor em aberto</option>
           </select>
         </div>
+        {(busca || statusRecupFiltro || situacaoFiltro || baseVencimentoFiltro || empresaFiltro) && (
+          <button
+            onClick={() => {
+              setBusca("");
+              setStatusRecupFiltro(null);
+              setSituacaoFiltro(null);
+              setBaseVencimentoFiltro(null);
+              setEmpresaFiltro(null);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/[0.05] transition-colors"
+          >
+            <X size={14} /> Limpar filtros
+          </button>
+        )}
       </div>
 
       {/* Empreendimento — pills */}

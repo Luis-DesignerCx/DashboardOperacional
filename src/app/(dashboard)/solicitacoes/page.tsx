@@ -57,7 +57,10 @@ export default function SolicitacoesPage() {
     ? solicitacoes
     : solicitacoes.filter((s) => s.status === filtroStatus);
 
-  const pendentes = solicitacoes.filter((s) => s.status === "PENDENTE").length;
+  // Acompanha o filtro selecionado -- antes sempre mostrava o total geral de
+  // pendentes, mesmo filtrando por Aprovada/Rejeitada, destoando da lista
+  // abaixo (que já respeitava o filtro).
+  const pendentes = filtradas.filter((s) => s.status === "PENDENTE").length;
 
   return (
     <div className="space-y-6">
