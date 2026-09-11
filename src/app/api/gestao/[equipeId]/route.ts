@@ -91,7 +91,14 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
       ? prisma.recebimento.findMany({
           where: {
             consultorId: { in: consultorIds },
-            contrato: { carteiras: { some: { competenciaId, ativo: true } } },
+            // "tipoEquipe: equipeInfo.tipo" -- não basta o contrato ter
+            // QUALQUER carteira ativa nesta competência; ela precisa ser
+            // desta MESMA frente. Sem isso, um consultor Flash que recebe de
+            // um cliente cuja carteira desta competência é "1 a 30" (regra:
+            // o valor conta pro consultor normalmente, mas a inadimplência
+            // do contrato é de outra frente) fazia esse recebimento poluir
+            // o total da frente Flash, mesmo o contrato sendo de outra.
+            contrato: { carteiras: { some: { competenciaId, ativo: true, ...(equipeInfo ? { tipoEquipe: equipeInfo.tipo } : {}) } } },
             dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: {
