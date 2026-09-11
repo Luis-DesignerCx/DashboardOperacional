@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Users, FolderOpen, Upload, Target, DollarSign,
   BarChart3, ClipboardList, Settings, Shield, Bell, ChevronLeft,
   ChevronRight, History, Layers, UserCog, PieChart, Search,
-  SlidersHorizontal, Briefcase, ChevronDown,
+  SlidersHorizontal, Briefcase, ChevronDown, CalendarDays,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
@@ -57,6 +57,7 @@ const NAV_ITEMS: NavEntry[] = [
     ],
   },
   { label: "Comissão",     href: "/comissao",     icon: DollarSign,    perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
+  { label: "Relatório Diário", href: "/relatorio-diario", icon: CalendarDays, perfis: ["ADMINISTRADOR", "GESTOR", "CONSULTOR"] },
   { label: "Relatórios",   href: "/relatorios",   icon: BarChart3,     perfis: ["ADMINISTRADOR", "GESTOR"] },
   { label: "Solicitações", href: "/solicitacoes", icon: ClipboardList, perfis: ["ADMINISTRADOR", "GESTOR"] },
   { label: "Auditoria",    href: "/auditoria",    icon: Shield,        perfis: ["ADMINISTRADOR"] },
