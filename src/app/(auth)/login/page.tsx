@@ -185,8 +185,8 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={carregando}
-              className="w-full disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all text-sm mt-2 active:scale-[0.99]"
-              style={{ background: "linear-gradient(135deg, #4c3d8d, #6460e4)", boxShadow: "0 4px 20px rgba(76,61,141,0.35)" }}
+              className="glow-gr-cta w-full disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-xl transition-all text-sm mt-2 active:scale-[0.99]"
+              style={{ background: "linear-gradient(135deg, #4c3d8d, #6460e4)" }}
             >
               {carregando ? "Entrando..." : "Entrar na plataforma"}
             </button>
