@@ -5,6 +5,7 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff } from "lucide-react";
+import { GradientCursorTrail } from "@/components/ui/gradient-cursor-trail";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,6 +29,8 @@ export default function LoginPage() {
     /* ── Wrapper global — gradiente e glows cobrem TODA a tela ── */
     <div className="login-screen relative min-h-screen flex flex-col lg:flex-row overflow-hidden"
       style={{ background: "linear-gradient(145deg, #1a1438 0%, #0f0c24 40%, #16102e 100%)" }}>
+
+      <GradientCursorTrail />
 
       {/* Ambient glows — espalham por toda a tela */}
       <div className="absolute inset-0 pointer-events-none">
