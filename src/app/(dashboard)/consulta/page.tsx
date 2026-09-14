@@ -11,6 +11,7 @@ interface ResultadoConsulta {
   valorTotalAberto: number | null;
   maiorDiasAtraso: number | null;
   statusRecuperacao: string | null;
+  naMinhaCarteira: boolean;
   cliente: { id: string; nome: string; cpf: string | null; telefones: string | null };
   empresa: { nome: string };
   carteiras: {
@@ -172,20 +173,29 @@ export default function ConsultaPage() {
                       </div>
                     </div>
 
-                    {/* Valor + dias + link */}
+                    {/* Valor + dias + link -- só pra quem é dono do contrato;
+                        cliente de outro consultor mostra só o responsável
+                        (acima), sem valor/atraso/CPF/telefone nem link pra
+                        ficha (a API bloqueia o acesso mesmo assim). */}
                     <div className="text-right flex-shrink-0 flex flex-col items-end gap-2">
-                      <div>
-                        <p className="text-white font-bold text-sm tabular-nums">{formatarMoeda(Number(c.valorTotalAberto ?? 0))}</p>
-                        <p className={`text-xs font-medium tabular-nums ${diasCor(c.maiorDiasAtraso)}`}>
-                          {c.maiorDiasAtraso ?? 0}d em atraso
-                        </p>
-                      </div>
-                      <Link
-                        href={`/clientes/${c.cliente.id}`}
-                        className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-surface-1 hover:bg-white/[0.04] px-3 py-1.5 rounded-lg transition-colors"
-                      >
-                        Ver ficha <ArrowRight size={12} />
-                      </Link>
+                      {c.naMinhaCarteira ? (
+                        <>
+                          <div>
+                            <p className="text-white font-bold text-sm tabular-nums">{formatarMoeda(Number(c.valorTotalAberto ?? 0))}</p>
+                            <p className={`text-xs font-medium tabular-nums ${diasCor(c.maiorDiasAtraso)}`}>
+                              {c.maiorDiasAtraso ?? 0}d em atraso
+                            </p>
+                          </div>
+                          <Link
+                            href={`/clientes/${c.cliente.id}`}
+                            className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white bg-surface-1 hover:bg-white/[0.04] px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            Ver ficha <ArrowRight size={12} />
+                          </Link>
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-500 italic">Cliente de outro consultor</p>
+                      )}
                     </div>
                   </div>
                 </div>

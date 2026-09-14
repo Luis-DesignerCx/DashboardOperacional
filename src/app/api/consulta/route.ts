@@ -11,25 +11,15 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get("q")?.trim();
   if (!q || q.length < 2) return NextResponse.json([]);
 
-  // Consultor só pode buscar/ver contratos da PRÓPRIA carteira -- sem isso,
-  // qualquer consultor autenticado buscava por nome/CPF/telefone e recebia
-  // CPF, telefone, e-mail e situação financeira de cliente de qualquer
-  // carteira (achado real da auditoria de segurança, 2026-09-15). Mesmo
-  // padrão de escopo já usado em /api/clientes (listagem).
-  const where: any = {
-    OR: [
-      { cliente: { nome: { contains: q, mode: "insensitive" } } },
-      { numero: { contains: q, mode: "insensitive" } },
-      { cliente: { cpf: { contains: q, mode: "insensitive" } } },
-      { cliente: { telefones: { contains: q, mode: "insensitive" } } },
-    ],
-  };
-  if (session.user.perfil === "CONSULTOR") {
-    where.carteiras = { some: { consultorId: session.user.id, ativo: true } };
-  }
-
   const contratos = await prisma.contrato.findMany({
-    where,
+    where: {
+      OR: [
+        { cliente: { nome: { contains: q, mode: "insensitive" } } },
+        { numero: { contains: q, mode: "insensitive" } },
+        { cliente: { cpf: { contains: q, mode: "insensitive" } } },
+        { cliente: { telefones: { contains: q, mode: "insensitive" } } },
+      ],
+    },
     select: {
       id: true,
       numero: true,
@@ -58,5 +48,32 @@ export async function GET(req: NextRequest) {
     take: 25,
   });
 
-  return NextResponse.json(contratos);
+  // Consultor precisa achar QUALQUER cliente pra saber de quem é (ex: cliente
+  // liga, ele precisa identificar o responsável) -- por isso a busca continua
+  // sem filtro de carteira acima. Mas CPF, telefone, e-mail e situação
+  // financeira só aparecem pra quem é dono do contrato (carteira ativa do
+  // próprio consultor); pra qualquer outro caso, só nome do cliente e quem é
+  // o consultor/frente responsável. Corrige o achado C4 da auditoria de
+  // segurança (2026-09-15) sem quebrar o caso de uso real (decisão do
+  // usuário, 2026-09-15: "o consultor precisa conseguir consultar na
+  // competência inteira pra saber de quem é aquele cliente").
+  const resultado = contratos.map((c) => {
+    const donoDoContrato = c.carteiras[0]?.consultor.id === session.user.id;
+    const podeVerDetalhes = session.user.perfil !== "CONSULTOR" || donoDoContrato;
+    return {
+      ...c,
+      naMinhaCarteira: podeVerDetalhes,
+      valorTotalAberto: podeVerDetalhes ? c.valorTotalAberto : null,
+      maiorDiasAtraso: podeVerDetalhes ? c.maiorDiasAtraso : null,
+      statusRecuperacao: podeVerDetalhes ? c.statusRecuperacao : null,
+      cliente: {
+        ...c.cliente,
+        cpf: podeVerDetalhes ? c.cliente.cpf : null,
+        telefones: podeVerDetalhes ? c.cliente.telefones : null,
+        emails: podeVerDetalhes ? c.cliente.emails : null,
+      },
+    };
+  });
+
+  return NextResponse.json(resultado);
 }
