@@ -177,6 +177,21 @@ async function processarRecebimento(req: NextRequest, session: any) {
   });
   if (!contrato) return NextResponse.json({ erro: "Contrato não encontrado" }, { status: 404 });
 
+  // Consultor só pode registrar recebimento de contrato na PRÓPRIA carteira
+  // -- sem isso, qualquer consultor autenticado conseguia marcar parcela de
+  // outro consultor como paga e fechar promessas alheias só mandando o
+  // contratoId de um contrato que não é seu (achado real da auditoria de
+  // segurança, 2026-09-15). Mesma checagem já usada em
+  // src/app/api/contratos/[id]/route.ts pro PATCH de situação.
+  if (session.user.perfil === "CONSULTOR") {
+    const naCarteira = await prisma.carteiraParcela.findFirst({
+      where: { contratoId, consultorId: session.user.id, ativo: true },
+    });
+    if (!naCarteira) {
+      return NextResponse.json({ erro: "Contrato não está na sua carteira" }, { status: 403 });
+    }
+  }
+
   const valorNumerico = parsearValorMonetario(valor);
 
   // Teto de multa/juros: o consultor só pode registrar um valor acima do

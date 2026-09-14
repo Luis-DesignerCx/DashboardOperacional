@@ -11,15 +11,25 @@ export async function GET(req: NextRequest) {
   const q = searchParams.get("q")?.trim();
   if (!q || q.length < 2) return NextResponse.json([]);
 
+  // Consultor só pode buscar/ver contratos da PRÓPRIA carteira -- sem isso,
+  // qualquer consultor autenticado buscava por nome/CPF/telefone e recebia
+  // CPF, telefone, e-mail e situação financeira de cliente de qualquer
+  // carteira (achado real da auditoria de segurança, 2026-09-15). Mesmo
+  // padrão de escopo já usado em /api/clientes (listagem).
+  const where: any = {
+    OR: [
+      { cliente: { nome: { contains: q, mode: "insensitive" } } },
+      { numero: { contains: q, mode: "insensitive" } },
+      { cliente: { cpf: { contains: q, mode: "insensitive" } } },
+      { cliente: { telefones: { contains: q, mode: "insensitive" } } },
+    ],
+  };
+  if (session.user.perfil === "CONSULTOR") {
+    where.carteiras = { some: { consultorId: session.user.id, ativo: true } };
+  }
+
   const contratos = await prisma.contrato.findMany({
-    where: {
-      OR: [
-        { cliente: { nome: { contains: q, mode: "insensitive" } } },
-        { numero: { contains: q, mode: "insensitive" } },
-        { cliente: { cpf: { contains: q, mode: "insensitive" } } },
-        { cliente: { telefones: { contains: q, mode: "insensitive" } } },
-      ],
-    },
+    where,
     select: {
       id: true,
       numero: true,

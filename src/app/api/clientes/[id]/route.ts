@@ -25,6 +25,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
+  // Consultor só pode ver ficha de cliente que tem contrato na PRÓPRIA
+  // carteira -- sem isso, qualquer consultor autenticado lia CPF/telefone/
+  // e-mail/financeiro completo de qualquer cliente do sistema só sabendo o
+  // id (achado real da auditoria de segurança, 2026-09-15). A listagem
+  // (/api/clientes) já restringia isso corretamente; faltava aqui, no
+  // detalhe por id.
+  if (session.user.perfil === "CONSULTOR") {
+    const naCarteira = await prisma.carteiraParcela.findFirst({
+      where: { consultorId: session.user.id, ativo: true, contrato: { clienteId: params.id } },
+    });
+    if (!naCarteira) {
+      return NextResponse.json({ erro: "Cliente não está na sua carteira" }, { status: 403 });
+    }
+  }
+
   // Só mostra recebimento da competência ABERTA (vigente) -- pra QUALQUER
   // perfil, inclusive Gestor/Administrador. Recebimento de mês já fechado
   // (cliente que já quitou e agora tem uma parcela nova) não deve aparecer
