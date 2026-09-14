@@ -246,6 +246,29 @@ function faixaParaTipoEquipe(faixa: string): TipoEquipe | null {
   return null;
 }
 
+// Dias estimados de atraso da parcela MAIS ANTIGA de um contrato, quando só
+// se sabe (a) o atraso da parcela mais recente e (b) quantas estão vencidas
+// no total. O arquivo Flash manda 1 linha por contrato (a mais recente) --
+// não dá pra saber a data real das parcelas anteriores. Assume ~30 dias por
+// ciclo mensal entre uma parcela e a próxima (aproximação, não é exato).
+function estimarDiasAtrasoParcelaMaisAntiga(diasParcelaAtual: number, totalParcelasVencidas: number | null): number {
+  if (!totalParcelasVencidas || totalParcelasVencidas <= 1) return diasParcelaAtual;
+  return diasParcelaAtual + (totalParcelasVencidas - 1) * 30;
+}
+
+// Um contrato importado como Flash só continua Flash se tiver EXATAMENTE 1
+// parcela vencida -- se tiver 2 ou mais, é sinal de dívida acumulada de
+// vários meses (mesmo que a parcela mais nova tenha poucos dias de atraso),
+// e o contrato deve ir pra faixa certa por dias de atraso, igual à Base
+// Geral. Achado real: 15 contratos Mydest caindo em Flash com até 7
+// parcelas vencidas, alguns há vários meses de dívida (ver conversa com
+// Weriton/gestor em 2026-09-14).
+function tipoEquipeParaFlash(diasParcelaAtual: number, totalParcelasVencidas: number | null): TipoEquipe {
+  if (!totalParcelasVencidas || totalParcelasVencidas <= 1) return "FLASH";
+  const diasEstimados = estimarDiasAtrasoParcelaMaisAntiga(diasParcelaAtual, totalParcelasVencidas);
+  return obterEquipePorDiasAtraso(diasEstimados);
+}
+
 function chunks<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -602,13 +625,18 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 7. Substitui parcelas (deleteMany + createMany) ──────────────────────
-    // Usa existingMap (já filtrado) e não existingContratos (lista original) --
-    // contratos removidos em "ignoradosPorBaseMensal" saíram do existingMap
-    // pra não serem tocados, mas o array original ainda os incluía aqui,
-    // apagando as parcelas deles sem recriar (elas nunca entram em
-    // allParcelas, já que o contrato foi excluído de "grupos").
+    // Só entram aqui contratos que realmente ganharam parcela nova nesta
+    // importação (updateOps + newContratos) -- NÃO existingMap.values() nem
+    // existingContratos. Um contrato encontrado no arquivo mas com todas as
+    // linhas descartadas pelas regras de filtro (origem/tags/meio de
+    // pagamento/nome vazio/empresa não identificada) cai em "continue" antes
+    // de chegar em updateOps e nunca entra em allParcelas -- se ele entrasse
+    // aqui mesmo assim, suas parcelas eram apagadas e nunca recriadas,
+    // deixando o contrato com valorTotalAberto/parcelas vencidas antigos
+    // (travados) mas zero parcela de verdade no banco (achado real: 89
+    // contratos nesse estado, todos Mydest).
     const allContratoIds = [
-      ...[...existingMap.values()].map((c) => c.id),
+      ...updateOps.map((op) => op.contratoId),
       ...newContratos.map((c) => c.id),
     ];
     await prisma.parcela.deleteMany({ where: { contratoId: { in: allContratoIds } } });
@@ -746,7 +774,7 @@ async function distribuirCarteiraAutomatica(
 
   const contratos = await prisma.contrato.findMany({
     where: { id: { in: paraDistribuir }, ativo: true },
-    select: { id: true, clienteId: true, maiorDiasAtraso: true, valorTotalAberto: true },
+    select: { id: true, clienteId: true, maiorDiasAtraso: true, valorTotalAberto: true, totalParcelasVencidas: true },
   });
 
   // Carrega TODAS as equipes de uma vez (evita N queries dentro do loop) --
@@ -802,7 +830,7 @@ async function distribuirCarteiraAutomatica(
     for (const c of semConsultorDefinido) {
       let tipo: TipoEquipe;
       if (isFlash) {
-        tipo = "FLASH";
+        tipo = tipoEquipeParaFlash(c.maiorDiasAtraso ?? 0, c.totalParcelasVencidas);
       } else {
         const faixaTexto = faixaPorContrato.get(c.id);
         tipo = (faixaTexto ? faixaParaTipoEquipe(faixaTexto) : null)
