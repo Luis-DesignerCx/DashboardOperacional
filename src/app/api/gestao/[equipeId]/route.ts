@@ -29,6 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
   // da equipe já selecionada -- nunca substitui o escopo por equipe abaixo)
   const diasMinParam = searchParams.get("diasMin");
   const diasMaxParam = searchParams.get("diasMax");
+  const baseVencimentoParam = searchParams.get("baseVencimento");
 
   const equipeInfo = await prisma.equipe.findUnique({
     where: { id: equipeId },
@@ -53,6 +54,12 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     if (diasMinParam) diasFilter.gte = Number(diasMinParam);
     if (diasMaxParam) diasFilter.lte = Number(diasMaxParam);
     carteiraWhere.contrato = { maiorDiasAtraso: diasFilter };
+  }
+  // Mesmo drill-down, mas pra Flash: base de vencimento (05/10/15/20/25) em
+  // vez de faixa de dias -- mesmo filtro que o consultor Flash já tem em
+  // Minha Carteira, agora disponível pro gestor/admin em Gestão de Carteiras.
+  if (baseVencimentoParam) {
+    carteiraWhere.baseVencimento = Number(baseVencimentoParam);
   }
 
   const carteiraData = await prisma.carteiraParcela.findMany({

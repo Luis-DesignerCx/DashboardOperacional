@@ -46,7 +46,12 @@ const SUB_FAIXAS_MAP: Record<string, Array<{ label: string; diasMin: number; dia
 const SUB_FAIXA_COR: Record<string, string> = {
   CR_31_90:      "bg-blue-500/20 text-blue-300 border border-blue-500/30",
   CR_PDD_91_180: "bg-orange-500/20 text-orange-300 border border-orange-500/30",
+  FLASH:         "bg-amber-500/20 text-amber-300 border border-amber-500/30",
 };
+
+// Base de vencimento Flash (05/10/15/20/25) -- mesmo filtro que o consultor
+// Flash já tem em Minha Carteira, agora também pro gestor/admin.
+const BASES_VENCIMENTO_FLASH = [5, 10, 15, 20, 25];
 
 interface EquipeUsuario { id: string; perfil: string; }
 interface Equipe { id: string; nome: string; tipo: string; usuarios: EquipeUsuario[]; }
@@ -68,6 +73,7 @@ export default function GestaoPage() {
   const [busca, setBusca] = usePersistedState("busca", "");
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [subFaixa, setSubFaixa] = usePersistedState("subFaixa", 0); // índice em SUB_FAIXAS_MAP[tipo]
+  const [baseVencFiltro, setBaseVencFiltro] = usePersistedState<number | null>("baseVencFiltro", null);
 
   useEffect(() => {
     Promise.all([
@@ -108,12 +114,15 @@ export default function GestaoPage() {
         url += `&diasMin=${sf.diasMin}`;
         if (sf.diasMax !== undefined) url += `&diasMax=${sf.diasMax}`;
       }
+      if (equipe.tipo === "FLASH" && baseVencFiltro) {
+        url += `&baseVencimento=${baseVencFiltro}`;
+      }
     }
 
     fetch(url)
       .then((r) => r.json())
       .then((data) => { setConsultores(Array.isArray(data) ? data : []); setCarregando(false); });
-  }, [equipeId, competenciaId, subFaixa, equipes]);
+  }, [equipeId, competenciaId, subFaixa, baseVencFiltro, equipes]);
 
   useEffect(() => { carregarConsultores(); }, [carregarConsultores]);
 
@@ -212,6 +221,35 @@ export default function GestaoPage() {
                 }`}
               >
                 {sf.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Base de vencimento (Flash) */}
+        {equipeSelecionada?.tipo === "FLASH" && (
+          <div className="flex gap-1 px-6 pt-3 pb-0 flex-shrink-0">
+            <button
+              onClick={() => setBaseVencFiltro(null)}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                baseVencFiltro === null
+                  ? SUB_FAIXA_COR.FLASH
+                  : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
+              }`}
+            >
+              Todos
+            </button>
+            {BASES_VENCIMENTO_FLASH.map((dia) => (
+              <button
+                key={dia}
+                onClick={() => setBaseVencFiltro(dia)}
+                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                  baseVencFiltro === dia
+                    ? SUB_FAIXA_COR.FLASH
+                    : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
+                }`}
+              >
+                Dia {String(dia).padStart(2, "0")}
               </button>
             ))}
           </div>
