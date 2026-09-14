@@ -177,7 +177,13 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
         "relative flex items-center h-16 border-b border-white/[0.05] flex-shrink-0",
         collapsed ? "justify-center px-0" : "px-4 gap-2.5"
       )}>
-        <div className="relative flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden ring-1 ring-brand-purple/30">
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          title={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
+          aria-label={collapsed ? "Expandir sidebar" : "Recolher sidebar"}
+          className="no-shine relative flex-shrink-0 w-8 h-8 rounded-lg overflow-hidden ring-1 ring-brand-purple/30"
+        >
           <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(76,61,141,0.3), rgba(40,37,82,0.5))" }} />
           <Image
             src="/logo-gr-icon.png"
@@ -185,7 +191,7 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
             width={32} height={32}
             className="relative z-10 w-full h-full object-contain"
           />
-        </div>
+        </button>
 
         {!collapsed && (
           <div className="flex-1 min-w-0 leading-tight">
@@ -240,9 +246,9 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
                 </>
               );
               const classeLinha = cn(
-                "relative flex items-center rounded-xl text-sm transition-all duration-200 group",
+                "relative flex items-center rounded-xl text-sm transition-all duration-200 group shine-surface",
                 collapsed ? "justify-center p-2.5" : "gap-2 px-3 py-2.5",
-                ativo ? "bg-gr-500/[0.12] text-white font-medium" : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
+                ativo ? "bg-gr-500/[0.12] text-white font-medium shine-active" : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
               );
 
               return (
@@ -283,8 +289,8 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
                             <Link
                               href={filho.href}
                               className={cn(
-                                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all duration-200 group",
-                                ativoFilho ? "text-white font-medium bg-white/[0.04]" : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.03]"
+                                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm transition-all duration-200 group shine-surface",
+                                ativoFilho ? "text-white font-medium bg-white/[0.04] shine-active" : "text-slate-500 hover:text-slate-200 hover:bg-white/[0.03]"
                               )}
                             >
                               <filho.icon size={13} className={cn("flex-shrink-0", ativoFilho ? "text-gr-400" : "text-slate-600 group-hover:text-slate-400")} />
@@ -308,10 +314,10 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
                   href={item.href}
                   title={collapsed ? item.label : undefined}
                   className={cn(
-                    "relative flex items-center rounded-xl text-sm transition-all duration-200 group",
+                    "relative flex items-center rounded-xl text-sm transition-all duration-200 group shine-surface",
                     collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5",
                     ativo
-                      ? "bg-gr-500/[0.12] text-white font-medium"
+                      ? "bg-gr-500/[0.12] text-white font-medium shine-active"
                       : "text-slate-400 hover:text-slate-200 hover:bg-white/[0.03]"
                   )}
                 >
@@ -425,29 +431,6 @@ export function Sidebar({ perfil, equipesGerenciadas }: SidebarProps) {
         </div>
       )}
 
-      {/* Profile badge ──────────────────────────────────────────── */}
-      {!collapsed && (
-        <div className="p-3 border-t border-white/[0.04]">
-          <div className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl bg-white/[0.025] border border-white/[0.05]">
-            <div className={cn(
-              "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold flex-shrink-0",
-              perfil === "ADMINISTRADOR" && "bg-brand-purple/20 text-brand-violet",
-              perfil === "GESTOR"        && "bg-amber-500/20 text-amber-400",
-              perfil === "CONSULTOR"     && "bg-teal-500/20 text-teal-400",
-            )}>
-              {perfil === "ADMINISTRADOR" ? "A" : perfil === "GESTOR" ? "G" : "C"}
-            </div>
-            <span className={cn(
-              "text-xs font-medium",
-              perfil === "ADMINISTRADOR" && "text-brand-violet",
-              perfil === "GESTOR"        && "text-amber-400",
-              perfil === "CONSULTOR"     && "text-teal-400",
-            )}>
-              {perfil === "ADMINISTRADOR" ? "Administrador" : perfil === "GESTOR" ? "Gestor" : "Consultor"}
-            </span>
-          </div>
-        </div>
-      )}
     </aside>
   );
 }
