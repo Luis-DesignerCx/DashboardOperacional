@@ -36,6 +36,25 @@ export async function GET(req: NextRequest) {
     whereBase.id = { in: clienteIdsConsultor };
   }
 
+  // Selo de "último contato" só conta contato DESTA competência (a aberta) --
+  // um contato de uma competência já fechada (ex: "Recebido" registrado
+  // quando o cliente quitou o mês passado) não pode aparecer como status
+  // atual se o contrato voltou com dívida nova e ainda sem contato este mês
+  // (mesmo achado de src/app/api/carteira/route.ts, aplicado aqui também).
+  const competenciaAberta = await prisma.competencia.findFirst({
+    where: { fechada: false },
+    orderBy: [{ ano: "desc" }, { mes: "desc" }],
+    select: { mes: true, ano: true },
+  });
+  const contatosWhere = competenciaAberta
+    ? {
+        criadoEm: {
+          gte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes - 1, 1, 3, 0, 0, 0)),
+          lte: new Date(Date.UTC(competenciaAberta.ano, competenciaAberta.mes, 1, 2, 59, 59, 999)),
+        },
+      }
+    : { id: "" };
+
   const [total, clientes] = await Promise.all([
     prisma.cliente.count({ where: whereBase }),
     prisma.cliente.findMany({
@@ -54,6 +73,7 @@ export async function GET(req: NextRequest) {
             valorTotalAberto: true,
             maiorDiasAtraso: true,
             contatos: {
+              where: contatosWhere,
               select: { status: true, criadoEm: true },
               orderBy: { criadoEm: "desc" },
               take: 1,

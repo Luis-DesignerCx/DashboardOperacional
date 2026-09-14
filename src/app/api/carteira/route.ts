@@ -106,7 +106,15 @@ export async function GET(req: NextRequest) {
             totalParcelasVencidas: true,
             cliente: { select: { id: true, nome: true, telefones: true, emails: true } },
             empresa: { select: { id: true, nome: true } },
+            // Só o último contato DESTA competência -- um contato de uma
+            // competência fechada (ex: "Recebido" registrado em agosto)
+            // não pode aparecer como selo de status em setembro, se o
+            // contrato voltou com dívida nova e ainda não teve contato
+            // nenhum neste mês (achado real: cliente Wallysson Alves
+            // Pereira, contrato pago em agosto, novo débito Flash em
+            // setembro, selo "Recebido" vazando do mês fechado).
             contatos: {
+              where: { criadoEm: { gte: iniComp, lte: fimComp } },
               orderBy: { criadoEm: "desc" },
               take: 1,
               select: { tipo: true, status: true, criadoEm: true, agendadoPara: true },
