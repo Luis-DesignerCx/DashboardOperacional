@@ -128,15 +128,24 @@ export async function GET(req: NextRequest) {
     const frenteConsultorMap = new Map<string, Map<string, Acum>>();
     for (const fId of frentesAtivas) frenteConsultorMap.set(fId, new Map());
 
-    // Mapa (consultorId|contratoId) -> frenteId, pra recebimento herdar a
-    // MESMA frente da carteira que o originou -- em vez de recalcular pelo
-    // atraso atual do contrato, que pode já ter mudado de faixa.
+    // Mapa contratoId -> frenteId, pra recebimento herdar a MESMA frente da
+    // carteira que o originou -- em vez de recalcular pelo atraso atual do
+    // contrato, que pode já ter mudado de faixa. Chave é só o contratoId
+    // (não consultorId+contratoId): a frente vem do tipoEquipe "congelado"
+    // do CONTRATO, não de quem é o dono atual da carteira -- se o contrato
+    // trocar de consultor (ex: redistribuição de frente por férias) DEPOIS
+    // de um recebimento já ter sido registrado pelo consultor anterior, o
+    // recebimento sumia da Matriz de Performance inteira (nem contava pro
+    // consultor antigo, nem pro novo) porque a chave antiga nunca dava
+    // match. Achado real: André de Brito Rodrigues (14 recebimentos, R$
+    // 8.806,56 em setembro) aparecendo com só 1/R$197 depois que o Jair
+    // redistribuiu a carteira dele (de férias) pra Selma, 2026-09-15.
     const contratoFrenteMap = new Map<string, string>();
 
     for (const cp of carteiras) {
       const consultor = consultorMap.get(cp.consultorId);
       const frenteId = derivarFrenteId(cp.tipoEquipe, consultor?.equipeId ?? null, cp.contrato.maiorDiasAtraso ?? 0);
-      contratoFrenteMap.set(`${cp.consultorId}|${cp.contratoId}`, frenteId);
+      contratoFrenteMap.set(cp.contratoId, frenteId);
       if (!frenteConsultorMap.has(frenteId)) continue;
       const fMap = frenteConsultorMap.get(frenteId)!;
       if (!fMap.has(cp.consultorId)) fMap.set(cp.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
@@ -146,7 +155,7 @@ export async function GET(req: NextRequest) {
     }
 
     for (const r of recebimentos) {
-      const frenteId = contratoFrenteMap.get(`${r.consultorId}|${r.contratoId}`);
+      const frenteId = contratoFrenteMap.get(r.contratoId);
       if (!frenteId || !frenteConsultorMap.has(frenteId)) continue;
       const fMap = frenteConsultorMap.get(frenteId)!;
       if (!fMap.has(r.consultorId)) fMap.set(r.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
