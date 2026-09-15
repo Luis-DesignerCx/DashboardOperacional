@@ -335,19 +335,26 @@ export default function GestaoPage() {
           </div>
         )}
 
+        {/* A partir daqui, tudo rola junto num bloco só -- Por Empreendimento
+            pode crescer bastante (vários empreendimentos, linhas expandidas)
+            e antes disso "empurrava" a tabela de consultor pra fora da tela
+            sem nenhum jeito de rolar até ela (cada bloco fixo demais, sem
+            sobra de espaço pro flex-1 da tabela). */}
+        <div className="flex-1 overflow-y-auto">
+
         {/* Por Empreendimento -- mesmos números dos cards acima, agregados por
             empreendimento em vez de por consultor. Sempre a frente inteira,
             não some com a busca (que é só pra tabela de consultor abaixo). */}
         {!carregando && porEmpreendimento.length > 0 && (
-          <div className="px-6 pt-3 flex-shrink-0">
+          <div className="px-6 pt-3">
             <div className="bg-surface-2 border border-white/[0.06] rounded-xl overflow-hidden">
               <div className="px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   Por Empreendimento
                 </p>
               </div>
-              <div className="max-h-72 overflow-y-auto">
-                <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-4 py-2 border-b border-white/[0.06] bg-white/[0.02] sticky top-0">
+              <div>
+                <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-4 py-2 border-b border-white/[0.06] bg-white/[0.02]">
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Empreendimento</span>
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Inadimplência</span>
@@ -419,7 +426,7 @@ export default function GestaoPage() {
         )}
 
         {/* Busca */}
-        <div className="px-6 py-3 border-b border-white/[0.06] flex-shrink-0">
+        <div className="px-6 py-3 border-b border-white/[0.06]">
           <div className="relative max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
@@ -433,7 +440,7 @@ export default function GestaoPage() {
         </div>
 
         {/* Tabela */}
-        <div className="flex-1 overflow-y-auto">
+        <div>
           {carregando ? (
             <div className="flex justify-center items-center h-48">
               <div className="w-7 h-7 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
@@ -525,6 +532,8 @@ export default function GestaoPage() {
               </div>
             </>
           )}
+        </div>
+
         </div>
       </div>
     </div>
