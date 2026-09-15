@@ -251,7 +251,14 @@ export default function CarteiraPage() {
   const [salvandoEditAParte, setSalvandoEditAParte] = useState(false);
 
 
-  // Estado modal recebimento externo (outra carteira)
+  // Estado modal recebimento externo (outra carteira) -- "receber" (padrão,
+  // busca em qualquer carteira e pede pra transferir pra si) ou "enviar"
+  // (empurrar um cliente DA PRÓPRIA carteira pra um colega, mediante
+  // aprovação do gestor -- sem isso, o único jeito de "dar" um cliente pra
+  // outro consultor era o próprio colega ter que descobrir e pedir, ou
+  // desvirtuar o fluxo de "inadimplência equivocada" só pra tirar da conta
+  // da carteira antiga, achado real com a Leusiele/Bianka em 2026-09-15).
+  const [externoDirecao, setExternoDirecao] = useState<"receber" | "enviar">("receber");
   const [externoQuery, setExternoQuery] = useState("");
   const [externoResultados, setExternoResultados] = useState<any[]>([]);
   const [externoBuscando, setExternoBuscando] = useState(false);
@@ -261,6 +268,8 @@ export default function CarteiraPage() {
   const [externoErro, setExternoErro] = useState("");
   const [externoSucesso, setExternoSucesso] = useState(false);
   const externoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [enviarDestinoId, setEnviarDestinoId] = useState("");
+  const [colegas, setColegas] = useState<{ id: string; nome: string }[]>([]);
 
   // Estado modal novo cliente
   const [novoForm, setNovoForm] = useState({
@@ -389,8 +398,11 @@ export default function CarteiraPage() {
     }, 400);
   }, [novoForm.numeroContrato, novoForm.tipo]);
 
-  // Busca externo com debounce
+  // Busca externo com debounce -- só na direção "receber" (busca em
+  // qualquer carteira). Na direção "enviar" a busca é local, na própria
+  // carteira já carregada (ver "enviarResultados" abaixo).
   useEffect(() => {
+    if (externoDirecao !== "receber") return;
     if (!externoQuery || externoQuery.length < 2) { setExternoResultados([]); return; }
     if (externoTimer.current) clearTimeout(externoTimer.current);
     externoTimer.current = setTimeout(async () => {
@@ -399,12 +411,37 @@ export default function CarteiraPage() {
       setExternoResultados(Array.isArray(data) ? data : []);
       setExternoBuscando(false);
     }, 350);
-  }, [externoQuery]);
+  }, [externoQuery, externoDirecao]);
+
+  // Colegas de equipe -- pra escolher o destino ao "enviar" um cliente da
+  // própria carteira. Restrito ao próprio time: o gestor que vai aprovar a
+  // solicitação só tem autoridade sobre a frente do SOLICITANTE (ver
+  // getEquipesGerenciadas em /api/solicitacoes), então mandar pra um
+  // consultor de outra frente ficaria sem gestor certo pra aprovar.
+  useEffect(() => {
+    if (externoDirecao !== "enviar" || modal !== "externo") return;
+    const meuEquipeId = (session?.user as any)?.equipe?.id;
+    const meuId = (session?.user as any)?.id;
+    if (!meuEquipeId) return;
+    fetch("/api/equipes").then((r) => r.json()).then((equipes) => {
+      const minhaEquipe = Array.isArray(equipes) ? equipes.find((e: any) => e.id === meuEquipeId) : null;
+      const usuarios = (minhaEquipe?.usuarios ?? []).filter((u: any) => u.perfil === "CONSULTOR" && u.id !== meuId);
+      setColegas(usuarios);
+    }).catch(() => setColegas([]));
+  }, [externoDirecao, modal, session]);
+
+  const enviarResultados = externoDirecao === "enviar" && externoQuery.length >= 2
+    ? carteira.filter((item) =>
+        item.contrato.cliente.nome.toLowerCase().includes(externoQuery.toLowerCase()) ||
+        item.contrato.numero.toLowerCase().includes(externoQuery.toLowerCase())
+      ).slice(0, 20)
+    : [];
 
   async function salvarExternoRecebimento() {
     setExternoErro("");
     if (!externoContrato) return;
     if (!externoForm.observacao.trim()) { setExternoErro("Informe o motivo da solicitação de transferência"); return; }
+    if (externoDirecao === "enviar" && !enviarDestinoId) { setExternoErro("Selecione o consultor de destino"); return; }
     setExternoSalvando(true);
     const resSolic = await fetch("/api/solicitacoes", {
       method: "POST",
@@ -413,6 +450,7 @@ export default function CarteiraPage() {
         tipo: "TRANSFERENCIA_CONTRATO",
         contratoId: externoContrato.id,
         motivo: `${externoForm.observacao.trim()} — ${externoContrato.cliente.nome} (${externoContrato.numero})`,
+        ...(externoDirecao === "enviar" ? { dados: { destinoConsultorId: enviarDestinoId } } : {}),
       }),
     });
     setExternoSalvando(false);
@@ -455,12 +493,25 @@ export default function CarteiraPage() {
 
   function abrirExterno() {
     setModal("externo");
+    setExternoDirecao("receber");
     setExternoQuery("");
     setExternoResultados([]);
     setExternoContrato(null);
     setExternoForm({ valor: "", data: new Date().toISOString().slice(0, 10), formaPagamento: "PIX", observacao: "" });
     setExternoErro("");
     setExternoSucesso(false);
+    setEnviarDestinoId("");
+  }
+
+  // Troca de aba dentro do modal -- limpa o que já tinha sido escolhido pra
+  // não misturar um contrato buscado numa direção com o fluxo da outra.
+  function trocarDirecaoExterno(direcao: "receber" | "enviar") {
+    setExternoDirecao(direcao);
+    setExternoQuery("");
+    setExternoResultados([]);
+    setExternoContrato(null);
+    setExternoErro("");
+    setEnviarDestinoId("");
   }
 
 
@@ -1183,14 +1234,20 @@ export default function CarteiraPage() {
         </div>
       )}
 
-      {/* Modal: Receber de outra carteira */}
+      {/* Modal: Receber/Enviar carteira */}
       {modal === "externo" && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
-                <h2 className="text-white font-semibold">Receber de outra carteira</h2>
-                <p className="text-slate-500 text-xs mt-0.5">O cliente será transferido para você após aprovação do gestor</p>
+                <h2 className="text-white font-semibold">
+                  {externoDirecao === "receber" ? "Receber de outra carteira" : "Enviar para outra carteira"}
+                </h2>
+                <p className="text-slate-500 text-xs mt-0.5">
+                  {externoDirecao === "receber"
+                    ? "O cliente será transferido para você após aprovação do gestor"
+                    : "O cliente sai da sua carteira e vai pro colega após aprovação do gestor"}
+                </p>
               </div>
               <button onClick={() => setModal(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
                 <X size={16} />
@@ -1201,7 +1258,11 @@ export default function CarteiraPage() {
               <div className="p-8 text-center space-y-3">
                 <CheckCircle2 size={40} className="mx-auto text-emerald-400" />
                 <p className="text-white font-semibold">Solicitação enviada!</p>
-                <p className="text-slate-400 text-sm">O gestor receberá a solicitação de transferência. Após aprovação, o cliente entrará na sua carteira.</p>
+                <p className="text-slate-400 text-sm">
+                  {externoDirecao === "receber"
+                    ? "O gestor receberá a solicitação de transferência. Após aprovação, o cliente entrará na sua carteira."
+                    : "O gestor receberá a solicitação de transferência. Após aprovação, o cliente sai da sua carteira e entra na do colega."}
+                </p>
                 <button
                   onClick={() => setModal(null)}
                   className="mt-2 w-full bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
@@ -1211,55 +1272,118 @@ export default function CarteiraPage() {
               </div>
             ) : (
               <div className="p-5 space-y-4">
+                {!externoContrato && (
+                  <div className="flex gap-2 bg-surface-1 rounded-xl p-1">
+                    <button
+                      onClick={() => trocarDirecaoExterno("receber")}
+                      className={`flex-1 text-xs font-medium py-2 rounded-lg transition-colors ${
+                        externoDirecao === "receber" ? "bg-amber-500 text-white" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Receber
+                    </button>
+                    <button
+                      onClick={() => trocarDirecaoExterno("enviar")}
+                      className={`flex-1 text-xs font-medium py-2 rounded-lg transition-colors ${
+                        externoDirecao === "enviar" ? "bg-amber-500 text-white" : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Enviar
+                    </button>
+                  </div>
+                )}
+
                 {!externoContrato ? (
                   <div className="space-y-3">
-                    <p className="text-xs text-slate-400">Busque o cliente pelo nome, CPF ou número do contrato</p>
+                    <p className="text-xs text-slate-400">
+                      {externoDirecao === "receber"
+                        ? "Busque o cliente pelo nome, CPF ou número do contrato"
+                        : "Busque o cliente na sua própria carteira"}
+                    </p>
                     <div className="relative">
                       <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                       <input
                         autoFocus
                         value={externoQuery}
                         onChange={(e) => setExternoQuery(e.target.value)}
-                        placeholder="Nome, CPF ou nº do contrato..."
+                        placeholder={externoDirecao === "receber" ? "Nome, CPF ou nº do contrato..." : "Nome ou nº do contrato..."}
                         className={inputCls + " pl-9"}
                       />
                     </div>
-                    {externoBuscando && (
-                      <div className="flex justify-center py-3">
-                        <Loader2 size={18} className="animate-spin text-slate-500" />
-                      </div>
-                    )}
-                    {!externoBuscando && externoResultados.length === 0 && externoQuery.length >= 2 && (
-                      <p className="text-slate-500 text-sm text-center py-3">Nenhum cliente encontrado</p>
-                    )}
-                    {externoResultados.length > 0 && (
-                      <div className="space-y-1.5 max-h-64 overflow-y-auto">
-                        {externoResultados.map((ct) => {
-                          const cart = ct.carteiras?.[0];
-                          return (
-                            <button
-                              key={ct.id}
-                              onClick={() => setExternoContrato(ct)}
-                              className="w-full bg-surface-1 hover:bg-white/[0.04] rounded-xl px-4 py-3 text-left transition-colors"
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div>
-                                  <p className="text-white text-sm font-medium">{ct.cliente.nome}</p>
-                                  <p className="text-slate-500 text-xs font-mono">{ct.numero} · {ct.empresa.nome}</p>
-                                  {cart && (
-                                    <p className="text-slate-500 text-xs mt-0.5 flex items-center gap-1">
-                                      <User size={10} /> {cart.consultor.nome}
+
+                    {externoDirecao === "receber" ? (
+                      <>
+                        {externoBuscando && (
+                          <div className="flex justify-center py-3">
+                            <Loader2 size={18} className="animate-spin text-slate-500" />
+                          </div>
+                        )}
+                        {!externoBuscando && externoResultados.length === 0 && externoQuery.length >= 2 && (
+                          <p className="text-slate-500 text-sm text-center py-3">Nenhum cliente encontrado</p>
+                        )}
+                        {externoResultados.length > 0 && (
+                          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                            {externoResultados.map((ct) => {
+                              const cart = ct.carteiras?.[0];
+                              return (
+                                <button
+                                  key={ct.id}
+                                  onClick={() => setExternoContrato(ct)}
+                                  className="w-full bg-surface-1 hover:bg-white/[0.04] rounded-xl px-4 py-3 text-left transition-colors"
+                                >
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                      <p className="text-white text-sm font-medium">{ct.cliente.nome}</p>
+                                      <p className="text-slate-500 text-xs font-mono">{ct.numero} · {ct.empresa.nome}</p>
+                                      {cart && (
+                                        <p className="text-slate-500 text-xs mt-0.5 flex items-center gap-1">
+                                          <User size={10} /> {cart.consultor.nome}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <p className="text-white text-xs font-semibold tabular-nums flex-shrink-0">
+                                      {formatarMoeda(Number(ct.valorTotalAberto ?? 0))}
                                     </p>
-                                  )}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {externoQuery.length >= 2 && enviarResultados.length === 0 && (
+                          <p className="text-slate-500 text-sm text-center py-3">Nenhum cliente encontrado na sua carteira</p>
+                        )}
+                        {enviarResultados.length > 0 && (
+                          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                            {enviarResultados.map((item) => (
+                              <button
+                                key={item.id}
+                                onClick={() => setExternoContrato({
+                                  id: item.contrato.id,
+                                  numero: item.contrato.numero,
+                                  cliente: item.contrato.cliente,
+                                  empresa: item.contrato.empresa,
+                                  valorTotalAberto: item.contrato.valorTotalAberto,
+                                })}
+                                className="w-full bg-surface-1 hover:bg-white/[0.04] rounded-xl px-4 py-3 text-left transition-colors"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="text-white text-sm font-medium">{item.contrato.cliente.nome}</p>
+                                    <p className="text-slate-500 text-xs font-mono">{item.contrato.numero} · {item.contrato.empresa.nome}</p>
+                                  </div>
+                                  <p className="text-white text-xs font-semibold tabular-nums flex-shrink-0">
+                                    {formatarMoeda(Number(item.contrato.valorTotalAberto ?? 0))}
+                                  </p>
                                 </div>
-                                <p className="text-white text-xs font-semibold tabular-nums flex-shrink-0">
-                                  {formatarMoeda(Number(ct.valorTotalAberto ?? 0))}
-                                </p>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 ) : (
@@ -1270,7 +1394,7 @@ export default function CarteiraPage() {
                         <div>
                           <p className="text-white text-sm font-medium">{externoContrato.cliente.nome}</p>
                           <p className="text-slate-400 text-xs">{externoContrato.numero} · {externoContrato.empresa.nome}</p>
-                          {externoContrato.carteiras?.[0] && (
+                          {externoDirecao === "receber" && externoContrato.carteiras?.[0] && (
                             <p className="text-amber-400/70 text-xs mt-0.5 flex items-center gap-1">
                               <User size={10} /> Carteira de: {externoContrato.carteiras[0].consultor.nome}
                             </p>
@@ -1284,6 +1408,23 @@ export default function CarteiraPage() {
                         </button>
                       </div>
                     </div>
+
+                    {externoDirecao === "enviar" && (
+                      <div>
+                        <label className="block text-xs text-slate-400 mb-1.5">Enviar para *</label>
+                        <select
+                          value={enviarDestinoId}
+                          onChange={(e) => setEnviarDestinoId(e.target.value)}
+                          className={inputCls}
+                        >
+                          <option value="">Selecione o colega...</option>
+                          {colegas.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
+                        </select>
+                        {colegas.length === 0 && (
+                          <p className="text-slate-500 text-xs mt-1">Nenhum outro consultor ativo na sua frente.</p>
+                        )}
+                      </div>
+                    )}
 
                     {/* Motivo da transferência */}
                     <div>
@@ -1299,7 +1440,11 @@ export default function CarteiraPage() {
                     </div>
 
                     <div className="bg-amber-500/5 border border-amber-500/15 rounded-lg px-3 py-2">
-                      <p className="text-amber-400/80 text-xs">Após aprovação do gestor, o cliente entrará na sua carteira. O recebimento deve ser registrado depois, com o cliente já vinculado.</p>
+                      <p className="text-amber-400/80 text-xs">
+                        {externoDirecao === "receber"
+                          ? "Após aprovação do gestor, o cliente entrará na sua carteira. O recebimento deve ser registrado depois, com o cliente já vinculado."
+                          : "Após aprovação do gestor, o cliente sai da sua carteira e entra na do colega escolhido."}
+                      </p>
                     </div>
                   </div>
                 )}

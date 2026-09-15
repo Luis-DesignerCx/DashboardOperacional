@@ -51,7 +51,26 @@ export async function GET() {
     orderBy: { criadoEm: "desc" },
   });
 
-  return NextResponse.json(solicitacoes);
+  // Resolve o nome de quem é o destino, quando a transferência for do tipo
+  // "enviar" (o próprio dono empurrando o cliente pra um colega) -- sem
+  // isso, o gestor só via "solicitante = dono atual" e o destino ficava
+  // escondido dentro do texto livre do motivo.
+  const destinoIds = [...new Set(
+    solicitacoes
+      .map((s) => (s.dados as { destinoConsultorId?: string } | null)?.destinoConsultorId)
+      .filter((id): id is string => !!id)
+  )];
+  const destinos = destinoIds.length > 0
+    ? await prisma.usuario.findMany({ where: { id: { in: destinoIds } }, select: { id: true, nome: true } })
+    : [];
+  const destinoPorId = new Map(destinos.map((d) => [d.id, d.nome]));
+
+  const resultado = solicitacoes.map((s) => {
+    const destinoId = (s.dados as { destinoConsultorId?: string } | null)?.destinoConsultorId;
+    return { ...s, destinoConsultorNome: destinoId ? destinoPorId.get(destinoId) ?? null : null };
+  });
+
+  return NextResponse.json(resultado);
 }
 
 export async function POST(req: NextRequest) {
@@ -59,6 +78,25 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
 
   const { tipo, motivo, contratoId, dados } = await req.json();
+
+  // Pedido de "enviar" (consultor empurrando um contrato da PRÓPRIA carteira
+  // pra um colega) só pode ser aberto sobre um contrato que realmente está
+  // na carteira ativa de quem está pedindo -- sem isso, um consultor
+  // conseguia forjar uma solicitação movendo contrato de outra pessoa,
+  // mesmo dependendo de aprovação do gestor depois.
+  if (
+    tipo === "TRANSFERENCIA_CONTRATO" &&
+    contratoId &&
+    dados?.destinoConsultorId &&
+    session.user.perfil === "CONSULTOR"
+  ) {
+    const naCarteira = await prisma.carteiraParcela.findFirst({
+      where: { contratoId, consultorId: session.user.id, ativo: true },
+    });
+    if (!naCarteira) {
+      return NextResponse.json({ erro: "Contrato não está na sua carteira" }, { status: 403 });
+    }
+  }
 
   const solicitacao = await prisma.solicitacao.create({
     data: {

@@ -96,11 +96,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   // Ao aprovar transferência: move o contrato para a carteira do solicitante
+  // -- ou, se for um pedido de ENVIO (o próprio dono da carteira empurrando
+  // o cliente pra um colega, com "dados.destinoConsultorId"), pra quem foi
+  // escolhido como destino, não pra quem abriu o pedido.
   if (
     status === "APROVADA" &&
     solicitacaoAtual.tipo === "TRANSFERENCIA_CONTRATO" &&
     solicitacaoAtual.contratoId
   ) {
+    const dadosTransferencia = solicitacaoAtual.dados as { destinoConsultorId?: string } | null;
+    const consultorDestinoId = dadosTransferencia?.destinoConsultorId || solicitacaoAtual.solicitanteId;
+
     // Usa a competência ativa (não fechada mais recente)
     const competencia = await prisma.competencia.findFirst({
       where: { fechada: false },
@@ -117,13 +123,25 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             competenciaId: competencia.id,
           },
         },
-        update: { consultorId: solicitacaoAtual.solicitanteId, ativo: true },
+        update: { consultorId: consultorDestinoId, ativo: true },
         create: {
           contratoId: solicitacaoAtual.contratoId,
-          consultorId: solicitacaoAtual.solicitanteId,
+          consultorId: consultorDestinoId,
           competenciaId: competencia.id,
           ativo: true,
         },
+      });
+
+      // Reativar a carteira de um contrato marcado "inadimplência equivocada"
+      // não pode deixá-lo escondido de quem acabou de receber ele -- achado
+      // real: duas solicitações do mesmo contrato aprovadas fora de ordem
+      // (equivocada aprovada ANTES da transferência, minutos depois) deixava
+      // o contrato com carteira ativa mas ainda marcado equivocada, invisível
+      // em Minha Carteira mesmo aparecendo como "seu" na busca global
+      // (2026-09-15, contratos PG004187 e RS221989 da Bianka Rodrigues).
+      await prisma.contrato.update({
+        where: { id: solicitacaoAtual.contratoId },
+        data: { inadimplenciaEquivocada: false },
       });
       console.log(`[transferencia] contrato=${solicitacaoAtual.contratoId} → consultor=${solicitacaoAtual.solicitanteId} competencia=${competencia.id}`);
     } else {

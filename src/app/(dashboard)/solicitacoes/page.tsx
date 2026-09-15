@@ -38,6 +38,7 @@ interface Solicitacao {
     empresa: { nome: string };
     carteiras?: { consultor: { nome: string; equipe?: Equipe | null } }[];
   } | null;
+  destinoConsultorNome?: string | null;
 }
 
 export default function SolicitacoesPage() {
@@ -158,6 +159,19 @@ export default function SolicitacoesPage() {
                       const frenteSolicitante = s.solicitante.equipe?.tipo;
                       const frenteDono = donoAtual?.equipe?.tipo;
                       const frenteDiferente = frenteSolicitante && frenteDono && frenteSolicitante !== frenteDono;
+                      // "Enviar": o próprio dono (solicitante) pediu pra mandar
+                      // pra um colega -- mostra o destino escolhido em vez de
+                      // repetir "dono atual = solicitante".
+                      if (s.destinoConsultorNome) {
+                        return (
+                          <div className="mt-1.5 rounded-lg px-3 py-2 border text-xs bg-surface-1 border-white/[0.08]">
+                            <p className="text-slate-400">
+                              Enviar de <span className="text-slate-300">{s.solicitante.nome}</span> para{" "}
+                              <span className="text-slate-300">{s.destinoConsultorNome}</span>
+                            </p>
+                          </div>
+                        );
+                      }
                       return donoAtual ? (
                         <div className={`mt-1.5 rounded-lg px-3 py-2 border text-xs ${frenteDiferente ? "bg-amber-500/10 border-amber-500/30" : "bg-surface-1 border-white/[0.08]"}`}>
                           <p className="text-slate-400">
