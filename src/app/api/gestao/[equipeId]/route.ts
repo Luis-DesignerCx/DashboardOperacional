@@ -49,8 +49,9 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
   } else {
     carteiraWhere.consultor = { equipeId };
   }
+  let diasFilter: { gte?: number; lte?: number } | null = null;
   if (diasMinParam || diasMaxParam) {
-    const diasFilter: { gte?: number; lte?: number } = {};
+    diasFilter = {};
     if (diasMinParam) diasFilter.gte = Number(diasMinParam);
     if (diasMaxParam) diasFilter.lte = Number(diasMaxParam);
     carteiraWhere.contrato = { maiorDiasAtraso: diasFilter };
@@ -61,6 +62,15 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
   if (baseVencimentoParam) {
     carteiraWhere.baseVencimento = Number(baseVencimentoParam);
   }
+
+  // Mesmas sub-faixas (dias ou base de vencimento) aplicadas ao recebimento
+  // abaixo -- sem isso, o card de "Recebido" ficava congelado no total da
+  // frente inteira mesmo com o gestor filtrando por dia do Flash ou por
+  // 31-60/61-90/91-120 etc: a inadimplência (via carteiraWhere acima)
+  // acompanhava o filtro, mas o recebimento não (achado real, 2026-09-15).
+  const carteiraCondRecebimento: any = { competenciaId, ativo: true };
+  if (equipeInfo) carteiraCondRecebimento.tipoEquipe = equipeInfo.tipo;
+  if (baseVencimentoParam) carteiraCondRecebimento.baseVencimento = Number(baseVencimentoParam);
 
   const carteiraData = await prisma.carteiraParcela.findMany({
     where: carteiraWhere,
@@ -105,7 +115,12 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
             // o valor conta pro consultor normalmente, mas a inadimplência
             // do contrato é de outra frente) fazia esse recebimento poluir
             // o total da frente Flash, mesmo o contrato sendo de outra.
-            contrato: { carteiras: { some: { competenciaId, ativo: true, ...(equipeInfo ? { tipoEquipe: equipeInfo.tipo } : {}) } } },
+            // baseVencimento entra na MESMA condição da carteira (Flash);
+            // maiorDiasAtraso é campo do contrato, entra fora do "some".
+            contrato: {
+              carteiras: { some: carteiraCondRecebimento },
+              ...(diasFilter ? { maiorDiasAtraso: diasFilter } : {}),
+            },
             dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: {
