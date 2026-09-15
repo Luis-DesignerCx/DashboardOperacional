@@ -169,6 +169,7 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     const porEmpresa = Array.from(todasEmpresas).map((empId) => ({
       id: empId,
       nome: empresaNames.get(empId) ?? empId,
+      contratos: empCarteira.get(empId)?.contratos.size ?? 0,
       inadimplencia: empCarteira.get(empId)?.inadimplencia ?? 0,
       recebido: empReceb.get(empId)?.recebido ?? 0,
       recebidoAParte: empReceb.get(empId)?.recebidoAParte ?? 0,

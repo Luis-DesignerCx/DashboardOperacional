@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useFrente } from "@/contexts/FrenteContext";
 import { formatarMoeda } from "@/lib/utils";
 import { ChevronDown, ChevronRight, Search, AlertCircle, TrendingUp, Palmtree, Activity } from "lucide-react";
@@ -55,11 +55,17 @@ const BASES_VENCIMENTO_FLASH = [5, 10, 15, 20, 25];
 
 interface EquipeUsuario { id: string; perfil: string; }
 interface Equipe { id: string; nome: string; tipo: string; usuarios: EquipeUsuario[]; }
-interface PorEmpresa { id: string; nome: string; inadimplencia: number; recebido: number; recebidoAParte: number; }
+interface PorEmpresa { id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; }
 interface Consultor {
   id: string; nome: string; emFerias: boolean;
   totalContratos: number; inadimplencia: number; recebido: number;
   recebidoAParte: number; percentual: number; porEmpresa: PorEmpresa[];
+}
+interface ConsultorNoEmpreendimento { id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; }
+interface Empreendimento {
+  id: string; nome: string;
+  contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; percentual: number;
+  consultores: ConsultorNoEmpreendimento[];
 }
 
 export default function GestaoPage() {
@@ -72,6 +78,7 @@ export default function GestaoPage() {
   const [carregando, setCarregando] = useState(false);
   const [busca, setBusca] = usePersistedState("busca", "");
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  const [expandidosEmpreend, setExpandidosEmpreend] = useState<Set<string>>(new Set());
   const [subFaixa, setSubFaixa] = usePersistedState("subFaixa", 0); // índice em SUB_FAIXAS_MAP[tipo]
   const [baseVencFiltro, setBaseVencFiltro] = usePersistedState<number | null>("baseVencFiltro", null);
 
@@ -105,6 +112,7 @@ export default function GestaoPage() {
     const equipe = equipes.find((e) => e.id === equipeId);
     setCarregando(true);
     setExpandidos(new Set());
+    setExpandidosEmpreend(new Set());
 
     let url = `/api/gestao/${equipeId}?competenciaId=${competenciaId}`;
     if (equipe) {
@@ -133,6 +141,45 @@ export default function GestaoPage() {
       return next;
     });
   }
+
+  function toggleExpandirEmpreend(id: string) {
+    setExpandidosEmpreend((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  // Agregado por empreendimento -- sempre da frente inteira (não some com a
+  // busca de consultor, que serve só pra tabela de baixo).
+  const porEmpreendimento: Empreendimento[] = useMemo(() => {
+    const mapa = new Map<string, { nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; consultores: ConsultorNoEmpreendimento[] }>();
+    for (const c of consultores) {
+      for (const emp of c.porEmpresa) {
+        if (!mapa.has(emp.id)) {
+          mapa.set(emp.id, { nome: emp.nome, contratos: 0, inadimplencia: 0, recebido: 0, recebidoAParte: 0, consultores: [] });
+        }
+        const reg = mapa.get(emp.id)!;
+        reg.contratos += emp.contratos;
+        reg.inadimplencia += emp.inadimplencia;
+        reg.recebido += emp.recebido;
+        reg.recebidoAParte += emp.recebidoAParte;
+        reg.consultores.push({ id: c.id, nome: c.nome, contratos: emp.contratos, inadimplencia: emp.inadimplencia, recebido: emp.recebido, recebidoAParte: emp.recebidoAParte });
+      }
+    }
+    return Array.from(mapa.entries())
+      .map(([id, v]) => ({
+        id,
+        nome: v.nome,
+        contratos: v.contratos,
+        inadimplencia: v.inadimplencia,
+        recebido: v.recebido,
+        recebidoAParte: v.recebidoAParte,
+        percentual: v.inadimplencia > 0 ? Math.min((v.recebido / v.inadimplencia) * 100, 100) : 0,
+        consultores: v.consultores.sort((a, b) => b.recebido - a.recebido),
+      }))
+      .sort((a, b) => b.inadimplencia - a.inadimplencia);
+  }, [consultores]);
 
   const equipeSelecionada = equipes.find((e) => e.id === equipeId);
   const visiveis = equipes.filter((e) => FRENTES_VISIVEIS.includes(e.tipo));
@@ -284,6 +331,89 @@ export default function GestaoPage() {
               }`}>
                 {eficiencia.toFixed(1)}%
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* Por Empreendimento -- mesmos números dos cards acima, agregados por
+            empreendimento em vez de por consultor. Sempre a frente inteira,
+            não some com a busca (que é só pra tabela de consultor abaixo). */}
+        {!carregando && porEmpreendimento.length > 0 && (
+          <div className="px-6 pt-3 flex-shrink-0">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-xl overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Por Empreendimento
+                </p>
+              </div>
+              <div className="max-h-72 overflow-y-auto">
+                <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-4 py-2 border-b border-white/[0.06] bg-white/[0.02] sticky top-0">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Empreendimento</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Inadimplência</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Recebido</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">A Parte</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">%</span>
+                </div>
+                <div className="divide-y divide-white/[0.04]">
+                  {porEmpreendimento.map((emp) => {
+                    const aberto = expandidosEmpreend.has(emp.id);
+                    return (
+                      <div key={emp.id}>
+                        <button
+                          onClick={() => toggleExpandirEmpreend(emp.id)}
+                          className="w-full grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-4 py-2.5 hover:bg-white/[0.02] transition-colors text-left"
+                        >
+                          <div className="flex items-center gap-2">
+                            {aberto
+                              ? <ChevronDown size={14} className="text-gr-400 flex-shrink-0" />
+                              : <ChevronRight size={14} className="text-slate-400 flex-shrink-0" />}
+                            <span className="text-white font-medium text-sm truncate">{emp.nome}</span>
+                          </div>
+                          <span className="text-slate-400 text-sm tabular-nums text-right self-center">{emp.contratos}</span>
+                          <span className="text-white text-sm tabular-nums font-medium text-right self-center">{formatarMoeda(emp.inadimplencia)}</span>
+                          <span className="text-emerald-400 text-sm tabular-nums font-semibold text-right self-center">{formatarMoeda(emp.recebido)}</span>
+                          <span className="text-sky-400 text-sm tabular-nums text-right self-center">
+                            {emp.recebidoAParte > 0 ? formatarMoeda(emp.recebidoAParte) : <span className="text-slate-400">—</span>}
+                          </span>
+                          <div className="text-right self-center">
+                            <span className={`text-sm font-bold tabular-nums ${
+                              emp.percentual >= 80 ? "text-emerald-400" : emp.percentual >= 40 ? "text-gr-400" : "text-slate-400"
+                            }`}>
+                              {emp.percentual.toFixed(1)}%
+                            </span>
+                          </div>
+                        </button>
+
+                        {aberto && (
+                          <div className="bg-surface-0/60 border-t border-white/[0.06]/50">
+                            <div className="grid grid-cols-[1fr_100px_160px_160px_160px] gap-2 px-11 py-2 border-b border-white/[0.06]/30">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Consultor</span>
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Contratos</span>
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Recebido</span>
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">A Parte</span>
+                            </div>
+                            {emp.consultores.map((cons) => (
+                              <div key={cons.id} className="grid grid-cols-[1fr_100px_160px_160px_160px] gap-2 px-11 py-2 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">
+                                <span className="text-slate-300 text-sm truncate">{cons.nome}</span>
+                                <span className="text-slate-400 text-sm tabular-nums text-right">{cons.contratos}</span>
+                                <span className="text-slate-400 text-sm tabular-nums text-right">{formatarMoeda(cons.inadimplencia)}</span>
+                                <span className={`text-sm tabular-nums font-medium text-right ${cons.recebido > 0 ? "text-emerald-400" : "text-slate-400"}`}>
+                                  {cons.recebido > 0 ? formatarMoeda(cons.recebido) : "—"}
+                                </span>
+                                <span className={`text-sm tabular-nums text-right ${cons.recebidoAParte > 0 ? "text-sky-400" : "text-slate-400"}`}>
+                                  {cons.recebidoAParte > 0 ? formatarMoeda(cons.recebidoAParte) : "—"}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         )}
