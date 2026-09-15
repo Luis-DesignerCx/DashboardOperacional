@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, Save, Trash2, AlertTriangle } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { Settings, Save } from "lucide-react";
 
 interface Config { chave: string; valor: string }
 
@@ -12,8 +11,6 @@ const LABELS: Record<string, { label: string; descricao: string; tipo: string }>
 };
 
 export default function ConfiguracoesPage() {
-  const { data: session } = useSession();
-  const isAdmin = session?.user?.perfil === "ADMINISTRADOR";
   const [configs, setConfigs] = useState<Config[]>([]);
   const [editados, setEditados] = useState<Record<string, string>>({});
   const [salvando, setSalvando] = useState(false);
@@ -79,97 +76,6 @@ export default function ConfiguracoesPage() {
         <h2 className="text-white font-semibold mb-4">Nova Competência</h2>
         <NovaCompetencia />
       </div>
-
-      {/* Reset — somente Admin */}
-      {isAdmin && <ResetSistema />}
-    </div>
-  );
-}
-
-function ResetSistema() {
-  const [confirmando, setConfirmando] = useState(false);
-  const [senha, setSenha] = useState("");
-  const [resetando, setResetando] = useState(false);
-  const [feito, setFeito] = useState(false);
-  const [erro, setErro] = useState("");
-
-  async function executarReset() {
-    setResetando(true);
-    setErro("");
-    const res = await fetch("/api/admin/reset", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ senha }),
-    });
-    const data = await res.json();
-    setResetando(false);
-    if (!res.ok) { setErro(data.erro || "Erro ao resetar"); return; }
-    setFeito(true);
-    setConfirmando(false);
-    setSenha("");
-  }
-
-  if (feito) {
-    return (
-      <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-6">
-        <p className="text-emerald-400 font-semibold">Base limpa com sucesso.</p>
-        <p className="text-slate-400 text-sm mt-1">Crie uma nova competência e importe a base para começar.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-6 space-y-4">
-      <div className="flex items-start gap-3">
-        <AlertTriangle size={20} className="text-red-400 mt-0.5 flex-shrink-0" />
-        <div>
-          <h2 className="text-white font-semibold">Limpar base de dados</h2>
-          <p className="text-slate-400 text-sm mt-1">
-            Remove todos os contratos, clientes, parcelas, carteiras, recebimentos, promessas, atendimentos, comissões, metas e competências.
-            <span className="text-white font-medium"> Usuários, equipes e regras de comissão são mantidos.</span>
-          </p>
-        </div>
-      </div>
-
-      {!confirmando ? (
-        <button
-          onClick={() => setConfirmando(true)}
-          className="flex items-center gap-2 bg-red-600/20 hover:bg-red-600/30 border border-red-500/30 text-red-400 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
-        >
-          <Trash2 size={15} />
-          Limpar base de dados
-        </button>
-      ) : (
-        <div className="space-y-3">
-          <p className="text-sm text-slate-300">
-            Digite sua senha de administrador para confirmar:
-          </p>
-          <input
-            autoFocus
-            type="password"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            placeholder="Sua senha"
-            className="w-full bg-surface-1 border border-red-500/30 rounded-lg px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-          />
-          {erro && <p className="text-red-400 text-sm">{erro}</p>}
-          <div className="flex gap-3">
-            <button
-              onClick={() => { setConfirmando(false); setSenha(""); setErro(""); }}
-              className="flex-1 bg-surface-1 hover:bg-white/[0.04] text-slate-300 text-sm font-medium py-2.5 rounded-xl transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={executarReset}
-              disabled={!senha || resetando}
-              className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-red-600/20 disabled:cursor-not-allowed text-white text-sm font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              {resetando ? "Limpando..." : "Confirmar limpeza"}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
