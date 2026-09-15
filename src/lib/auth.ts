@@ -11,6 +11,12 @@ if (process.env.VERCEL_URL && !process.env.NEXTAUTH_URL) {
   process.env.NEXTAUTH_URL = `https://${process.env.VERCEL_URL}`;
 }
 
+// Proteção contra força bruta -- sem rate limit algum antes (achado real da
+// auditoria de segurança, 2026-09-15). MAX_TENTATIVAS erradas seguidas bloqueia
+// o login (mesmo com a senha certa) por DURACAO_BLOQUEIO_MS.
+const MAX_TENTATIVAS = 5;
+const DURACAO_BLOQUEIO_MS = 15 * 60 * 1000;
+
 export const authOptions: NextAuthOptions = {
   session: { strategy: "jwt" },
   pages: {
@@ -33,14 +39,36 @@ export const authOptions: NextAuthOptions = {
             id: true, email: true, nome: true, perfil: true,
             senhaHash: true, ativo: true, empresaId: true,
             equipeId: true, deveAlterarSenha: true,
+            tentativasLoginFalhas: true, bloqueadoAte: true,
             equipe: { select: { id: true, nome: true, tipo: true } },
           },
         });
 
         if (!usuario || !usuario.ativo) return null;
 
+        // Bloqueado por tentativas erradas recentes -- nega mesmo se a senha
+        // enviada agora estiver certa, até o bloqueio expirar.
+        if (usuario.bloqueadoAte && usuario.bloqueadoAte > new Date()) return null;
+
         const senhaCorreta = await bcrypt.compare(credentials.password, usuario.senhaHash);
-        if (!senhaCorreta) return null;
+        if (!senhaCorreta) {
+          const tentativas = usuario.tentativasLoginFalhas + 1;
+          await prisma.usuario.update({
+            where: { id: usuario.id },
+            data: tentativas >= MAX_TENTATIVAS
+              ? { tentativasLoginFalhas: 0, bloqueadoAte: new Date(Date.now() + DURACAO_BLOQUEIO_MS) }
+              : { tentativasLoginFalhas: tentativas },
+          }).catch(() => {});
+          return null;
+        }
+
+        // Login certo -- zera qualquer tentativa/bloqueio anterior
+        if (usuario.tentativasLoginFalhas > 0 || usuario.bloqueadoAte) {
+          await prisma.usuario.update({
+            where: { id: usuario.id },
+            data: { tentativasLoginFalhas: 0, bloqueadoAte: null },
+          }).catch(() => {});
+        }
 
         // Auditoria de login — fire-and-forget para não bloquear o login
         prisma.auditoria.create({

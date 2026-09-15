@@ -7,8 +7,12 @@ export async function GET(req: NextRequest) {
   const secret = req.headers.get("authorization")?.replace("Bearer ", "");
   const querySecret = new URL(req.url).searchParams.get("secret");
 
+  // Nega por padrão -- se CRON_SECRET não estiver configurada no ambiente,
+  // a rota ficava aberta pra qualquer um (achado real da auditoria de
+  // segurança, 2026-09-15): a condição antiga só bloqueava quando a env var
+  // existia E não batia; sem a env var configurada, ela nunca bloqueava.
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && secret !== cronSecret && querySecret !== cronSecret) {
+  if (!cronSecret || (secret !== cronSecret && querySecret !== cronSecret)) {
     return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
   }
 

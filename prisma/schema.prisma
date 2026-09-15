@@ -125,6 +125,12 @@ model Usuario {
   ativo             Boolean   @default(true)
   emFerias          Boolean   @default(false)
   deveAlterarSenha  Boolean   @default(false)
+  // Proteção contra força bruta no login -- incrementa a cada senha errada,
+  // zera em login certo; ao atingir o limite, bloqueia por um tempo mesmo
+  // com a senha certa (achado real da auditoria de segurança, 2026-09-15:
+  // não havia nenhuma barreira contra tentativa repetida de senha).
+  tentativasLoginFalhas Int       @default(0)
+  bloqueadoAte          DateTime?
   empresaId    String?
   equipeId     String?
   criadoEm     DateTime  @default(now())

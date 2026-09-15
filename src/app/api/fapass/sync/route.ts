@@ -68,6 +68,14 @@ function chunks<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
+// Limite de chamadas via chave estática (x-api-key) numa janela de tempo --
+// essa rota cria/edita/apaga dados financeiros de uma competência inteira, e
+// antes não tinha nenhuma barreira contra a chave sendo usada repetidamente
+// (achado real da auditoria de segurança, 2026-09-15). O uso legítimo é 1x/dia
+// (agendado às 08h, ver scripts/fapass-sync.ps1); a janela é generosa só pra
+// não travar uma retentativa manual depois de uma falha.
+const MAX_SYNCS_POR_HORA_VIA_CHAVE = 12;
+
 export async function POST(req: NextRequest) {
   const apiKey = req.headers.get("x-api-key");
   const isCron = apiKey && apiKey === process.env.CRON_SECRET;
@@ -75,6 +83,12 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
       return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+    }
+  } else {
+    const umaHoraAtras = new Date(Date.now() - 60 * 60 * 1000);
+    const syncsRecentes = await prisma.faPassSync.count({ where: { criadoEm: { gte: umaHoraAtras } } });
+    if (syncsRecentes >= MAX_SYNCS_POR_HORA_VIA_CHAVE) {
+      return NextResponse.json({ erro: "Limite de chamadas por hora excedido, tente novamente mais tarde" }, { status: 429 });
     }
   }
 
