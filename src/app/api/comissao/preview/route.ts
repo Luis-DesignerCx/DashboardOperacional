@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { calcularComissaoMetas } from "@/lib/comissao";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -25,7 +26,17 @@ export async function GET(req: NextRequest) {
     });
     if (c) consultores = [c];
   } else {
-    const equipeAlvo = equipeIdParam ?? (perfil === "GESTOR" ? session.user.equipeId : null);
+    let equipeAlvo = equipeIdParam ?? null;
+    // GESTOR só vê prévia de comissão de frente que ele gerencia -- sem
+    // isso, bastava trocar o equipeId na query pra ver comissão/recebido
+    // de gestão alheia (achado real da auditoria de segurança, 2026-09-15).
+    if (perfil === "GESTOR") {
+      const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+      if (equipeAlvo && !equipesGerenciadas.includes(equipeAlvo)) {
+        return NextResponse.json({ erro: "Sem permissão para esta frente" }, { status: 403 });
+      }
+      equipeAlvo = equipeAlvo ?? equipesGerenciadas[0] ?? null;
+    }
     if (!equipeAlvo) return NextResponse.json({ erro: "equipeId obrigatório" }, { status: 400 });
 
     // Consultor pertence à frente via equipeId primário OU via EquipeConsultor (frente adicional)

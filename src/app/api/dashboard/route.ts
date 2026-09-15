@@ -40,8 +40,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(await dashboardExecutivo(competenciaId, equipeIds));
     }
   } catch (err: any) {
+    // Detalhe completo só no log do servidor -- não vaza schema/infra
+    // interna pro cliente (achado real da auditoria de segurança, 2026-09-15).
     console.error("[dashboard]", err);
-    return NextResponse.json({ erro: err.message || "Erro interno" }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao carregar dashboard. Tente novamente." }, { status: 500 });
   }
 }
 

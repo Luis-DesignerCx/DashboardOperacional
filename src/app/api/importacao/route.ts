@@ -753,9 +753,12 @@ export async function POST(req: NextRequest) {
       where: { id: importacao.id },
       data: { status: "ERRO" },
     });
+    // Detalhe completo só no log do servidor -- não vaza schema/infra
+    // interna do Prisma/Postgres pro cliente (achado real da auditoria de
+    // segurança, 2026-09-15); a importação já fica marcada "ERRO" no
+    // histórico pra investigar depois.
     console.error(err);
-    const detalhe = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ erro: `Erro ao processar arquivo: ${detalhe}` }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao processar arquivo. Verifique o formato da planilha e tente novamente." }, { status: 500 });
   }
 }
 

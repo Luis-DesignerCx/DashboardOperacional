@@ -48,9 +48,13 @@ export async function POST(req: NextRequest) {
   });
 
   if (resp.status !== 204) {
+    // Corpo de erro da API do GitHub fica salvo no FaPassSync (útil pra
+    // investigar); não repassa cru pro cliente (achado real da auditoria
+    // de segurança, 2026-09-15).
     const erro = await resp.text();
+    console.error("[fapass/trigger] GitHub Actions:", erro);
     await prisma.faPassSync.update({ where: { id: syncId }, data: { status: "ERRO", erro } });
-    return NextResponse.json({ erro: `Erro ao disparar Actions: ${erro}` }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao disparar processamento. Verifique o histórico de sincronização." }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, syncId });

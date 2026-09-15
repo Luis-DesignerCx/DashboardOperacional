@@ -52,6 +52,15 @@ export async function POST(req: NextRequest) {
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
   if (!tipo) return NextResponse.json({ erro: "tipo obrigatório" }, { status: 400 });
 
+  // GESTOR só cria meta pra uma frente que ele gerencia (achado real da
+  // auditoria de segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!equipesGerenciadas.includes(equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para esta frente" }, { status: 403 });
+    }
+  }
+
   if (tipo === "FINANCEIRA" && (!valorAlvo || Number(valorAlvo) <= 0) && (!percentualAlvo || Number(percentualAlvo) <= 0)) {
     return NextResponse.json({ erro: "Informe o valor alvo em R$ ou o percentual da inadimplência" }, { status: 400 });
   }
@@ -94,6 +103,17 @@ export async function PATCH(req: NextRequest) {
   const { id, nome, percentualAlvo, quantidadeAlvo, valorAlvo, peso, thresholdsMonitoria, resultadosConsultores } = body;
   if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
 
+  // GESTOR só edita meta de uma frente que ele gerencia (achado real da
+  // auditoria de segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const metaAtual = await prisma.meta.findUnique({ where: { id }, select: { equipeId: true } });
+    if (!metaAtual) return NextResponse.json({ erro: "Meta não encontrada" }, { status: 404 });
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!equipesGerenciadas.includes(metaAtual.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para esta frente" }, { status: 403 });
+    }
+  }
+
   // Para resultadosConsultores: merge em vez de substituir
   let resultadosMerge: Record<string, number> | undefined;
   if (resultadosConsultores) {
@@ -125,6 +145,22 @@ export async function DELETE(req: NextRequest) {
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ erro: "id obrigatório" }, { status: 400 });
 
+  if (session.user.perfil === "GESTOR") {
+    const metaAtual = await prisma.meta.findUnique({ where: { id }, select: { equipeId: true } });
+    if (!metaAtual) return NextResponse.json({ erro: "Meta não encontrada" }, { status: 404 });
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!equipesGerenciadas.includes(metaAtual.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para esta frente" }, { status: 403 });
+    }
+  }
+
   await prisma.meta.delete({ where: { id } });
+
+  // Auditoria -- antes não ficava rastro de quem apagou uma meta (achado
+  // real da auditoria de segurança, 2026-09-15).
+  prisma.auditoria.create({
+    data: { usuarioId: session.user.id, tabela: "metas", registroId: id, acao: "DELETE" },
+  }).catch(() => {});
+
   return NextResponse.json({ ok: true });
 }

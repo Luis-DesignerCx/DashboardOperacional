@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 const PAGE_SIZE = 50;
 
@@ -39,6 +40,14 @@ export async function GET(req: NextRequest) {
 
   const where: any = { competenciaId, ativo: true };
   if (session.user.perfil === "CONSULTOR") where.consultorId = session.user.id;
+  // GESTOR só vê carteira de consultor de uma frente que ele gerencia --
+  // sem isso, essa tela (pensada pro consultor, mas alcançável por
+  // qualquer perfil autenticado) devolvia a carteira da empresa inteira
+  // pra um gestor (achado real da auditoria de segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    where.consultor = { equipeId: { in: equipesGerenciadas } };
+  }
   if (baseVencimentoParam) where.baseVencimento = parseInt(baseVencimentoParam);
 
   where.contrato = { inadimplenciaEquivocada: false };

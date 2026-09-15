@@ -476,11 +476,14 @@ export async function POST(req: NextRequest) {
       totalDivergencias: divergencias.length,
     });
   } catch (err: any) {
+    // O detalhe completo fica salvo no FaPassSync; a resposta ao cliente
+    // não devolve err.message cru, que pode vazar schema/infra interna
+    // (achado real da auditoria de segurança, 2026-09-15).
     console.error("[fapass/sync]", err);
     await prisma.faPassSync.update({
       where: { id: sync.id },
       data: { status: "ERRO", erro: err.message },
     });
-    return NextResponse.json({ erro: err.message || "Erro ao processar" }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao processar. Verifique o histórico de sincronização." }, { status: 500 });
   }
 }

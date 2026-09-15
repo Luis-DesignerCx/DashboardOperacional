@@ -105,7 +105,9 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err: any) {
+    // Detalhe completo só no log do servidor (achado real da auditoria de
+    // segurança, 2026-09-15).
     console.error("[fapass/exportar]", err);
-    return NextResponse.json({ erro: err?.message ?? "Erro interno" }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao gerar exportação. Tente novamente." }, { status: 500 });
   }
 }

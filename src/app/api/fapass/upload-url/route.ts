@@ -53,8 +53,12 @@ export async function POST(req: NextRequest) {
   });
 
   if (!resp.ok) {
+    // Corpo de erro do Supabase Storage só no log do servidor -- não
+    // repassa cru pro cliente (achado real da auditoria de segurança,
+    // 2026-09-15).
     const erro = await resp.text();
-    return NextResponse.json({ erro: `Erro ao gerar URL de upload: ${erro}` }, { status: 500 });
+    console.error("[fapass/upload-url] Supabase Storage:", erro);
+    return NextResponse.json({ erro: "Erro ao gerar URL de upload. Tente novamente." }, { status: 500 });
   }
 
   const { url: signedPath } = await resp.json();

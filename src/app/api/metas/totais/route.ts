@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 // Retorna o total de inadimplência de uma equipe (ou consultor) numa competência.
 // Usado para calcular a prévia do valor alvo quando a meta é definida em %.
@@ -18,6 +19,15 @@ export async function GET(req: NextRequest) {
 
   if (!equipeId || !competenciaId) {
     return NextResponse.json({ erro: "equipeId e competenciaId obrigatórios" }, { status: 400 });
+  }
+
+  // GESTOR só consulta total de uma frente que ele gerencia (achado real
+  // da auditoria de segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!equipesGerenciadas.includes(equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para esta frente" }, { status: 403 });
+    }
   }
 
   let consultorIds: string[];

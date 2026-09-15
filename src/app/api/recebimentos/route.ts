@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { FormaPagamento } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { parsearValorMonetario, parseDataLocalBrasil } from "@/lib/utils";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -55,6 +56,21 @@ export async function PATCH(req: NextRequest) {
 
   const rec = await prisma.recebimento.update({ where: { id }, data });
 
+  // Auditoria da edição -- antes não ficava nenhum rastro de quem mudou
+  // valor/forma/data de um recebimento já registrado (achado real da
+  // auditoria de segurança, 2026-09-15).
+  prisma.auditoria.create({
+    data: {
+      usuarioId: session.user.id,
+      tabela: "recebimentos",
+      registroId: id,
+      campo: Object.keys(data).join(","),
+      valorAnterior: String(recAtual.valor ?? ""),
+      valorNovo: valor !== undefined ? String(data.valor) : "",
+      acao: "UPDATE",
+    },
+  }).catch(() => {});
+
   if (valor !== undefined) {
     const novoValor = parsearValorMonetario(valor);
     const contrato = recAtual.contrato;
@@ -91,6 +107,7 @@ export async function DELETE(req: NextRequest) {
       valor: true,
       consultorId: true,
       parcelasIds: true,
+      consultor: { select: { equipeId: true } },
       contrato: {
         select: {
           valorTotalAberto: true,
@@ -101,6 +118,16 @@ export async function DELETE(req: NextRequest) {
     },
   });
   if (!rec) return NextResponse.json({ erro: "Não encontrado" }, { status: 404 });
+
+  // GESTOR só apaga recebimento de consultor de uma frente que ele gerencia
+  // -- sem isso, qualquer gestor apagava recebimento de qualquer frente
+  // (achado real da auditoria de segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!rec.consultor.equipeId || !equipesGerenciadas.includes(rec.consultor.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para excluir este recebimento" }, { status: 403 });
+    }
+  }
 
   await prisma.recebimento.delete({ where: { id } });
 

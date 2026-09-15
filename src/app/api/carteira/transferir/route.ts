@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -82,10 +83,29 @@ export async function POST(req: NextRequest) {
 
   const consultor = await prisma.usuario.findUnique({
     where: { id: consultorDestinoId },
-    select: { nome: true },
+    select: { nome: true, equipeId: true },
   });
   if (!consultor) {
     return NextResponse.json({ erro: "Consultor destino não encontrado" }, { status: 404 });
+  }
+
+  // GESTOR só transfere dentro das próprias frentes -- tanto o dono atual
+  // (se já tiver carteira ativa) quanto o destino precisam estar numa
+  // frente que esse gestor gerencia (achado real da auditoria de
+  // segurança, 2026-09-15: qualquer gestor movia qualquer contrato pra
+  // qualquer consultor do sistema).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!consultor.equipeId || !equipesGerenciadas.includes(consultor.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para transferir pra este consultor" }, { status: 403 });
+    }
+    const carteiraAtual = await prisma.carteiraParcela.findFirst({
+      where: { contratoId, competenciaId: competencia.id, ativo: true },
+      select: { consultor: { select: { equipeId: true } } },
+    });
+    if (carteiraAtual && (!carteiraAtual.consultor.equipeId || !equipesGerenciadas.includes(carteiraAtual.consultor.equipeId))) {
+      return NextResponse.json({ erro: "Sem permissão para transferir este contrato" }, { status: 403 });
+    }
   }
 
   await prisma.carteiraParcela.upsert({

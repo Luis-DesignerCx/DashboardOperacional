@@ -4,11 +4,31 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { parsearValorMonetario } from "@/lib/utils";
+import { getEquipesGerenciadas } from "@/lib/frentes";
+
+// GESTOR só mexe em parcela de contrato de uma frente que ele gerencia --
+// sem isso, qualquer gestor editava/apagava parcela de qualquer frente
+// (achado real da auditoria de segurança, 2026-09-15).
+async function gestorPodeMexer(session: { user: { id: string; perfil: string } }, contratoId: string): Promise<boolean> {
+  if (session.user.perfil !== "GESTOR") return true;
+  const carteiraAtual = await prisma.carteiraParcela.findFirst({
+    where: { contratoId, ativo: true },
+    select: { consultor: { select: { equipeId: true } } },
+  });
+  const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+  return !!carteiraAtual?.consultor.equipeId && equipesGerenciadas.includes(carteiraAtual.consultor.equipeId);
+}
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  const parcelaAtual = await prisma.parcela.findUnique({ where: { id: params.id }, select: { contratoId: true } });
+  if (!parcelaAtual) return NextResponse.json({ erro: "Parcela não encontrada" }, { status: 404 });
+  if (!(await gestorPodeMexer(session, parcelaAtual.contratoId))) {
+    return NextResponse.json({ erro: "Sem permissão para editar esta parcela" }, { status: 403 });
   }
 
   const body = await req.json();
@@ -22,6 +42,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (paga !== undefined) data.paga = Boolean(paga);
 
   const parcela = await prisma.parcela.update({ where: { id: params.id }, data });
+
+  // Auditoria -- antes não ficava rastro de quem editou parcela (achado
+  // real da auditoria de segurança, 2026-09-15).
+  prisma.auditoria.create({
+    data: {
+      usuarioId: session.user.id,
+      tabela: "parcelas",
+      registroId: params.id,
+      campo: Object.keys(data).join(","),
+      valorNovo: JSON.stringify(Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v?.toString?.() ?? v]))),
+      acao: "UPDATE",
+    },
+  }).catch(() => {});
 
   // Recalcula maiorDiasAtraso do contrato se diasAtraso foi alterado
   if (diasAtraso !== undefined && diasAtraso !== "") {
@@ -47,8 +80,22 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     select: { id: true, contratoId: true, valorTotalAberto: true },
   });
   if (!parcela) return NextResponse.json({ erro: "Parcela não encontrada" }, { status: 404 });
+  if (!(await gestorPodeMexer(session, parcela.contratoId))) {
+    return NextResponse.json({ erro: "Sem permissão para excluir esta parcela" }, { status: 403 });
+  }
 
   await prisma.parcela.delete({ where: { id: params.id } });
+
+  prisma.auditoria.create({
+    data: {
+      usuarioId: session.user.id,
+      tabela: "parcelas",
+      registroId: params.id,
+      campo: "valorTotalAberto",
+      valorAnterior: String(parcela.valorTotalAberto ?? ""),
+      acao: "DELETE",
+    },
+  }).catch(() => {});
 
   // Recalcula valorTotalAberto e maiorDiasAtraso do contrato
   const restantes = await prisma.parcela.findMany({

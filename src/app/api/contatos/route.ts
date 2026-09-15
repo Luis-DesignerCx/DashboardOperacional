@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { StatusContato, TipoContato } from "@prisma/client";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -72,6 +73,17 @@ export async function GET(req: NextRequest) {
   if (contratoId) where.contratoId = contratoId;
   if (clienteId) where.contrato = { clienteId };
   if (session.user.perfil === "CONSULTOR") where.consultorId = session.user.id;
+  // GESTOR só vê contato de consultor de uma frente que ele gerencia --
+  // sem isso, via histórico de atendimento de clientes de toda a empresa
+  // (achado real da auditoria de segurança, 2026-09-15). Só aplica quando
+  // NÃO é uma consulta de cliente/contrato específico (ex: "agendados
+  // hoje") -- a tela de Clientes ainda não é escopada por frente pro
+  // gestor, então restringir aqui também nesse caso deixaria a listagem
+  // (sem filtro) inconsistente com o histórico (filtrado).
+  if (session.user.perfil === "GESTOR" && !contratoId && !clienteId) {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    where.consultor = { equipeId: { in: equipesGerenciadas } };
+  }
 
   if (agendadosHoje) {
     const ini = new Date(); ini.setHours(0, 0, 0, 0);

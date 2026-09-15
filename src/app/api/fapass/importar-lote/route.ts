@@ -366,7 +366,11 @@ export async function POST(req: NextRequest) {
       colunasResolvidas: C,
     });
   } catch (err: any) {
+    // O detalhe completo fica salvo no FaPassSync; a resposta ao cliente
+    // não devolve err.message cru (achado real da auditoria de
+    // segurança, 2026-09-15).
+    console.error("[fapass/importar-lote]", err);
     await prisma.faPassSync.update({ where: { id: sync.id }, data: { status: "ERRO", erro: err.message } });
-    return NextResponse.json({ erro: err.message || "Erro interno" }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao processar. Verifique o histórico de sincronização." }, { status: 500 });
   }
 }

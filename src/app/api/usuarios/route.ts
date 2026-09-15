@@ -107,6 +107,16 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  // Auditoria de criação de ADMINISTRADOR -- essa é a única forma de
+  // promover alguém a admin (a edição não aceita trocar perfil), e antes
+  // não ficava nenhum rastro de quem criou (achado real da auditoria de
+  // segurança, 2026-09-15).
+  if (perfilCriado === "ADMINISTRADOR") {
+    prisma.auditoria.create({
+      data: { usuarioId: session.user.id, tabela: "usuarios", registroId: usuario.id, acao: "CREATE", motivo: `Criou ADMINISTRADOR: ${usuario.email}` },
+    }).catch(() => {});
+  }
+
   if (frentesAdicionaisIds.length > 0) {
     await prisma.equipeConsultor.createMany({
       data: frentesAdicionaisIds.map((equipeId) => ({ equipeId, consultorId: usuario.id })),

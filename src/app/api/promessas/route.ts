@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FormaPagamento } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -54,10 +55,18 @@ export async function PATCH(req: NextRequest) {
   if (!id) return NextResponse.json({ erro: "ID obrigatório" }, { status: 400 });
 
   // Verifica que a promessa pertence ao consultor (ou é gestor/admin)
-  const promessa = await prisma.promessa.findUnique({ where: { id }, select: { consultorId: true } });
+  const promessa = await prisma.promessa.findUnique({ where: { id }, select: { consultorId: true, consultor: { select: { equipeId: true } } } });
   if (!promessa) return NextResponse.json({ erro: "Promessa não encontrada" }, { status: 404 });
   if (session.user.perfil === "CONSULTOR" && promessa.consultorId !== session.user.id) {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+  // GESTOR só mexe em promessa de consultor de uma frente que ele gerencia
+  // (achado real da auditoria de segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!promessa.consultor.equipeId || !equipesGerenciadas.includes(promessa.consultor.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para editar esta promessa" }, { status: 403 });
+    }
   }
 
   const atualizada = await prisma.promessa.update({
@@ -92,11 +101,14 @@ export async function GET(req: NextRequest) {
   if (status) where.status = status;
   if (session.user.perfil === "CONSULTOR" && !todas) where.consultorId = session.user.id;
   if (session.user.perfil === "GESTOR" && !todas) {
-    const equipeId = (session.user as any).equipeId;
+    // Usa TODAS as frentes gerenciadas (principal + adicionais), não só a
+    // equipe primária -- senão um gestor com frente adicional não via
+    // promessa dos consultores daquela frente extra.
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
     const idsPermitidos: string[] = [session.user.id];
-    if (equipeId) {
+    if (equipesGerenciadas.length > 0) {
       const consultores = await prisma.usuario.findMany({
-        where: { equipeId, ativo: true },
+        where: { equipeId: { in: equipesGerenciadas }, ativo: true },
         select: { id: true },
       });
       consultores.forEach((c) => { if (!idsPermitidos.includes(c.id)) idsPermitidos.push(c.id); });
@@ -133,14 +145,24 @@ export async function DELETE(req: NextRequest) {
 
   const promessa = await prisma.promessa.findUnique({
     where: { id },
-    select: { consultorId: true, status: true, contratoId: true },
+    select: { consultorId: true, status: true, contratoId: true, consultor: { select: { equipeId: true } } },
   });
   if (!promessa) return NextResponse.json({ erro: "Promessa não encontrada" }, { status: 404 });
   if (session.user.perfil === "CONSULTOR" && promessa.consultorId !== session.user.id) {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
   }
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!promessa.consultor.equipeId || !equipesGerenciadas.includes(promessa.consultor.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para excluir esta promessa" }, { status: 403 });
+    }
+  }
 
   await prisma.promessa.delete({ where: { id } });
+
+  prisma.auditoria.create({
+    data: { usuarioId: session.user.id, tabela: "promessas", registroId: id, acao: "DELETE" },
+  }).catch(() => {});
 
   // Se não restam promessas abertas para o contrato, volta a situação para INADIMPLENTE
   if (promessa.contratoId) {

@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { Decimal } from "@prisma/client/runtime/library";
 import { SituacaoContrato } from "@prisma/client";
 import { parsearValorMonetario } from "@/lib/utils";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -21,6 +22,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { contratoId: params.id, consultorId: session.user.id, ativo: true },
     });
     if (!naCarteira) return NextResponse.json({ erro: "Contrato não está na sua carteira" }, { status: 403 });
+  }
+
+  // GESTOR só pode editar contrato de uma frente que ele gerencia -- sem
+  // isso, qualquer gestor editava valor/dias/status de contrato de
+  // qualquer outra gestão só sabendo o id (achado real da auditoria de
+  // segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const carteiraAtual = await prisma.carteiraParcela.findFirst({
+      where: { contratoId: params.id, ativo: true },
+      select: { consultor: { select: { equipeId: true } } },
+    });
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!carteiraAtual?.consultor.equipeId || !equipesGerenciadas.includes(carteiraAtual.consultor.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para editar este contrato" }, { status: 403 });
+    }
   }
 
   // Bloqueia mudança de situação para contratos já recuperados integralmente
@@ -74,6 +90,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const contrato = await prisma.contrato.update({ where: { id: params.id }, data });
+
+  // Auditoria de edição de valor/dias/status -- antes não ficava rastro de
+  // quem mudou esses campos de um contrato (achado real da auditoria de
+  // segurança, 2026-09-15).
+  if (data.maiorDiasAtraso !== undefined || data.valorTotalAberto !== undefined || data.statusContrato !== undefined) {
+    prisma.auditoria.create({
+      data: {
+        usuarioId: session.user.id,
+        tabela: "contratos",
+        registroId: params.id,
+        campo: ["maiorDiasAtraso", "valorTotalAberto", "statusContrato"].filter((k) => data[k] !== undefined).join(","),
+        valorNovo: JSON.stringify({
+          maiorDiasAtraso: data.maiorDiasAtraso, valorTotalAberto: data.valorTotalAberto?.toString(), statusContrato: data.statusContrato,
+        }),
+        acao: "UPDATE",
+      },
+    }).catch(() => {});
+  }
 
   // Quando situação é INADIMPLENCIA_EQUIVOCADA, cria Solicitação para o gestor (se não houver pendente)
   if (situacao === "INADIMPLENCIA_EQUIVOCADA") {

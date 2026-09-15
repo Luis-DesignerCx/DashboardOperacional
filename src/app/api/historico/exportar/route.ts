@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import * as XLSX from "xlsx";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 // GET /api/historico/exportar?competenciaId=xxx — exporta planilha da competência
 export async function GET(req: NextRequest) {
@@ -26,9 +27,19 @@ export async function GET(req: NextRequest) {
   const periodoInicio = new Date(competencia.ano, competencia.mes - 1, 1);
   const periodoFim    = new Date(competencia.ano, competencia.mes, 1);
 
+  // GESTOR só exporta contratos de consultor de uma frente que ele
+  // gerencia -- sem isso, exportava a planilha da empresa inteira, com
+  // dado pessoal e financeiro de gestões alheias (achado real da
+  // auditoria de segurança, 2026-09-15).
+  const carteiraWhere: any = { competenciaId };
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    carteiraWhere.consultor = { equipeId: { in: equipesGerenciadas } };
+  }
+
   // Busca todos os contratos atribuídos nesta competência
   const carteiras = await prisma.carteiraParcela.findMany({
-    where: { competenciaId },
+    where: carteiraWhere,
     include: {
       contrato: {
         include: {
@@ -232,7 +243,12 @@ export async function GET(req: NextRequest) {
     },
   });
   } catch (err: any) {
+    // Não devolve err.message ao cliente -- pode vazar detalhe interno de
+    // schema/infra (nome de tabela/coluna/constraint do Prisma) pra
+    // qualquer usuário autenticado que force um erro (achado real da
+    // auditoria de segurança, 2026-09-15). Detalhe completo só no log do
+    // servidor.
     console.error("[exportar]", err);
-    return NextResponse.json({ erro: err?.message ?? "Erro interno" }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao gerar exportação. Tente novamente." }, { status: 500 });
   }
 }

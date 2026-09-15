@@ -232,7 +232,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ frentes, porEmpresa });
   } catch (err: any) {
+    // Detalhe completo só no log do servidor (achado real da auditoria de
+    // segurança, 2026-09-15).
     console.error("[distribuicao]", err);
-    return NextResponse.json({ erro: err.message }, { status: 500 });
+    return NextResponse.json({ erro: "Erro ao carregar dados. Tente novamente." }, { status: 500 });
   }
 }

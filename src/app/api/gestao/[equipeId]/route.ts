@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function GET(req: NextRequest, { params }: { params: { equipeId: string } }) {
   const session = await getServerSession(authOptions);
@@ -11,6 +12,16 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
   }
 
   const { equipeId } = params;
+
+  // GESTOR só consulta uma frente que ele gerencia -- sem isso, bastava
+  // trocar o equipeId na URL pra ver inadimplência/recebido/performance de
+  // outra gestão (achado real da auditoria de segurança, 2026-09-15).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!equipesGerenciadas.includes(equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para esta frente" }, { status: 403 });
+    }
+  }
   const { searchParams } = new URL(req.url);
   const competenciaId = searchParams.get("competenciaId");
   if (!competenciaId) return NextResponse.json({ erro: "competenciaId obrigatório" }, { status: 400 });
