@@ -234,7 +234,11 @@ async function processarRecebimento(req: NextRequest, session: any) {
 
   // Teto de multa/juros: o consultor só pode registrar um valor acima do
   // valor original da parcela em até 2% de multa (uma vez, se está
-  // atrasada) + 1% de juros ao mês pro-rata (do vencimento até hoje).
+  // atrasada) + 1% de juros ao mês pro-rata (do vencimento até hoje) + uma
+  // margem fixa de R$50 (o cálculo percentual sozinho travava por diferenças
+  // de poucos centavos/reais entre sistemas, e nem o gestor conseguia dizer
+  // com certeza qual devia ser o valor exato; R$50 dá folga real sem abrir
+  // mão do teto -- decisão de 2026-09-16).
   // GESTOR/ADMINISTRADOR podem sobrescrever (ex: acordo renegociado).
   //
   // Dias usados no cálculo = dias corridos real + 1 (o sistema financeiro da
@@ -244,6 +248,7 @@ async function processarRecebimento(req: NextRequest, session: any) {
   // de data entre sistemas).
   const DIAS_AJUSTE_SISTEMA_FINANCEIRO = 1;
   const DIAS_BRECHA_CONSULTOR = 3;
+  const MARGEM_FIXA_REAIS = 50;
   if (session.user.perfil === "CONSULTOR" && Array.isArray(parcelasIds) && parcelasIds.length > 0) {
     const parcelasSelecionadas = await prisma.parcela.findMany({
       where: { id: { in: parcelasIds } },
@@ -258,9 +263,9 @@ async function processarRecebimento(req: NextRequest, session: any) {
       const juros = 0.01 * (diasParaCalculo / 30);
       valorMaximoTotal += Number(p.valorParcela ?? 0) * (1 + multa + juros);
     }
-    if (valorNumerico > valorMaximoTotal + 0.02) {
+    if (valorNumerico > valorMaximoTotal + MARGEM_FIXA_REAIS) {
       return NextResponse.json({
-        erro: `Valor informado (${formatarMoeda(valorNumerico)}) excede o máximo permitido para as parcelas selecionadas: ${formatarMoeda(valorMaximoTotal)} (valor original + até 2% de multa + 1% de juros ao mês pro-rata).`,
+        erro: `Valor informado (${formatarMoeda(valorNumerico)}) excede o máximo permitido para as parcelas selecionadas: ${formatarMoeda(valorMaximoTotal + MARGEM_FIXA_REAIS)} (valor original + até 2% de multa + 1% de juros ao mês pro-rata + R$50 de margem).`,
       }, { status: 400 });
     }
   }
