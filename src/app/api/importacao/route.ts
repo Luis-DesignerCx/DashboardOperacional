@@ -246,29 +246,6 @@ function faixaParaTipoEquipe(faixa: string): TipoEquipe | null {
   return null;
 }
 
-// Dias estimados de atraso da parcela MAIS ANTIGA de um contrato, quando só
-// se sabe (a) o atraso da parcela mais recente e (b) quantas estão vencidas
-// no total. O arquivo Flash manda 1 linha por contrato (a mais recente) --
-// não dá pra saber a data real das parcelas anteriores. Assume ~30 dias por
-// ciclo mensal entre uma parcela e a próxima (aproximação, não é exato).
-function estimarDiasAtrasoParcelaMaisAntiga(diasParcelaAtual: number, totalParcelasVencidas: number | null): number {
-  if (!totalParcelasVencidas || totalParcelasVencidas <= 1) return diasParcelaAtual;
-  return diasParcelaAtual + (totalParcelasVencidas - 1) * 30;
-}
-
-// Um contrato importado como Flash só continua Flash se tiver EXATAMENTE 1
-// parcela vencida -- se tiver 2 ou mais, é sinal de dívida acumulada de
-// vários meses (mesmo que a parcela mais nova tenha poucos dias de atraso),
-// e o contrato deve ir pra faixa certa por dias de atraso, igual à Base
-// Geral. Achado real: 15 contratos Mydest caindo em Flash com até 7
-// parcelas vencidas, alguns há vários meses de dívida (ver conversa com
-// Weriton/gestor em 2026-09-14).
-function tipoEquipeParaFlash(diasParcelaAtual: number, totalParcelasVencidas: number | null): TipoEquipe {
-  if (!totalParcelasVencidas || totalParcelasVencidas <= 1) return "FLASH";
-  const diasEstimados = estimarDiasAtrasoParcelaMaisAntiga(diasParcelaAtual, totalParcelasVencidas);
-  return obterEquipePorDiasAtraso(diasEstimados);
-}
-
 function chunks<T>(arr: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
@@ -409,30 +386,31 @@ export async function POST(req: NextRequest) {
     });
     const existingMap = new Map(existingContratos.map((c) => [c.numero, c]));
 
-    // Importação FLASH: contratos que já têm carteira nesta competência
-    // atribuída a uma equipe que NÃO é Flash (ou seja, já fazem parte da
-    // base mensal) são ignorados por completo — não entram, não atualizam
-    // dados nem parcelas. Contratos já em Flash (envio incremental semanal)
-    // continuam sendo atualizados normalmente.
+    // Importação FLASH: contrato que já tem QUALQUER carteira nesta
+    // competência (base mensal OU um Flash anterior, ex.: dia 05) é
+    // ignorado por completo neste novo arquivo -- não entra, não atualiza
+    // dado nem parcela. Um Flash representa sempre 1 parcela realmente
+    // vencida, com poucos dias; ele nunca é reenviado pra "acumular atraso",
+    // e se o mesmo cliente/contrato aparecer de novo num Flash posterior
+    // (ex.: dia 10), mesmo com mais dias, o cliente já está com o
+    // consultor Flash desde o arquivo anterior e o registro novo é
+    // descartado (confirmado com o gestor, 2026-09-16).
     let ignoradosPorBaseMensal = 0;
     if (isFlash && existingContratos.length > 0) {
       const carteirasExistentes = await prisma.carteiraParcela.findMany({
         where: { competenciaId, contratoId: { in: existingContratos.map((c) => c.id) } },
-        include: { consultor: { include: { equipe: true } } },
+        select: { contratoId: true },
       });
-      const contratoIdParaTipoEquipe = new Map(
-        carteirasExistentes.map((c) => [c.contratoId, c.consultor.equipe?.tipo])
-      );
+      const contratosJaAtribuidos = new Set(carteirasExistentes.map((c) => c.contratoId));
       for (const [num, ec] of [...existingMap]) {
-        const tipoEquipe = contratoIdParaTipoEquipe.get(ec.id);
-        if (tipoEquipe && tipoEquipe !== "FLASH") {
+        if (contratosJaAtribuidos.has(ec.id)) {
           grupos.delete(num);
           existingMap.delete(num);
           ignoradosPorBaseMensal++;
         }
       }
       if (ignoradosPorBaseMensal > 0) {
-        console.log(`Importação FLASH: ${ignoradosPorBaseMensal} contrato(s) ignorado(s) por já estarem na base mensal desta competência.`);
+        console.log(`Importação FLASH: ${ignoradosPorBaseMensal} contrato(s) ignorado(s) por já terem carteira nesta competência (base mensal ou Flash anterior).`);
       }
     }
 
@@ -777,7 +755,7 @@ async function distribuirCarteiraAutomatica(
 
   const contratos = await prisma.contrato.findMany({
     where: { id: { in: paraDistribuir }, ativo: true },
-    select: { id: true, clienteId: true, maiorDiasAtraso: true, valorTotalAberto: true, totalParcelasVencidas: true },
+    select: { id: true, clienteId: true, maiorDiasAtraso: true, valorTotalAberto: true },
   });
 
   // Carrega TODAS as equipes de uma vez (evita N queries dentro do loop) --
@@ -833,7 +811,13 @@ async function distribuirCarteiraAutomatica(
     for (const c of semConsultorDefinido) {
       let tipo: TipoEquipe;
       if (isFlash) {
-        tipo = tipoEquipeParaFlash(c.maiorDiasAtraso ?? 0, c.totalParcelasVencidas);
+        // Flash representa sempre 1 parcela vencida com poucos dias --
+        // nunca dívida acumulada de vários meses (o campo informativo
+        // "parcelas vencidas" do arquivo pode incluir parcela futura,
+        // ainda não vencida; não é confiável pra estimar atraso real).
+        // Caso genuíno de PDD/atraso maior é tratado manualmente, caso a
+        // caso, via conferência no TSExplorer -- não pelo sistema.
+        tipo = "FLASH";
       } else {
         const faixaTexto = faixaPorContrato.get(c.id);
         tipo = (faixaTexto ? faixaParaTipoEquipe(faixaTexto) : null)
