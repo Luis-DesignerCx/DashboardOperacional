@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -12,7 +13,15 @@ export async function GET(req: NextRequest) {
 
   const where: any = {};
   if (session.user.perfil === "CONSULTOR") where.usuarioId = session.user.id;
-  if (session.user.perfil === "GESTOR" && session.user.equipeId) where.equipeId = session.user.equipeId;
+  if (session.user.perfil === "GESTOR") {
+    // Usa TODAS as frentes gerenciadas (principal + adicionais) -- a
+    // versão antiga usava só session.user.equipeId, e se um gestor não
+    // tivesse frente primária (só adicionais), a condição inteira era
+    // pulada e ele via a comissão de TODOS os consultores da empresa
+    // (achado real da revisão de segurança, 2026-09-16).
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    where.equipeId = { in: equipesGerenciadas };
+  }
   if (competenciaId) where.competenciaId = competenciaId;
 
   const comissoes = await prisma.comissao.findMany({

@@ -2,11 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session || !["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  // GESTOR só edita cliente que tem contrato numa frente que ele gerencia
+  // -- o GET já tinha esse cuidado (pro consultor); o PATCH não tinha
+  // nenhuma checagem pro gestor (achado real da revisão de segurança,
+  // 2026-09-16).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    const naGestao = await prisma.carteiraParcela.findFirst({
+      where: { ativo: true, consultor: { equipeId: { in: equipesGerenciadas } }, contrato: { clienteId: params.id } },
+    });
+    if (!naGestao) {
+      return NextResponse.json({ erro: "Cliente não está na sua gestão" }, { status: 403 });
+    }
   }
 
   const body = await req.json();

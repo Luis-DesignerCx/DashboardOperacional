@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -17,5 +18,22 @@ export async function GET() {
 
   equipes.sort((a, b) => (ORDEM[a.tipo] ?? 9) - (ORDEM[b.tipo] ?? 9));
 
-  return NextResponse.json(equipes);
+  // comissaoBase só aparece pra ADMINISTRADOR, pro GESTOR de uma frente que
+  // ele gerencia, ou pro CONSULTOR pra própria frente -- antes, qualquer
+  // perfil autenticado lia a comissaoBase de TODAS as frentes por esta
+  // listagem (achado real da revisão de segurança, 2026-09-16; o mesmo já
+  // tinha sido corrigido na rota de detalhe por id, mas não aqui).
+  const perfil = session.user.perfil;
+  const equipesGerenciadas = perfil === "GESTOR" ? await getEquipesGerenciadas(session.user.id) : [];
+  const minhaEquipeId = (session.user as any).equipeId;
+
+  const resultado = equipes.map((eq) => {
+    const podeVerComissao =
+      perfil === "ADMINISTRADOR" ||
+      (perfil === "GESTOR" && equipesGerenciadas.includes(eq.id)) ||
+      (perfil === "CONSULTOR" && eq.id === minhaEquipeId);
+    return { ...eq, comissaoBase: podeVerComissao ? eq.comissaoBase : null };
+  });
+
+  return NextResponse.json(resultado);
 }

@@ -20,6 +20,7 @@ export async function PATCH(req: NextRequest) {
   const recAtual = await prisma.recebimento.findUnique({
     where: { id },
     include: {
+      consultor: { select: { equipeId: true } },
       contrato: {
         select: {
           id: true,
@@ -37,6 +38,16 @@ export async function PATCH(req: NextRequest) {
     }
     if (valor === undefined) {
       return NextResponse.json({ erro: "Informe o valor a corrigir" }, { status: 400 });
+    }
+  }
+
+  // GESTOR só edita recebimento de consultor de uma frente que ele
+  // gerencia -- o DELETE já tinha essa checagem, o PATCH tinha ficado de
+  // fora (achado real da revisão de segurança, 2026-09-16).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!recAtual.consultor.equipeId || !equipesGerenciadas.includes(recAtual.consultor.equipeId)) {
+      return NextResponse.json({ erro: "Sem permissão para editar este recebimento" }, { status: 403 });
     }
   }
 

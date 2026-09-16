@@ -6,12 +6,24 @@ import { randomUUID } from "crypto";
 import { distribuirCarteira } from "@/utils/distribuicao-carteira";
 import { CONFIG_EQUIPES } from "@/constants/equipes";
 import { TipoEquipe } from "@prisma/client";
+import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
   if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
   if (!["ADMINISTRADOR", "GESTOR"].includes(session.user.perfil)) {
     return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
+
+  // GESTOR só redistribui uma frente que ele gerencia -- essa rota APAGA e
+  // recria a carteira inteira da faixa; sem essa checagem, qualquer gestor
+  // conseguia apagar/redistribuir a carteira de qualquer outra frente
+  // (achado real da revisão de segurança, 2026-09-16).
+  if (session.user.perfil === "GESTOR") {
+    const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
+    if (!equipesGerenciadas.includes(params.id)) {
+      return NextResponse.json({ erro: "Sem permissão para esta frente" }, { status: 403 });
+    }
   }
 
   const { competenciaId } = await req.json();

@@ -25,9 +25,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   // Gestor só pode editar consultores de qualquer uma das suas frentes
+  let minhasFrentes: string[] = [];
   if (perfil === "GESTOR") {
     const alvo = await prisma.usuario.findUnique({ where: { id: params.id }, select: { perfil: true, equipeId: true } });
-    const minhasFrentes = await getEquipeIdsGestor(session.user.id, session.user.equipeId ?? null);
+    minhasFrentes = await getEquipeIdsGestor(session.user.id, session.user.equipeId ?? null);
     if (!alvo || alvo.perfil !== "CONSULTOR" || !minhasFrentes.includes(alvo.equipeId ?? "")) {
       return NextResponse.json({ erro: "Sem permissão para editar este usuário" }, { status: 403 });
     }
@@ -35,6 +36,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const body = await req.json();
   const { nome, email, senha, frentesIds, ativo, emFerias } = body;
+
+  // GESTOR só pode mover o consultor pra frente(s) que ele próprio
+  // gerencia -- sem isso, dava pra mover um consultor da própria gestão
+  // pra QUALQUER outra frente do sistema (achado real da revisão de
+  // segurança, 2026-09-16).
+  if (perfil === "GESTOR" && Array.isArray(frentesIds)) {
+    const todasValidas = frentesIds.every((eqId: string) => minhasFrentes.includes(eqId));
+    if (!todasValidas) {
+      return NextResponse.json({ erro: "Sem permissão para uma das frentes selecionadas" }, { status: 403 });
+    }
+  }
 
   const data: Record<string, any> = {};
   if (nome !== undefined) data.nome = nome;

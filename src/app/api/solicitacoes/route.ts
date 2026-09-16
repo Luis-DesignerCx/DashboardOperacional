@@ -96,6 +96,29 @@ export async function POST(req: NextRequest) {
     if (!naCarteira) {
       return NextResponse.json({ erro: "Contrato não está na sua carteira" }, { status: 403 });
     }
+
+    // destinoConsultorId nunca era validado -- dava pra forjar o pedido
+    // apontando pra qualquer id do sistema (até um ADMINISTRADOR, ou
+    // alguém de outra frente), confiando só na aprovação manual do gestor
+    // como barreira. Agora exige que o destino seja um CONSULTOR ativo da
+    // MESMA frente de quem está pedindo (acompanha o que o front-end já
+    // restringe). Achado da revisão de segurança, 2026-09-16.
+    const meuId = session.user.id;
+    const [meuUsuario, minhasAdicionais] = await Promise.all([
+      prisma.usuario.findUnique({ where: { id: meuId }, select: { equipeId: true } }),
+      prisma.equipeConsultor.findMany({ where: { consultorId: meuId }, select: { equipeId: true } }),
+    ]);
+    const minhasFrentes = [meuUsuario?.equipeId, ...minhasAdicionais.map((f) => f.equipeId)].filter(Boolean) as string[];
+    const destino = await prisma.usuario.findUnique({
+      where: { id: dados.destinoConsultorId },
+      select: { ativo: true, perfil: true, equipeId: true },
+    });
+    if (
+      !destino || !destino.ativo || destino.perfil !== "CONSULTOR" ||
+      !destino.equipeId || !minhasFrentes.includes(destino.equipeId)
+    ) {
+      return NextResponse.json({ erro: "Consultor de destino inválido" }, { status: 400 });
+    }
   }
 
   const solicitacao = await prisma.solicitacao.create({

@@ -5,7 +5,13 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session) return NextResponse.json({ erro: "Não autorizado" }, { status: 401 });
+  // Só ADMINISTRADOR (mesma regra do PUT logo abaixo, e da própria tela no
+  // menu) -- antes qualquer usuário autenticado, inclusive CONSULTOR, lia
+  // as configurações do sistema (achado real da revisão de segurança,
+  // 2026-09-16).
+  if (!session || session.user.perfil !== "ADMINISTRADOR") {
+    return NextResponse.json({ erro: "Sem permissão" }, { status: 403 });
+  }
 
   const configs = await prisma.configuracao.findMany({ orderBy: { chave: "asc" } });
   return NextResponse.json(configs);
