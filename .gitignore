@@ -53,3 +53,6 @@ scripts/fapass-debug.py
 scripts/fapass-debug2.py
 scripts/fapass-sync-local.mjs
 scripts/validar-dashboard.mjs
+
+.vercel
+.env*

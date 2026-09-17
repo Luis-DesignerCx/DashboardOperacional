@@ -59,9 +59,16 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
   const iniComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
   const fimComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes,    1, 2, 59, 59, 999)) : new Date();
 
+  // O recebimento conta SEMPRE pro consultor que o registrou -- nunca exige
+  // que o contrato ainda esteja na carteira ATUAL dele nesta competência.
+  // Sem isso, um consultor que registrou um recebimento e depois teve o
+  // contrato redistribuído pra outra carteira (ex.: saiu de férias, saiu da
+  // empresa, foi reclassificado) via seu próprio dashboard mostrando MENOS
+  // recebimentos do que a Matriz de Performance do gestor, que já seguia
+  // essa regra corretamente. Achado real: Selma, 2026-09-17.
   const recebWhere = {
     consultorId,
-    contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId, competenciaId, ativo: true } } },
+    contrato: { inadimplenciaEquivocada: false },
     dataRecebimento: { gte: iniComp, lte: fimComp },
   };
 

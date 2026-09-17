@@ -96,10 +96,15 @@ export async function POST(req: NextRequest) {
       const saldoConsultor = Number(saldoAgg._sum?.valorTotalAberto ?? 0);
 
       const [recebimentos, qtdRecuperados] = await Promise.all([
+        // O recebimento conta pra comissão de quem o registrou, mesmo que o
+        // contrato tenha mudado de carteira depois -- exige só que o
+        // contrato esteja classificado nesta frente (tipoEquipe), não que
+        // ainda seja deste MESMO consultor (achado real com a Selma,
+        // 2026-09-17; mesma regra do dashboard do consultor).
         prisma.recebimento.findMany({
           where: {
             consultorId: consultor.id,
-            contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true, OR: [{ tipoEquipe: equipe!.tipo }, { tipoEquipe: null }] } } },
+            contrato: { inadimplenciaEquivocada: false, carteiras: { some: { competenciaId, ativo: true, OR: [{ tipoEquipe: equipe!.tipo }, { tipoEquipe: null }] } } },
             dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: { valor: true, valorAParte: true },
