@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getEquipesGerenciadas } from "@/lib/frentes";
+import { reatribuirRecebimentosDaCarteira } from "@/lib/recebimento";
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -131,6 +132,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
           ativo: true,
         },
       });
+
+      // Recebimento pertence a quem tem a carteira hoje -- ao aprovar a
+      // transferência, os recebimentos já registrados nesta competência
+      // pro contrato seguem junto pro novo dono.
+      await reatribuirRecebimentosDaCarteira([solicitacaoAtual.contratoId], competencia.id, consultorDestinoId);
 
       // Reativar a carteira de um contrato marcado "inadimplência equivocada"
       // não pode deixá-lo escondido de quem acabou de receber ele -- achado

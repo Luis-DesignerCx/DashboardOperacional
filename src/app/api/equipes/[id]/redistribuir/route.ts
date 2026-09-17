@@ -7,6 +7,7 @@ import { distribuirCarteira } from "@/utils/distribuicao-carteira";
 import { CONFIG_EQUIPES } from "@/constants/equipes";
 import { TipoEquipe } from "@prisma/client";
 import { getEquipesGerenciadas } from "@/lib/frentes";
+import { reatribuirRecebimentosDaCarteira } from "@/lib/recebimento";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
@@ -86,6 +87,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Insere em lotes
   for (let i = 0; i < novas.length; i += 3000) {
     await prisma.carteiraParcela.createMany({ data: novas.slice(i, i + 3000), skipDuplicates: true });
+  }
+
+  // Recebimento pertence a quem tem a carteira hoje -- redistribuir a
+  // carteira inteira precisa levar junto os recebimentos já registrados
+  // nesta competência pros contratos que mudaram de dono.
+  for (const at of atribuicoes) {
+    if (at.contratoIds.length) {
+      await reatribuirRecebimentosDaCarteira(at.contratoIds, competenciaId, at.consultorId);
+    }
   }
 
   return NextResponse.json({ redistribuidos: novas.length, consultores: equipe.usuarios.length });
