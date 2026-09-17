@@ -47,15 +47,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     _sum: { valorTotalAberto: true },
   });
 
-  // Snapshot do total recebido na competência -- o recebimento conta pra
-  // quem o registrou, mesmo que o contrato já tenha saído da carteira dele
-  // (é justamente o caso de férias: a carteira é redistribuída pra outro
-  // consultor, mas o snapshot precisa preservar o que este consultor
-  // realmente recebeu antes disso, achado real com a Selma, 2026-09-17).
+  // Snapshot do total recebido na competência
   const recebidoAgg = await prisma.recebimento.aggregate({
     where: {
       consultorId: ferias.consultorId,
-      contrato: { inadimplenciaEquivocada: false },
+      contrato: {
+        inadimplenciaEquivocada: false,
+        carteiras: { some: { consultorId: ferias.consultorId, competenciaId: ferias.competenciaId, ativo: true } },
+      },
       dataRecebimento: { gte: iniComp, lte: fimComp },
     },
     _sum: { valor: true, valorAParte: true },

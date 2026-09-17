@@ -88,13 +88,10 @@ export async function GET(req: NextRequest) {
       const saldoConsultor = Number(saldoAgg._sum.valorTotalAberto ?? 0);
 
       const [recebimentos, qtdRecuperados] = await Promise.all([
-        // O recebimento conta pra comissão de quem o registrou, mesmo que o
-        // contrato tenha mudado de carteira depois (mesma regra do
-        // dashboard do consultor, achado real com a Selma, 2026-09-17).
         prisma.recebimento.findMany({
           where: {
             consultorId: consultor.id,
-            contrato: { inadimplenciaEquivocada: false },
+            contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } } },
             dataRecebimento: { gte: iniComp, lte: fimComp },
           },
           select: { valor: true, valorAParte: true },
