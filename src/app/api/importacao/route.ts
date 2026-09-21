@@ -755,7 +755,7 @@ async function distribuirCarteiraAutomatica(
 
   const contratos = await prisma.contrato.findMany({
     where: { id: { in: paraDistribuir }, ativo: true },
-    select: { id: true, clienteId: true, maiorDiasAtraso: true, valorTotalAberto: true },
+    select: { id: true, clienteId: true, maiorDiasAtraso: true, valorTotalAberto: true, cliente: { select: { nome: true } } },
   });
 
   // Carrega TODAS as equipes de uma vez (evita N queries dentro do loop) --
@@ -788,6 +788,31 @@ async function distribuirCarteiraAutomatica(
   const novasAtribuicoes: { id: string; contratoId: string; consultorId: string; competenciaId: string; tipoEquipe: TipoEquipe | null; baseVencimento: number | null }[] = [];
   const semConsultorDefinido: typeof contratos = [];
 
+  // Cliente com mais de 1 contrato inadimplente na MESMA faixa fica sempre
+  // no mesmo consultor -- não existe deduplicação de Cliente no sistema
+  // (cada contrato tem seu próprio registro, mesma pessoa real aparece em
+  // várias linhas), então o match é por nome normalizado + tipoEquipe.
+  // Nunca cruza faixa (um contrato Flash e outro 31-90 do mesmo cliente
+  // continuam podendo ficar com consultores diferentes). Semeado com a
+  // carteira já existente nesta competência (de uma importação anterior,
+  // ex.: outro empreendimento) e atualizado a cada nova atribuição deste
+  // lote, pra pegar também clientes com 2+ contratos no MESMO arquivo.
+  // Achado real: 156 clientes com contratos em consultores diferentes,
+  // corrigido manualmente em 2026-09-18 -- isso evita que aconteça de novo.
+  function chaveClienteFaixa(nomeCliente: string, tipo: TipoEquipe): string {
+    return normalizar(nomeCliente) + "|" + tipo;
+  }
+  const carteirasExistentes = await prisma.carteiraParcela.findMany({
+    where: { competenciaId, ativo: true, tipoEquipe: { not: null } },
+    select: { consultorId: true, tipoEquipe: true, contrato: { select: { cliente: { select: { nome: true } } } } },
+  });
+  const clienteFaixaConsultorMap = new Map<string, string>();
+  for (const cp of carteirasExistentes) {
+    if (!cp.tipoEquipe) continue;
+    const chave = chaveClienteFaixa(cp.contrato.cliente.nome, cp.tipoEquipe);
+    if (!clienteFaixaConsultorMap.has(chave)) clienteFaixaConsultorMap.set(chave, cp.consultorId);
+  }
+
   // 1ª passagem: atribuições diretas da planilha
   for (const c of contratos) {
     const nomeRaw = nomeConsultorPorContrato.get(c.id);
@@ -798,6 +823,9 @@ async function distribuirCarteiraAutomatica(
           id: randomUUID(), contratoId: c.id, consultorId: consultor.id, competenciaId, tipoEquipe: consultor.tipoEquipe,
           baseVencimento: consultor.tipoEquipe === "FLASH" ? baseVencimento : null,
         });
+        if (consultor.tipoEquipe) {
+          clienteFaixaConsultorMap.set(chaveClienteFaixa(c.cliente.nome, consultor.tipoEquipe), consultor.id);
+        }
         continue;
       }
     }
@@ -808,6 +836,7 @@ async function distribuirCarteiraAutomatica(
   if (semConsultorDefinido.length > 0) {
 
     const porEquipe = new Map<TipoEquipe, typeof contratos>();
+    const tipoPorContrato = new Map<string, TipoEquipe>();
     for (const c of semConsultorDefinido) {
       let tipo: TipoEquipe;
       if (isFlash) {
@@ -823,9 +852,26 @@ async function distribuirCarteiraAutomatica(
         tipo = (faixaTexto ? faixaParaTipoEquipe(faixaTexto) : null)
           ?? obterEquipePorDiasAtraso(c.maiorDiasAtraso ?? 0);
       }
+      tipoPorContrato.set(c.id, tipo);
+
+      // Cliente já tem outro contrato nesta MESMA faixa nesta competência
+      // (desta importação ou de uma anterior) -- entra direto no mesmo
+      // consultor, sem passar pela distribuição automática.
+      const chave = chaveClienteFaixa(c.cliente.nome, tipo);
+      const consultorExistente = clienteFaixaConsultorMap.get(chave);
+      if (consultorExistente) {
+        novasAtribuicoes.push({
+          id: randomUUID(), contratoId: c.id, consultorId: consultorExistente, competenciaId, tipoEquipe: tipo,
+          baseVencimento: tipo === "FLASH" ? baseVencimento : null,
+        });
+        continue;
+      }
+
       if (!porEquipe.has(tipo)) porEquipe.set(tipo, []);
       porEquipe.get(tipo)!.push(c);
     }
+
+    const contratoParaCliente = new Map(semConsultorDefinido.map((c) => [c.id, c.cliente.nome]));
 
     for (const [tipo, lista] of porEquipe) {
       const equipe = equipeMap.get(tipo);
@@ -843,8 +889,15 @@ async function distribuirCarteiraAutomatica(
 
       for (const at of atribuicoes) {
         for (const contratoId of at.contratoIds) {
+          // Outro contrato do MESMO cliente, na MESMA faixa, já caiu num
+          // consultor diferente NESTE MESMO lote (ex.: 2 contratos novos
+          // do mesmo cliente no mesmo arquivo) -- redireciona pro mesmo
+          // consultor em vez de deixar a distribuição greedy separar.
+          const chave = chaveClienteFaixa(contratoParaCliente.get(contratoId)!, tipo);
+          const consultorFinal = clienteFaixaConsultorMap.get(chave) ?? at.consultorId;
+          clienteFaixaConsultorMap.set(chave, consultorFinal);
           novasAtribuicoes.push({
-            id: randomUUID(), contratoId, consultorId: at.consultorId, competenciaId, tipoEquipe: tipo,
+            id: randomUUID(), contratoId, consultorId: consultorFinal, competenciaId, tipoEquipe: tipo,
             baseVencimento: tipo === "FLASH" ? baseVencimento : null,
           });
         }
