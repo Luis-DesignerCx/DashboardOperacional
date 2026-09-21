@@ -5,7 +5,7 @@ import { useSession } from "next-auth/react";
 import {
   FolderOpen, Search, Plus, X, AlertCircle, AlertTriangle,
   ChevronRight, UserPlus, Building2, Loader2, CheckCircle2, DollarSign, ArrowLeftRight, User,
-  Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2, RefreshCw,
+  Phone, History, Calendar, ArrowUpDown, Clock, Pencil, Trash2, RefreshCw, Download,
 } from "lucide-react";
 import { formatarMoeda, parsearValorMonetario } from "@/lib/utils";
 import { usePersistedState } from "@/hooks/usePersistedState";
@@ -219,6 +219,7 @@ export default function CarteiraPage() {
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [competenciaId, setCompetenciaId] = useState("");
   const [competencias, setCompetencias] = useState<any[]>([]);
+  const [exportando, setExportando] = useState(false);
   const [busca, setBusca] = usePersistedState("busca", "");
   const [sort, setSort] = usePersistedState("sort", "diasAtraso");
   const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string | null>("empresaFiltro", null);
@@ -489,6 +490,30 @@ export default function CarteiraPage() {
           : item
       )
     );
+  }
+
+  async function exportar() {
+    if (!competenciaId || exportando) return;
+    setExportando(true);
+    try {
+      const res = await fetch(`/api/carteira/exportar?competenciaId=${competenciaId}`);
+      if (!res.ok) {
+        const ct = res.headers.get("content-type") ?? "";
+        const msg = ct.includes("json") ? (await res.json()).erro : await res.text();
+        alert(`Erro ao exportar: ${msg}`);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const descricao = competencias.find((c) => c.id === competenciaId)?.descricao ?? competenciaId;
+      a.download = `carteira_${descricao.replace(/\s+/g, "_")}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExportando(false);
+    }
   }
 
   function abrirExterno() {
@@ -820,6 +845,14 @@ export default function CarteiraPage() {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={exportar}
+            disabled={exportando || !competenciaId}
+            className="flex items-center gap-2 bg-surface-1 hover:bg-white/[0.06] text-slate-300 border border-white/[0.08] text-sm font-medium px-3 py-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {exportando ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+            Exportar
+          </button>
           <button
             onClick={abrirExterno}
             className="flex items-center gap-2 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 text-sm font-medium px-3 py-2 rounded-xl transition-colors"
