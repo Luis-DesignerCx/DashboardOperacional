@@ -140,17 +140,19 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       where: { consultorId_competenciaId: { consultorId, competenciaId } },
       select: { congelado: true, snapshotSaldo: true, snapshotRecebido: true, snapshotMetaAlvo: true },
     }),
-    // Base para meta financeira: paga:false, equivocada:false (inclui remanejadas, igual à comissão)
-    prisma.parcela.aggregate({
-      where: {
-        paga: false,
-        equivocada: false,
-        contrato: {
-          inadimplenciaEquivocada: false,
-          carteiras: { some: { consultorId, competenciaId, ativo: true } },
-        },
-      },
-      _sum: { valorTotalAberto: true },
+    // Carteira Total / base da meta financeira: soma o valorTotalAberto do
+    // CONTRATO (fixado na importação, só muda numa reimportação com dívida
+    // nova ou correção) -- não soma parcela por parcela. Antes somava
+    // Parcela.valorTotalAberto (paga:false), que cai a cada pagamento
+    // parcial registrado -- fazia a "Carteira Total" do consultor encolher
+    // no meio do dia conforme ele ia recebendo. A carteira do mês não muda
+    // por pagamento -- quitado ou não, o contrato permanece contado; só
+    // sobe quando entra parcela nova (ex.: correção de dado que não tinha
+    // ido pra Base Geral). Achado real: Leusiele Ribeiro dos Santos,
+    // 2026-09-21.
+    prisma.carteiraParcela.findMany({
+      where: { consultorId, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
+      select: { contrato: { select: { valorTotalAberto: true } } },
     }),
     // Contratos recuperados integralmente (para meta QUANTIDADE)
     prisma.contrato.count({
@@ -243,13 +245,15 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     }))
     .sort((a, b) => b.recebido - a.recebido);
 
-  // valorCarteira = saldo devedor total (paga:false, equivocada:false, inclui remanejadas — ainda são dívidas ativas)
-  const valorCarteira = Number(saldoParcelasAgg._sum.valorTotalAberto ?? 0);
+  // valorCarteira = soma do valorTotalAberto do contrato (fixo, não cai por
+  // pagamento parcial -- só sai quando o contrato deixa a carteira ativa)
+  const valorCarteiraSoma = saldoParcelasAgg.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
+  const valorCarteira = valorCarteiraSoma;
   const totalClientes = new Set(carteira.map((c) => c.contrato.clienteId)).size;
   const promessasAbertas = promessasAbertasAgg._count;
 
-  // Usa a mesma base de cálculo da comissão: soma de parcelas não pagas/não equivocadas
-  const saldoConsultor = Number(saldoParcelasAgg._sum.valorTotalAberto ?? 0);
+  // Usa a mesma base de cálculo da meta financeira
+  const saldoConsultor = valorCarteiraSoma;
 
   // Se carteira congelada (férias), usa snapshot fixo da meta
   const metaAlvo = (feriasSnapshot?.congelado && feriasSnapshot.snapshotMetaAlvo)
@@ -381,8 +385,17 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     recAParteAgg,
     contratosRecebidosRows,
   ] = await Promise.all([
+    // Inadimplência Inicial: soma o valorTotalAberto do contrato (fixo) --
+    // não cai quando um consultor da equipe recebe um pagamento parcial,
+    // quitado ou não o contrato continua contado. Mesma correção do
+    // dashboard do consultor (achado real: Leusiele Ribeiro dos Santos,
+    // 2026-09-21).
     prisma.carteiraParcela.findMany({
-      where: { consultorId: { in: consultorIds }, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false }, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) },
+      where: {
+        consultorId: { in: consultorIds }, competenciaId, ativo: true,
+        contrato: { inadimplenciaEquivocada: false },
+        ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}),
+      },
       select: { contrato: { select: { valorTotalAberto: true, clienteId: true } } },
     }),
     prisma.recebimento.aggregate({
@@ -467,7 +480,12 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
   const inadimplenciaInicial = carteiras.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const totalContratosInicial = carteiras.length;
   const totalClientesInicial = new Set(carteiras.map((c) => c.contrato.clienteId)).size;
-  const recebido = Number(recebidoAgg._sum.valor ?? 0);
+  // Recebido no Mês soma valor + valorAParte, igual ao "Total Recebido" do
+  // consultor -- antes só somava "valor", fazendo o card do gestor mostrar
+  // menos do que a soma que o próprio consultor via na tela dele sempre que
+  // havia recebimento "à parte" (achado real: Samara Machado de Melo,
+  // 2026-09-21).
+  const recebido = Number(recebidoAgg._sum.valor ?? 0) + Number(recAParteAgg._sum.valorAParte ?? 0);
   const baixado = Number(baixadoAgg._sum.valorBaixado ?? 0);
   const contratosRecebidos = contratosRecebidosRows.length;
 

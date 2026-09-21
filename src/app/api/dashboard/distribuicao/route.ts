@@ -119,6 +119,7 @@ export async function GET(req: NextRequest) {
         consultorId: true,
         contratoId: true,
         valor: true,
+        valorAParte: true,
         contrato: { select: { maiorDiasAtraso: true } },
       },
     });
@@ -150,6 +151,10 @@ export async function GET(req: NextRequest) {
       const fMap = frenteConsultorMap.get(frenteId)!;
       if (!fMap.has(cp.consultorId)) fMap.set(cp.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
       const d = fMap.get(cp.consultorId)!;
+      // Saldo sob Gestão soma o valorTotalAberto do contrato (fixo) -- não
+      // cai por pagamento parcial nem quando o contrato é recuperado de
+      // vez; quitado ou não, permanece contado (achado real: Leusiele
+      // Ribeiro dos Santos, 2026-09-21).
       d.saldoAberto += Number(cp.contrato.valorTotalAberto ?? 0);
       d.contratos += 1;
     }
@@ -160,7 +165,9 @@ export async function GET(req: NextRequest) {
       const fMap = frenteConsultorMap.get(frenteId)!;
       if (!fMap.has(r.consultorId)) fMap.set(r.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
       const d = fMap.get(r.consultorId)!;
-      d.recebido += Number(r.valor ?? 0);
+      // Recebido no Mês soma valor + valorAParte, igual ao "Total Recebido"
+      // do consultor (achado real: Samara Machado de Melo, 2026-09-21).
+      d.recebido += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
       d.contratosRecebidosSet.add(r.contratoId);
     }
 

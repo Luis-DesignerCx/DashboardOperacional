@@ -602,6 +602,10 @@ export default function CarteiraPage() {
     setErroReceb("");
     const valor = parsearValorMonetario(recebForm.valor);
     if (!valor || valor <= 0) { setErroReceb("Informe um valor válido"); return; }
+    if (recebForm.parcelasIds.length === 0 && recebForm.parcelasRemanejadas.length === 0) {
+      setErroReceb("Marque ao menos uma parcela (recebida ou remanejada) antes de registrar");
+      return;
+    }
     setSalvandoReceb(true);
     try {
       const res = await fetch("/api/recebimentos", {

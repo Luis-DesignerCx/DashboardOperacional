@@ -96,7 +96,7 @@ export function DashboardExecutivo() {
           <p className="text-2xl font-bold text-white mt-2 tabular-nums leading-none">{formatarMoeda(dados.inadimplenciaTotal)}</p>
           <div className="mt-3 pt-3 border-t border-white/[0.05]">
             <span className="text-xs text-slate-500">
-              <span className="text-slate-300 font-semibold">{dados.totalClientes}</span> clientes
+              <span className="text-slate-300 font-semibold">{dados.totalContratos}</span> contratos
             </span>
           </div>
         </div>

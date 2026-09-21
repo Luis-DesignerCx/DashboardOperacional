@@ -209,6 +209,23 @@ async function processarRecebimento(req: NextRequest, session: any) {
     return NextResponse.json({ erro: "Campos obrigatórios: contratoId, valor, data, forma de pagamento" }, { status: 400 });
   }
 
+  // Pelo menos 1 parcela precisa ser marcada (recebida ou remanejada) --
+  // sem isso, o valor entrava como recebido mas nenhuma Parcela virava
+  // paga:true, então o contrato ficava preso em "Recuperação Parcial" (ou
+  // até "Inadimplente") pra sempre, mesmo já tendo recebido mais que o
+  // valor total em aberto. Achado real: RP001054, REI DAS BOMBAS TUDO PARA
+  // POSTO LTDA, consultora registrou 2 recebimentos (R$860,56 + R$843,59,
+  // cobrindo agosto e setembro) sem marcar nenhuma parcela -- contrato
+  // continuava mostrando "Recuperação Parcial" com só R$838,48 em aberto.
+  const totalParcelasMarcadas =
+    (Array.isArray(parcelasIds) ? parcelasIds.length : 0) +
+    (Array.isArray(parcelasRemanejadas) ? parcelasRemanejadas.length : 0);
+  if (totalParcelasMarcadas === 0) {
+    return NextResponse.json({
+      erro: "Selecione ao menos uma parcela (recebida ou remanejada) para registrar o recebimento.",
+    }, { status: 400 });
+  }
+
   const contrato = await prisma.contrato.findUnique({
     where: { id: contratoId },
     select: { id: true, valorTotalAberto: true, recebimentos: { select: { valor: true } } },
