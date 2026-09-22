@@ -9,8 +9,8 @@ import {
 import Link from "next/link";
 
 interface PorEmpresa {
-  nome: string; contratos: number; recebido: number;
-  inadimplencia: number; clientesPagaram: number; eficiencia: number;
+  nome: string; contratos: number; recebidoInadimplente: number; parcelaMes: number;
+  inadimplencia: number; clientesPagaram: number; contratosRecuperados: number; eficiencia: number;
 }
 
 interface DadosConsultor {
@@ -118,7 +118,7 @@ export function DashboardConsultor() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard titulo="Carteira Total"   valor={formatarMoeda(dados.valorCarteira)}  sub={`${dados.totalClientes} clientes`}          icon={DollarSign}      iconBg="bg-white/[0.07]" />
         <KpiCard titulo="Total Recebido"   valor={formatarMoeda(totalRecebido)}         sub={`${dados.clientesPagaram ?? 0} pagaram`}    icon={TrendingUp}      iconBg="bg-gr-500/80" />
-        <KpiCard titulo="À Parte"          valor={formatarMoeda(dados.valorAParte)}     sub="Fora da inadimplência"                      icon={Layers}          iconBg="bg-sky-600/80" />
+        <KpiCard titulo="Parcela Mês"      valor={formatarMoeda(dados.valorAParte)}     sub="Parcela do mês vigente"                     icon={Layers}          iconBg="bg-sky-600/80" />
         <KpiCard titulo="Remanejado"       valor={formatarMoeda(dados.valorRemanejado)} sub="Parcelas remanejadas"                       icon={ArrowRightLeft}  iconBg="bg-violet-600/80" />
       </div>
 
@@ -217,23 +217,27 @@ export function DashboardConsultor() {
               <thead>
                 <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
                   <th className="text-left pb-2.5 font-semibold">Empreendimento</th>
-                  <th className="text-right pb-2.5 font-semibold">Contratos</th>
-                  <th className="text-right pb-2.5 font-semibold">Pagaram</th>
-                  <th className="text-right pb-2.5 font-semibold">Inadimplência</th>
-                  <th className="text-right pb-2.5 font-semibold">Recebido</th>
-                  <th className="text-right pb-2.5 font-semibold">Eficiência</th>
+                  <th className="text-right pb-2.5 font-semibold">Recebido Inadimplente</th>
+                  <th className="text-right pb-2.5 font-semibold">Parcela Mês</th>
+                  <th className="text-center pb-2.5 font-semibold">Contr. Recuperados</th>
+                  <th className="text-right pb-2.5 font-semibold">Saldo sob Gestão</th>
+                  <th className="text-center pb-2.5 font-semibold">Contr. sob Gestão</th>
+                  <th className="text-right pb-2.5 font-semibold">% Recuperação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
                 {dados.porEmpresa.map((e) => (
                   <tr key={e.nome} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-2.5 text-slate-200 font-medium truncate max-w-[120px]">{e.nome}</td>
-                    <td className="py-2.5 text-right text-slate-400 tabular-nums">{e.contratos}</td>
-                    <td className="py-2.5 text-right text-emerald-400 font-medium tabular-nums">{e.clientesPagaram ?? 0}</td>
+                    <td className="py-2.5 text-left text-slate-200 font-bold">{e.nome}</td>
+                    <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(e.recebidoInadimplente)}</td>
+                    <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.parcelaMes)}</td>
+                    <td className="py-2.5 text-center text-slate-500 tabular-nums">{e.contratosRecuperados}</td>
                     <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.inadimplencia)}</td>
-                    <td className="py-2.5 text-right text-slate-300 tabular-nums">{formatarMoeda(e.recebido)}</td>
-                    <td className={`py-2.5 text-right font-semibold tabular-nums ${e.eficiencia >= 80 ? "text-emerald-400" : e.eficiencia >= 50 ? "text-amber-400" : "text-slate-500"}`}>
-                      {e.eficiencia.toFixed(1)}%
+                    <td className="py-2.5 text-center text-slate-500 tabular-nums">{e.contratos}</td>
+                    <td className="py-2.5 text-right">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums ${e.eficiencia >= 10 ? "bg-emerald-500/10 text-emerald-400" : e.eficiencia >= 5 ? "bg-amber-500/10 text-amber-400" : "bg-white/[0.04] text-slate-500"}`}>
+                        {e.eficiencia.toFixed(1)}%
+                      </span>
                     </td>
                   </tr>
                 ))}

@@ -539,10 +539,10 @@ function ConsultorComissao({ consultorId }: { consultorId: string }) {
             <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
               <p className="text-slate-400 text-xs mb-1">Total Recebido</p>
               <p className="text-white text-xl font-bold tabular-nums">{formatarMoeda(preview.totalRecebido)}</p>
-              <p className="text-slate-500 text-[10px] mt-1">inclui valores a parte</p>
+              <p className="text-slate-500 text-[10px] mt-1">inclui Parcela Mês</p>
             </div>
             <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
-              <p className="text-slate-400 text-xs mb-1">À Parte</p>
+              <p className="text-slate-400 text-xs mb-1">Parcela Mês</p>
               <p className="text-sky-400 text-xl font-bold tabular-nums">{formatarMoeda(preview.totalAParte ?? 0)}</p>
               <p className="text-slate-500 text-[10px] mt-1">incluído no total recebido</p>
             </div>

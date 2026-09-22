@@ -47,10 +47,10 @@ async function processarNovoCliente(req: NextRequest, session: any) {
     : null;
   const tipoEquipeAtual = equipeAtual?.tipo ?? null;
 
-  // ── RECEBIMENTO A PARTE ────────────────────────────────────────────────────
+  // ── RECEBIMENTO PARCELA MÊS ─────────────────────────────────────────────────
   if (tipo === "a_parte") {
     if (!formaPagamento) {
-      return NextResponse.json({ erro: "Forma de pagamento obrigatória para lançamento a parte" }, { status: 400 });
+      return NextResponse.json({ erro: "Forma de pagamento obrigatória para lançamento de Parcela Mês" }, { status: 400 });
     }
     if (!dataRecebimento) {
       return NextResponse.json({ erro: "Data do recebimento obrigatória" }, { status: 400 });
@@ -58,7 +58,7 @@ async function processarNovoCliente(req: NextRequest, session: any) {
 
     const parcelasAParte: ParcelaInput[] = Array.isArray(parcelas) && parcelas.length > 0 ? parcelas : [];
     if (parcelasAParte.length === 0) {
-      return NextResponse.json({ erro: "Informe ao menos uma parcela recebida a parte" }, { status: 400 });
+      return NextResponse.json({ erro: "Informe ao menos uma parcela recebida como Parcela Mês" }, { status: 400 });
     }
 
     const valorTotal = parcelasAParte.reduce((s, p) => s + (parsearValorMonetario(p.valor)), 0);
@@ -134,7 +134,7 @@ async function processarNovoCliente(req: NextRequest, session: any) {
         valorAParte: new Decimal(valorTotal.toFixed(2)),
         dataRecebimento: parseDataLocalBrasil(dataRecebimento),
         formaPagamento: formaPagamento as FormaPagamento,
-        justificativa: `Lançamento a parte — parcelas: ${detalhesParcelas}`,
+        justificativa: `Parcela Mês — parcelas: ${detalhesParcelas}`,
       },
     });
 

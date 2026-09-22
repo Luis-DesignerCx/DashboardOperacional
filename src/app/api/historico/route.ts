@@ -42,7 +42,11 @@ export async function GET(req: NextRequest) {
   // Para cada competência, conta contratos e soma inadimplência
   const resultado = await Promise.all(
     competencias.map(async (comp) => {
-      const where: any = { competenciaId: comp.id };
+      // ativo:true + inadimplenciaEquivocada:false -- mesmo filtro do
+      // dashboard. Sem isso, contrato removido por inadimplência equivocada
+      // ou carteira já inativa continuava contado aqui (achado real: Leticia
+      // Cristina da Silva Sergio, 2026-09-22).
+      const where: any = { competenciaId: comp.id, ativo: true, contrato: { inadimplenciaEquivocada: false } };
       if (equipesGerenciadas) where.consultor = { equipeId: { in: equipesGerenciadas } };
 
       const carteiras = await prisma.carteiraParcela.count({ where });

@@ -73,19 +73,18 @@ export async function GET(req: NextRequest) {
 
   const resultados = await Promise.all(
     consultores.map(async (consultor) => {
-      // Saldo da carteira individual do consultor (para metas com percentualAlvo)
-      const saldoAgg = await prisma.parcela.aggregate({
-        where: {
-          paga: false,
-          equivocada: false,
-          contrato: {
-            inadimplenciaEquivocada: false,
-            carteiras: { some: { consultorId: consultor.id, competenciaId, ativo: true } },
-          },
-        },
-        _sum: { valorTotalAberto: true },
+      // Saldo da carteira individual do consultor (para metas com
+      // percentualAlvo): soma o valorTotalAberto do CONTRATO (fixo), igual
+      // à Carteira Total do dashboard -- não a soma ao vivo das parcelas em
+      // aberto. Antes, cada recebimento reduzia esse saldo ao mesmo tempo
+      // que aumentava totalRecebido, inflando percentualMeta em dobro e
+      // fazendo o consultor pular de faixa de comissão antes da hora
+      // (achado real: Leticia Cristina da Silva Sergio, 2026-09-22).
+      const saldoCarteiras = await prisma.carteiraParcela.findMany({
+        where: { consultorId: consultor.id, competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
+        select: { contrato: { select: { valorTotalAberto: true } } },
       });
-      const saldoConsultor = Number(saldoAgg._sum.valorTotalAberto ?? 0);
+      const saldoConsultor = saldoCarteiras.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
 
       const [recebimentos, qtdRecuperados] = await Promise.all([
         prisma.recebimento.findMany({

@@ -756,7 +756,7 @@ export default function CarteiraPage() {
   }
 
   async function excluirAParte(id: string) {
-    if (!confirm("Excluir este lançamento a parte?")) return;
+    if (!confirm("Excluir este lançamento de Parcela Mês?")) return;
     const res = await fetch(`/api/recebimentos?id=${id}`, { method: "DELETE" });
     if (!res.ok) return;
     setModalAParte((prev) => prev ? {
@@ -1098,10 +1098,10 @@ export default function CarteiraPage() {
                               {totalAParte > 0 && (
                                 <button
                                   onClick={() => setModalAParte(c)}
-                                  title="Ver detalhes A Parte"
+                                  title="Ver detalhes Parcela Mês"
                                   className="text-xs font-medium tabular-nums text-sky-400 hover:text-sky-300 transition-colors text-right"
                                 >
-                                  ↳ {formatarMoeda(totalAParte)} a parte
+                                  ↳ {formatarMoeda(totalAParte)} Parcela Mês
                                 </button>
                               )}
                             </div>
@@ -1517,13 +1517,13 @@ export default function CarteiraPage() {
       )}
 
 
-      {/* Modal: Detalhes A Parte */}
+      {/* Modal: Detalhes Parcela Mês */}
       {modalAParte && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-surface-2 border border-white/[0.08] rounded-2xl w-full max-w-sm shadow-2xl">
             <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
               <div>
-                <h2 className="text-white font-semibold">Recebimentos A Parte</h2>
+                <h2 className="text-white font-semibold">Parcela Mês</h2>
                 <p className="text-slate-500 text-xs mt-0.5 truncate max-w-[240px]">{modalAParte.cliente.nome}</p>
               </div>
               <button onClick={() => setModalAParte(null)} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.03] transition-colors">
@@ -1581,7 +1581,7 @@ export default function CarteiraPage() {
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-xs bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-1 rounded-lg">A Parte</span>
+                            <span className="text-xs bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-1 rounded-lg">Parcela Mês</span>
                             {isGestorOuAdmin && (
                               <>
                                 <button
@@ -1606,7 +1606,7 @@ export default function CarteiraPage() {
                 }
               </div>
               <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
-                <span className="text-sm text-slate-400">Total a parte</span>
+                <span className="text-sm text-slate-400">Total Parcela Mês</span>
                 <span className="text-sm font-bold text-sky-400">
                   {formatarMoeda(modalAParte.recebimentos.reduce((s, r) => s + Number(r.valorAParte ?? 0), 0))}
                 </span>
@@ -2020,13 +2020,13 @@ export default function CarteiraPage() {
                         : "bg-surface-1 border-white/[0.08] text-slate-400 hover:text-slate-300"
                     }`}
                   >
-                    Recebimento a Parte
+                    Parcela Mês
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-1.5">
                   {novoForm.tipo === "inadimplencia"
                     ? "O valor será adicionado à dívida total da carteira e entrará em Recebido quando pago."
-                    : "O valor já foi recebido fora do fluxo normal. Será lançado diretamente como a parte."}
+                    : "O valor já foi recebido fora do fluxo normal. Será lançado diretamente como Parcela Mês."}
                 </p>
               </div>
 
@@ -2139,7 +2139,7 @@ export default function CarteiraPage() {
                   <>
                     <div className="col-span-2">
                       <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-xs text-slate-400">Parcelas recebidas a parte *</label>
+                        <label className="text-xs text-slate-400">Parcelas recebidas — Parcela Mês *</label>
                         <button
                           type="button"
                           onClick={() => setNovoForm((f) => ({ ...f, parcelas: [...f.parcelas, { dataVencimento: "", valor: "" }] }))}

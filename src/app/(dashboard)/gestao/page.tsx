@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 import { useFrente } from "@/contexts/FrenteContext";
 import { formatarMoeda } from "@/lib/utils";
-import { ChevronDown, ChevronRight, Search, AlertCircle, TrendingUp, Palmtree, Activity } from "lucide-react";
+import { ChevronDown, ChevronRight, Search, AlertCircle, TrendingUp, Palmtree } from "lucide-react";
 import { usePersistedState } from "@/hooks/usePersistedState";
 
 // ── Frentes visíveis no sidebar ──────────────────────────────────────────────
@@ -188,7 +188,6 @@ export default function GestaoPage() {
   const totalInad = filtrados.reduce((s, c) => s + c.inadimplencia, 0);
   const totalRec  = filtrados.reduce((s, c) => s + c.recebido, 0);
   const totalAP   = filtrados.reduce((s, c) => s + c.recebidoAParte, 0);
-  const eficiencia = totalInad > 0 ? Math.min((totalRec / totalInad) * 100, 100) : 0;
 
   const subFaixasAtivas = equipeSelecionada ? (SUB_FAIXAS_MAP[equipeSelecionada.tipo] ?? null) : null;
   const corSubFaixa = equipeSelecionada ? (SUB_FAIXA_COR[equipeSelecionada.tipo] ?? "bg-gr-500/20 text-gr-300 border border-gr-500/30") : "";
@@ -304,7 +303,7 @@ export default function GestaoPage() {
 
         {/* Cards de totais */}
         {!carregando && filtrados.length > 0 && (
-          <div className="grid grid-cols-4 gap-3 px-6 py-3 border-b border-white/[0.06] flex-shrink-0">
+          <div className="grid grid-cols-3 gap-3 px-6 py-3 border-b border-white/[0.06] flex-shrink-0">
             <div className="bg-surface-2 border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Inadimplência total</p>
               <p className="text-lg font-bold text-white mt-0.5">{formatarMoeda(totalInad)}</p>
@@ -314,23 +313,8 @@ export default function GestaoPage() {
               <p className="text-lg font-bold text-emerald-400 mt-0.5">{formatarMoeda(totalRec)}</p>
             </div>
             <div className="bg-surface-2 border border-white/[0.06] rounded-xl px-4 py-3">
-              <p className="text-xs text-slate-500">Total a parte</p>
+              <p className="text-xs text-slate-500">Parcela Mês</p>
               <p className="text-lg font-bold text-sky-400 mt-0.5">{formatarMoeda(totalAP)}</p>
-            </div>
-            <div className={`border rounded-xl px-4 py-3 ${
-              eficiencia >= 80 ? "bg-emerald-500/10 border-emerald-500/20"
-              : eficiencia >= 40 ? "bg-amber-500/10 border-amber-500/20"
-              : "bg-surface-2 border-white/[0.06]"
-            }`}>
-              <div className="flex items-center gap-1.5">
-                <Activity size={12} className={eficiencia >= 80 ? "text-emerald-400" : eficiencia >= 40 ? "text-amber-400" : "text-slate-500"} />
-                <p className="text-xs text-slate-500">Eficiência da equipe</p>
-              </div>
-              <p className={`text-lg font-bold mt-0.5 ${
-                eficiencia >= 80 ? "text-emerald-400" : eficiencia >= 40 ? "text-amber-400" : "text-slate-400"
-              }`}>
-                {eficiencia.toFixed(1)}%
-              </p>
             </div>
           </div>
         )}
@@ -359,7 +343,7 @@ export default function GestaoPage() {
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Inadimplência</span>
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Recebido</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">A Parte</span>
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Parcela Mês</span>
                   <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">%</span>
                 </div>
                 <div className="divide-y divide-white/[0.04]">
@@ -399,7 +383,7 @@ export default function GestaoPage() {
                               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Contratos</span>
                               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>
                               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Recebido</span>
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">A Parte</span>
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Parcela Mês</span>
                             </div>
                             {emp.consultores.map((cons) => (
                               <div key={cons.id} className="grid grid-cols-[1fr_100px_160px_160px_160px] gap-2 px-11 py-2 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">
@@ -457,7 +441,7 @@ export default function GestaoPage() {
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Inadimplência</span>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Recebido</span>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">A Parte</span>
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Parcela Mês</span>
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">%</span>
               </div>
 
@@ -502,7 +486,7 @@ export default function GestaoPage() {
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Empresa</span>
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>
                             <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Recebido</span>
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">A Parte</span>
+                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Parcela Mês</span>
                           </div>
                           {c.porEmpresa.map((emp) => (
                             <div key={emp.id} className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">

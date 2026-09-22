@@ -23,15 +23,23 @@ export async function GET(req: NextRequest) {
   const competencia = await prisma.competencia.findUnique({ where: { id: competenciaId } });
   if (!competencia) return NextResponse.json({ erro: "Competência não encontrada" }, { status: 404 });
 
-  // Período da competência (mesmo critério do dashboard)
-  const periodoInicio = new Date(competencia.ano, competencia.mes - 1, 1);
-  const periodoFim    = new Date(competencia.ano, competencia.mes, 1);
+  // Período da competência: boundary UTC-3 (Brasília) explícito, igual ao
+  // resto do sistema -- antes usava hora local do servidor; se o processo
+  // não roda no fuso de Brasília, a virada de mês contava recebimento no
+  // mês errado só aqui (achado real da varredura de consistência, 2026-09-22).
+  const periodoInicio = new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0));
+  const periodoFim    = new Date(Date.UTC(competencia.ano, competencia.mes, 1, 3, 0, 0, 0));
 
   // GESTOR só exporta contratos de consultor de uma frente que ele
   // gerencia -- sem isso, exportava a planilha da empresa inteira, com
   // dado pessoal e financeiro de gestões alheias (achado real da
   // auditoria de segurança, 2026-09-15).
-  const carteiraWhere: any = { competenciaId };
+  // ativo:true + inadimplenciaEquivocada:false -- mesmo filtro do dashboard
+  // (dashboard/route.ts, corrigido em 21/09). Sem isso, contrato removido por
+  // inadimplência equivocada continuava contado neste export, mesmo já
+  // excluído de "Minha Carteira" e do dashboard ao vivo (achado real: Livia
+  // Renata de Oliveira Costa, R$69.816,59, inflando a Leticia em 2026-09-22).
+  const carteiraWhere: any = { competenciaId, ativo: true, contrato: { inadimplenciaEquivocada: false } };
   if (session.user.perfil === "GESTOR") {
     const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
     carteiraWhere.consultor = { equipeId: { in: equipesGerenciadas } };
@@ -162,9 +170,12 @@ export async function GET(req: NextRequest) {
       });
     }
     const entry = resumoMap.get(cId)!;
-    const saldoParcelas = carteira.contrato.parcelas.reduce((s, p) => s + Number(p.valorTotalAberto), 0);
+    // Inadimplência soma o valorTotalAberto do CONTRATO (fixo), não a soma
+    // ao vivo das parcelas -- mesma correção do dashboard (21/09): não cai
+    // por pagamento parcial, quitado ou não o contrato permanece contado.
+    const valorCarteira = Number(carteira.contrato.valorTotalAberto ?? 0);
     const recebidoContrato = carteira.contrato.recebimentos.reduce((s, r) => s + Number(r.valor) + Number(r.valorAParte ?? 0), 0);
-    entry.inadimplencia += saldoParcelas;
+    entry.inadimplencia += valorCarteira;
     entry.recebido += recebidoContrato;
   }
 

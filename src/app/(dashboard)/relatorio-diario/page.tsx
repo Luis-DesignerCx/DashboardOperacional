@@ -73,7 +73,7 @@ export default function RelatorioDiarioPage() {
       </div>
 
       <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
-        <p className="text-slate-400 text-sm">Total recebido no dia (todos abaixo, já inclui "a parte")</p>
+        <p className="text-slate-400 text-sm">Total recebido no dia (todos abaixo, já inclui Parcela Mês)</p>
         <p className="text-3xl font-bold text-emerald-400 mt-1">{formatarMoeda(totalGeral)}</p>
       </div>
 
@@ -89,7 +89,7 @@ export default function RelatorioDiarioPage() {
           <div className="flex items-center justify-between px-5 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
             <span>Consultor</span>
             <div className="flex items-center gap-4">
-              <span className="w-28 text-right">A parte</span>
+              <span className="w-28 text-right">Parcela Mês</span>
               <span className="w-28 text-right">Total recebido</span>
             </div>
           </div>
@@ -135,7 +135,7 @@ export default function RelatorioDiarioPage() {
                             <p className="text-sm font-medium text-white tabular-nums">{formatarMoeda(item.valor)}</p>
                           )}
                           {item.valorAParte > 0 && (
-                            <p className="text-xs text-sky-400 tabular-nums">{formatarMoeda(item.valorAParte)} a parte</p>
+                            <p className="text-xs text-sky-400 tabular-nums">{formatarMoeda(item.valorAParte)} Parcela Mês</p>
                           )}
                         </div>
                       </div>

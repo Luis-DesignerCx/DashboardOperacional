@@ -87,6 +87,9 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
             clienteId: true,
             empresa: { select: { nome: true } },
             promessas: { where: { status: "ABERTA" }, select: { id: true } },
+            // Valor fixo do contrato -- usado no agrupamento "por empreendimento"
+            // (mesma base do valorCarteira, ver comentário abaixo).
+            valorTotalAberto: true,
             // Todas as parcelas em aberto (inclui remanejadas — ainda são dívidas ativas)
             parcelas: {
               where: { paga: false, equivocada: false },
@@ -100,6 +103,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     prisma.recebimento.findMany({
       where: recebWhere,
       select: {
+        contratoId: true,
         valor: true,
         valorAParte: true,
         formaPagamento: true,
@@ -173,7 +177,7 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
       },
       _sum: { valorTotalAberto: true },
     }),
-    // Rec. a Parte: soma do valorAParte registrado pelo consultor
+    // Parcela Mês: soma do valorAParte registrado pelo consultor
     prisma.recebimento.aggregate({
       where: recebWhere,
       _sum: { valorAParte: true },
@@ -217,33 +221,46 @@ async function dashboardConsultor(consultorId: string, competenciaId: string) {
     recebimentosDetalhados.map((r) => r.contrato?.clienteId).filter(Boolean)
   ).size;
 
-  // Agrupamento por empreendimento usando parcelas vivas (mesma base do valorCarteira)
-  const empresaMap = new Map<string, { contratos: number; recebido: number; saldo: number; clientesPagaram: Set<string> }>();
+  // Agrupamento por empreendimento: soma o valorTotalAberto do CONTRATO
+  // (fixo) -- mesma correção do valorCarteira acima (21/09). Antes somava
+  // parcela ao vivo, então o card "Por Empreendimento" mostrava um total
+  // menor que a Carteira Total do topo da tela, mesmo sendo o mesmo
+  // consultor na mesma competência (achado real: Leticia Cristina da Silva
+  // Sergio, 2026-09-22).
+  const empresaMap = new Map<string, { contratos: number; recebidoInadimplente: number; parcelaMes: number; saldo: number; clientesPagaram: Set<string>; contratosRecuperadosSet: Set<string> }>();
   for (const cp of carteira) {
     const nome = cp.contrato.empresa?.nome ?? "Sem empresa";
-    const saldoContrato = (cp.contrato.parcelas as { valorTotalAberto: any }[])
-      .reduce((s, p) => s + Number(p.valorTotalAberto ?? 0), 0);
-    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: saldoContrato, clientesPagaram: new Set() });
+    const saldoContrato = Number(cp.contrato.valorTotalAberto ?? 0);
+    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebidoInadimplente: 0, parcelaMes: 0, saldo: saldoContrato, clientesPagaram: new Set(), contratosRecuperadosSet: new Set() });
     else empresaMap.get(nome)!.saldo += saldoContrato;
     empresaMap.get(nome)!.contratos += 1;
   }
   for (const r of recebimentosDetalhados) {
     const nome = r.contrato?.empresa?.nome ?? "Sem empresa";
-    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebido: 0, saldo: 0, clientesPagaram: new Set() });
+    if (!empresaMap.has(nome)) empresaMap.set(nome, { contratos: 0, recebidoInadimplente: 0, parcelaMes: 0, saldo: 0, clientesPagaram: new Set(), contratosRecuperadosSet: new Set() });
     const entry = empresaMap.get(nome)!;
-    entry.recebido += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
+    // Recebido Inadimplente (valor) e Parcela Mês (valorAParte) ficam
+    // separados -- são conceitos diferentes: recuperação de atraso vs
+    // parcela do mês vigente, paga em dia.
+    entry.recebidoInadimplente += Number(r.valor ?? 0);
+    entry.parcelaMes += Number(r.valorAParte ?? 0);
     if (r.contrato?.clienteId) entry.clientesPagaram.add(r.contrato.clienteId);
+    if (r.contratoId) entry.contratosRecuperadosSet.add(r.contratoId);
   }
   const porEmpresa = Array.from(empresaMap.entries())
     .map(([nome, d]) => ({
       nome,
       contratos: d.contratos,
-      recebido: d.recebido,
+      recebidoInadimplente: d.recebidoInadimplente,
+      parcelaMes: d.parcelaMes,
       inadimplencia: d.saldo,
       clientesPagaram: d.clientesPagaram.size,
-      eficiencia: (d.recebido + d.saldo) > 0 ? Math.round((d.recebido / (d.recebido + d.saldo)) * 10000) / 100 : 0,
+      contratosRecuperados: d.contratosRecuperadosSet.size,
+      // % Recuperação: só Recebido Inadimplente sobre o Saldo sob Gestão --
+      // Parcela Mês não é recuperação de dívida, não entra nessa conta.
+      eficiencia: d.saldo > 0 ? Math.min(Math.round((d.recebidoInadimplente / d.saldo) * 10000) / 100, 100) : 0,
     }))
-    .sort((a, b) => b.recebido - a.recebido);
+    .sort((a, b) => (b.recebidoInadimplente + b.parcelaMes) - (a.recebidoInadimplente + a.parcelaMes));
 
   // valorCarteira = soma do valorTotalAberto do contrato (fixo, não cai por
   // pagamento parcial -- só sai quando o contrato deixa a carteira ativa)
@@ -322,13 +339,13 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
   // de equipe, os recebimentos de um mês já fechado somem/reaparecem na frente
   // errada. Linhas antigas (antes dessa migração, tipoEquipe null) caem no
   // fallback pela equipe atual, igual ao comportamento de sempre.
-  let consultores: { id: string; nome: string }[];
+  let consultores: { id: string; nome: string; equipeId: string | null }[];
   let carteiraTeamOr: any[] | null = null; // extra filtro pra não vazar carteira de outra frente do mesmo consultor (frente adicional)
 
   if (semFiltro) {
     consultores = await prisma.usuario.findMany({
       where: { ativo: true, perfil: "CONSULTOR" },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, equipeId: true },
     });
   } else {
     const equipesSelecionadas = await prisma.equipe.findMany({
@@ -362,7 +379,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
 
     consultores = await prisma.usuario.findMany({
       where: { id: { in: consultorIdsDasEquipes }, ativo: true, perfil: "CONSULTOR" },
-      select: { id: true, nome: true },
+      select: { id: true, nome: true, equipeId: true },
     });
   }
 
@@ -377,7 +394,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     recebidoAgg,
     baixadoAgg,
     rankingAgg,
-    meta,
+    metasFinanceiras,
     aprovacoesPendentes,
     promessasTodas,
     clientesRegularizados,
@@ -396,7 +413,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
         contrato: { inadimplenciaEquivocada: false },
         ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}),
       },
-      select: { contrato: { select: { valorTotalAberto: true, clienteId: true } } },
+      select: { consultorId: true, contrato: { select: { valorTotalAberto: true, clienteId: true } } },
     }),
     prisma.recebimento.aggregate({
       where: {
@@ -423,13 +440,29 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
         contrato: { inadimplenciaEquivocada: false, carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } } },
         dataRecebimento: { gte: iniComp, lte: fimComp },
       },
-      _sum: { valor: true },
+      // Soma valor + valorAParte, igual ao "recebido" do card principal --
+      // antes só somava "valor", fazendo o Ranking de Consultores em
+      // /relatorios mostrar menos do que o card do Dashboard Gestor pra
+      // consultor com recebimento "Parcela Mês" (achado real da varredura
+      // de consistência, 2026-09-22).
+      _sum: { valor: true, valorAParte: true },
     }),
-    equipeIds.length === 1
-      ? prisma.meta.findFirst({ where: { equipeId: equipeIds[0], competenciaId }, select: { valorAlvo: true } })
-      : semFiltro
-        ? prisma.meta.findFirst({ where: { competenciaId }, select: { valorAlvo: true } })
-        : prisma.meta.findFirst({ where: { equipeId: { in: equipeIds }, competenciaId }, select: { valorAlvo: true } }),
+    // Meta do Mês do gestor: soma da meta FINANCEIRA individual de cada
+    // consultor da(s) frente(s) (nunca uma meta única da equipe) --
+    // MONITORIA nunca entra aqui, o gestor não tem meta desse tipo e o
+    // sistema não teria como calcular isso corretamente (decisão de
+    // negócio, 2026-09-22).
+    prisma.meta.findMany({
+      where: {
+        competenciaId,
+        tipo: "FINANCEIRA",
+        OR: [
+          { consultorId: { in: consultorIds } },
+          { consultorId: null, equipeId: { in: [...new Set(consultores.map((c) => c.equipeId).filter((x): x is string => !!x))] } },
+        ],
+      },
+      select: { consultorId: true, equipeId: true, percentualAlvo: true, valorAlvo: true },
+    }),
     prisma.solicitacao.count({ where: { status: "PENDENTE" } }),
     // Todas as promessas em aberto — bucketadas em hoje/vencidas/futuro abaixo
     prisma.promessa.findMany({
@@ -455,7 +488,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
       },
       _sum: { valor: true },
     }),
-    // Rec. a Parte: soma do valorAParte registrado pelos consultores
+    // Parcela Mês: soma do valorAParte registrado pelos consultores
     prisma.recebimento.aggregate({
       where: {
         consultorId: { in: consultorIds },
@@ -489,6 +522,29 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
   const baixado = Number(baixadoAgg._sum.valorBaixado ?? 0);
   const contratosRecebidos = contratosRecebidosRows.length;
 
+  // Meta do Mês do gestor: soma da meta FINANCEIRA individual de cada
+  // consultor da(s) frente(s) -- meta específica do consultor tem
+  // prioridade sobre a meta padrão da equipe dele; se for por percentual,
+  // aplica sobre a Carteira Total individual daquele consultor (mesma
+  // resolução usada na tela do próprio consultor). Nunca uma meta única
+  // cadastrada na equipe -- decisão de negócio, 2026-09-22.
+  const saldoPorConsultor = new Map<string, number>();
+  for (const c of carteiras) {
+    saldoPorConsultor.set(c.consultorId, (saldoPorConsultor.get(c.consultorId) ?? 0) + Number(c.contrato.valorTotalAberto ?? 0));
+  }
+  const metaIndividualMap = new Map(metasFinanceiras.filter((m) => m.consultorId).map((m) => [m.consultorId as string, m]));
+  const metaEquipeMap = new Map(metasFinanceiras.filter((m) => !m.consultorId).map((m) => [m.equipeId, m]));
+  let metaAlvoSomado = 0;
+  for (const c of consultores) {
+    const metaConsultor = metaIndividualMap.get(c.id) ?? (c.equipeId ? metaEquipeMap.get(c.equipeId) : undefined);
+    if (!metaConsultor) continue;
+    const saldoConsultor = saldoPorConsultor.get(c.id) ?? 0;
+    const metaAlvoConsultor = metaConsultor.percentualAlvo && saldoConsultor > 0
+      ? (Number(metaConsultor.percentualAlvo) / 100) * saldoConsultor
+      : metaConsultor.valorAlvo ? Number(metaConsultor.valorAlvo) : null;
+    if (metaAlvoConsultor) metaAlvoSomado += metaAlvoConsultor;
+  }
+
   // Bucketa as promessas em aberto por Hoje / Vencidas / Futuro
   const buckets = {
     hoje:     { count: 0, valor: 0, clientes: new Set<string>() },
@@ -508,7 +564,7 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
   const recebidoHoje = Number(recebidoHojeAgg._sum.valor ?? 0);
   const eficienciaHoje = valorAgendadoHoje > 0 ? Math.round((recebidoHoje / valorAgendadoHoje) * 10000) / 100 : 0;
 
-  const recebidoMap = new Map(rankingAgg.map((r) => [r.consultorId, Number(r._sum.valor ?? 0)]));
+  const recebidoMap = new Map(rankingAgg.map((r) => [r.consultorId, Number(r._sum.valor ?? 0) + Number(r._sum.valorAParte ?? 0)]));
   const rankingConsultores = consultores
     .map((c) => ({ id: c.id, nome: c.nome, recebido: recebidoMap.get(c.id) ?? 0 }))
     .sort((a, b) => b.recebido - a.recebido);
@@ -521,8 +577,14 @@ async function dashboardGestor(equipeIds: string[], competenciaId: string) {
     baixado,
     contratosRecebidos,
     recebimentoAParte: Number(recAParteAgg._sum.valorAParte ?? 0),
-    percentualMeta: (meta && meta.valorAlvo && Number(meta.valorAlvo) > 0) ? Math.round((baixado / Number(meta.valorAlvo)) * 10000) / 100 : 0,
-    metaAlvo: (meta && meta.valorAlvo) ? Number(meta.valorAlvo) : null,
+    // % da Meta soma valor + valorAParte (recebido) sobre a meta somada dos
+    // consultores da frente -- igual à tela do próprio consultor, e não mais
+    // baseado em valorBaixado (achado real da varredura de consistência,
+    // 2026-09-22; a Meta do Mês % do Executivo/Admin continua em
+    // valorBaixado por enquanto, fora de escopo até a tela de baixas ser
+    // estruturada).
+    percentualMeta: metaAlvoSomado > 0 ? Math.round((recebido / metaAlvoSomado) * 10000) / 100 : 0,
+    metaAlvo: metaAlvoSomado > 0 ? metaAlvoSomado : null,
     aprovacoesPendentes,
     totalConsultores: consultores.length,
     rankingConsultores,
@@ -589,7 +651,7 @@ async function dashboardExecutivo(competenciaId: string, equipeIds: string[] = [
       where: { contrato: { carteiras: { some: { competenciaId, ...frente } } } },
     }),
     prisma.empresa.findMany({ select: { id: true, nome: true } }),
-    // Rec. a Parte: soma do campo valorAParte registrado pelos consultores
+    // Parcela Mês: soma do campo valorAParte registrado pelos consultores
     prisma.recebimento.aggregate({
       where: {
         contrato: { carteiras: { some: { competenciaId, ativo: true, ...frente } } },

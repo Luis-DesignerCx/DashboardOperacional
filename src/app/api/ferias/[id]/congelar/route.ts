@@ -31,20 +31,27 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   });
   if (!competencia) return NextResponse.json({ erro: "Competência não encontrada" }, { status: 404 });
 
-  const iniComp = new Date(competencia.ano, competencia.mes - 1, 1);
-  const fimComp = new Date(competencia.ano, competencia.mes, 0, 23, 59, 59, 999);
+  // Boundary UTC-3 (Brasília) explícito, igual ao resto do sistema -- antes
+  // usava hora local do servidor; se o processo não roda no fuso de
+  // Brasília, a virada de mês contava recebimento no mês errado só aqui
+  // (achado real da varredura de consistência, 2026-09-22).
+  const iniComp = new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0));
+  const fimComp = new Date(Date.UTC(competencia.ano, competencia.mes, 1, 2, 59, 59, 999));
 
-  // Snapshot do saldo atual (parcelas em aberto, inclui remanejadas)
-  const saldoAgg = await prisma.parcela.aggregate({
+  // Snapshot do saldo atual: soma o valorTotalAberto do CONTRATO (fixo), não
+  // a soma ao vivo das parcelas em aberto -- antes usava parcela.aggregate
+  // (paga:false), então o saldo congelado dependia do exato instante em que
+  // alguém clicou "congelar" (se houve pagamento parcial minutos antes, o
+  // snapshot já vinha "encolhido"), divergindo da Carteira Total normal do
+  // consultor (achado real: Leticia Cristina da Silva Sergio, 2026-09-22).
+  const saldoCarteiras = await prisma.carteiraParcela.findMany({
     where: {
-      paga: false,
-      equivocada: false,
-      contrato: {
-        inadimplenciaEquivocada: false,
-        carteiras: { some: { consultorId: ferias.consultorId, competenciaId: ferias.competenciaId, ativo: true } },
-      },
+      consultorId: ferias.consultorId,
+      competenciaId: ferias.competenciaId,
+      ativo: true,
+      contrato: { inadimplenciaEquivocada: false },
     },
-    _sum: { valorTotalAberto: true },
+    select: { contrato: { select: { valorTotalAberto: true } } },
   });
 
   // Snapshot do total recebido na competência
@@ -75,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const metaGlobal = metas.find((m) => m.consultorId === null) ?? null;
   const meta = metaEsp ?? metaGlobal;
 
-  const saldo = Number(saldoAgg._sum.valorTotalAberto ?? 0);
+  const saldo = saldoCarteiras.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
   const recebido = Number(recebidoAgg._sum.valor ?? 0) + Number(recebidoAgg._sum.valorAParte ?? 0);
 
   const metaAlvo = meta

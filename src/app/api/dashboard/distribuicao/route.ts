@@ -60,13 +60,17 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Escopo de datas da competência
+    // Escopo de datas da competência -- boundary UTC-3 explícito, igual ao
+    // resto do sistema (dashboard/route.ts, comissao/*, carteira/*). Antes
+    // usava hora local do servidor: se o processo não roda no fuso de
+    // Brasília, a virada de mês contava recebimento no mês errado só aqui
+    // (achado real da varredura de consistência, 2026-09-22).
     const competencia = await prisma.competencia.findUnique({
       where: { id: competenciaId },
       select: { mes: true, ano: true },
     });
-    const iniComp = competencia ? new Date(competencia.ano, competencia.mes - 1, 1) : new Date(0);
-    const fimComp = competencia ? new Date(competencia.ano, competencia.mes, 0, 23, 59, 59, 999) : new Date();
+    const iniComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes - 1, 1, 3, 0, 0, 0)) : new Date(0);
+    const fimComp = competencia ? new Date(Date.UTC(competencia.ano, competencia.mes, 1, 2, 59, 59, 999)) : new Date();
 
     // 1. Consultores: frente primária OU frente adicional dentro das frentes ativas
     const consultores = await prisma.usuario.findMany({
@@ -124,8 +128,37 @@ export async function GET(req: NextRequest) {
       },
     });
 
+    // 3b. Metas FINANCEIRA da competência -- para "% da Meta" por consultor.
+    // Meta individual do consultor tem prioridade sobre a meta padrão da
+    // equipe (mesma regra de resolução usada na tela do próprio consultor).
+    // MONITORIA nunca entra aqui -- o gestor/consultor não tem meta desse
+    // tipo e o sistema não teria como calcular isso corretamente.
+    const equipeIdsDosConsultores = [...new Set(consultores.map((c) => c.equipeId).filter((x): x is string => !!x))];
+    const metas = await prisma.meta.findMany({
+      where: {
+        competenciaId,
+        tipo: "FINANCEIRA",
+        OR: [
+          { consultorId: { in: consultorIds } },
+          { consultorId: null, equipeId: { in: equipeIdsDosConsultores } },
+        ],
+      },
+      select: { consultorId: true, equipeId: true, percentualAlvo: true, valorAlvo: true },
+    });
+    const metaIndividualMap = new Map(metas.filter((m) => m.consultorId).map((m) => [m.consultorId as string, m]));
+    const metaEquipeMap = new Map(metas.filter((m) => !m.consultorId).map((m) => [m.equipeId, m]));
+    function resolverMetaConsultor(consultorId: string, equipeId: string | null) {
+      return metaIndividualMap.get(consultorId) ?? (equipeId ? metaEquipeMap.get(equipeId) : undefined) ?? null;
+    }
+    function calcularMetaAlvo(meta: { percentualAlvo: unknown; valorAlvo: unknown } | null, saldoAberto: number): number | null {
+      if (!meta) return null;
+      if (meta.percentualAlvo && saldoAberto > 0) return (Number(meta.percentualAlvo) / 100) * saldoAberto;
+      if (meta.valorAlvo) return Number(meta.valorAlvo);
+      return null;
+    }
+
     // 4. Acumular saldo e recebido por (frenteId, consultorId)
-    type Acum = { saldoAberto: number; recebido: number; contratos: number; contratosRecebidosSet: Set<string> };
+    type Acum = { saldoAberto: number; recebidoInadimplente: number; parcelaMes: number; contratos: number; contratosRecebidosSet: Set<string> };
     const frenteConsultorMap = new Map<string, Map<string, Acum>>();
     for (const fId of frentesAtivas) frenteConsultorMap.set(fId, new Map());
 
@@ -149,7 +182,7 @@ export async function GET(req: NextRequest) {
       contratoFrenteMap.set(cp.contratoId, frenteId);
       if (!frenteConsultorMap.has(frenteId)) continue;
       const fMap = frenteConsultorMap.get(frenteId)!;
-      if (!fMap.has(cp.consultorId)) fMap.set(cp.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
+      if (!fMap.has(cp.consultorId)) fMap.set(cp.consultorId, { saldoAberto: 0, recebidoInadimplente: 0, parcelaMes: 0, contratos: 0, contratosRecebidosSet: new Set() });
       const d = fMap.get(cp.consultorId)!;
       // Saldo sob Gestão soma o valorTotalAberto do contrato (fixo) -- não
       // cai por pagamento parcial nem quando o contrato é recuperado de
@@ -163,11 +196,13 @@ export async function GET(req: NextRequest) {
       const frenteId = contratoFrenteMap.get(r.contratoId);
       if (!frenteId || !frenteConsultorMap.has(frenteId)) continue;
       const fMap = frenteConsultorMap.get(frenteId)!;
-      if (!fMap.has(r.consultorId)) fMap.set(r.consultorId, { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidosSet: new Set() });
+      if (!fMap.has(r.consultorId)) fMap.set(r.consultorId, { saldoAberto: 0, recebidoInadimplente: 0, parcelaMes: 0, contratos: 0, contratosRecebidosSet: new Set() });
       const d = fMap.get(r.consultorId)!;
-      // Recebido no Mês soma valor + valorAParte, igual ao "Total Recebido"
-      // do consultor (achado real: Samara Machado de Melo, 2026-09-21).
-      d.recebido += Number(r.valor ?? 0) + Number(r.valorAParte ?? 0);
+      // Recebido Inadimplente (valor) e Parcela Mês (valorAParte) ficam
+      // separados -- são conceitos diferentes: o primeiro é recuperação de
+      // dívida em atraso, o segundo é a parcela do mês vigente, paga em dia.
+      d.recebidoInadimplente += Number(r.valor ?? 0);
+      d.parcelaMes += Number(r.valorAParte ?? 0);
       d.contratosRecebidosSet.add(r.contratoId);
     }
 
@@ -178,24 +213,33 @@ export async function GET(req: NextRequest) {
         const fMap = frenteConsultorMap.get(eqId) ?? new Map<string, Acum>();
         const fConsultores = Array.from(fMap.entries())
           .filter(([, d]) => d.contratos > 0)
-          .map(([cId, d]) => ({
-            consultorId: cId,
-            nome: consultorMap.get(cId)?.nome ?? cId,
-            saldoAberto: d.saldoAberto,
-            recebido: d.recebido,
-            contratos: d.contratos,
-            contratosRecebidos: d.contratosRecebidosSet.size,
-          }))
-          .sort((a, b) => b.saldoAberto - a.saldoAberto);
+          .map(([cId, d]) => {
+            const consultor = consultorMap.get(cId);
+            const meta = resolverMetaConsultor(cId, consultor?.equipeId ?? null);
+            const metaAlvo = calcularMetaAlvo(meta, d.saldoAberto);
+            return {
+              consultorId: cId,
+              nome: consultor?.nome ?? cId,
+              saldoAberto: d.saldoAberto,
+              recebidoInadimplente: d.recebidoInadimplente,
+              parcelaMes: d.parcelaMes,
+              contratos: d.contratos,
+              contratosRecebidos: d.contratosRecebidosSet.size,
+              metaAlvo,
+            };
+          })
+          .sort((a, b) => (b.recebidoInadimplente + b.parcelaMes) - (a.recebidoInadimplente + a.parcelaMes));
 
         const total = fConsultores.reduce(
           (acc, c) => ({
             saldoAberto: acc.saldoAberto + c.saldoAberto,
-            recebido: acc.recebido + c.recebido,
+            recebidoInadimplente: acc.recebidoInadimplente + c.recebidoInadimplente,
+            parcelaMes: acc.parcelaMes + c.parcelaMes,
             contratos: acc.contratos + c.contratos,
             contratosRecebidos: acc.contratosRecebidos + c.contratosRecebidos,
+            metaAlvo: acc.metaAlvo + (c.metaAlvo ?? 0),
           }),
-          { saldoAberto: 0, recebido: 0, contratos: 0, contratosRecebidos: 0 }
+          { saldoAberto: 0, recebidoInadimplente: 0, parcelaMes: 0, contratos: 0, contratosRecebidos: 0, metaAlvo: 0 }
         );
 
         return { equipeId: eqId, label: FRENTE_LABEL[eqId], consultores: fConsultores, total };
@@ -215,24 +259,32 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Recebimentos por contrato para empresa (já filtrados pelo mês acima)
-    const recContMap = new Map<string, number>();
+    // Recebimentos por contrato para empresa (já filtrados pelo mês acima) --
+    // Recebido Inadimplente e Parcela Mês somados separadamente.
+    const recInadimplenteContMap = new Map<string, number>();
+    const parcelaMesContMap = new Map<string, number>();
     for (const r of recebimentos) {
-      recContMap.set(r.contratoId, (recContMap.get(r.contratoId) ?? 0) + Number(r.valor ?? 0));
+      recInadimplenteContMap.set(r.contratoId, (recInadimplenteContMap.get(r.contratoId) ?? 0) + Number(r.valor ?? 0));
+      parcelaMesContMap.set(r.contratoId, (parcelaMesContMap.get(r.contratoId) ?? 0) + Number(r.valorAParte ?? 0));
     }
 
     const porEmpresa = Array.from(empresaMap.entries())
       .map(([id, e]) => {
-        const recebido = Array.from(e.contratos).reduce((sum, cId) => sum + (recContMap.get(cId) ?? 0), 0);
-        const contratosRecebidos = Array.from(e.contratos).filter((cId) => (recContMap.get(cId) ?? 0) > 0).length;
+        const recebidoInadimplente = Array.from(e.contratos).reduce((sum, cId) => sum + (recInadimplenteContMap.get(cId) ?? 0), 0);
+        const parcelaMes = Array.from(e.contratos).reduce((sum, cId) => sum + (parcelaMesContMap.get(cId) ?? 0), 0);
+        const contratosRecuperados = Array.from(e.contratos).filter((cId) => (recInadimplenteContMap.get(cId) ?? 0) > 0 || (parcelaMesContMap.get(cId) ?? 0) > 0).length;
         return {
           empresaId: id,
           nome: e.nome,
           saldoAberto: e.saldoAberto,
-          recebido,
+          recebidoInadimplente,
+          parcelaMes,
+          contratosRecuperados,
           contratos: e.contratos.size,
-          contratosRecebidos,
-          percentual: e.saldoAberto > 0 ? Math.min((recebido / e.saldoAberto) * 100, 100) : 0,
+          // % Recuperação: só Recebido Inadimplente sobre o saldo em aberto --
+          // Parcela Mês não é "recuperação" de dívida, é parcela do mês em
+          // dia, então não entra nessa conta.
+          percentual: e.saldoAberto > 0 ? Math.min((recebidoInadimplente / e.saldoAberto) * 100, 100) : 0,
         };
       })
       .sort((a, b) => b.saldoAberto - a.saldoAberto);

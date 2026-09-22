@@ -22,16 +22,18 @@ interface DadosGestor {
 }
 
 interface ConsultorDist {
-  consultorId: string; nome: string; saldoAberto: number; recebido: number;
-  contratos: number; contratosRecebidos: number;
+  consultorId: string; nome: string; saldoAberto: number;
+  recebidoInadimplente: number; parcelaMes: number;
+  contratos: number; contratosRecebidos: number; metaAlvo: number | null;
 }
 interface FrenteDist {
   equipeId: string; label: string; consultores: ConsultorDist[];
-  total: { saldoAberto: number; recebido: number; contratos: number; contratosRecebidos: number };
+  total: { saldoAberto: number; recebidoInadimplente: number; parcelaMes: number; contratos: number; contratosRecebidos: number; metaAlvo: number };
 }
 interface EmpresaDist {
-  empresaId: string; nome: string; saldoAberto: number; recebido: number;
-  contratos: number; contratosRecebidos: number; percentual: number;
+  empresaId: string; nome: string; saldoAberto: number;
+  recebidoInadimplente: number; parcelaMes: number;
+  contratosRecuperados: number; contratos: number; percentual: number;
 }
 
 export function DashboardGestor() {

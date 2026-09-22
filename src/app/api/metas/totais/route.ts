@@ -56,18 +56,22 @@ export async function GET(req: NextRequest) {
     carteiraTeamOr = [{ tipoEquipe: equipe.tipo }, { tipoEquipe: null }];
   }
 
-  // Mesma base do dashboard e da comissão: parcelas paga:false, equivocada:false
-  const agg = await prisma.parcela.aggregate({
+  // Mesma base do dashboard: soma o valorTotalAberto do CONTRATO (fixo), não
+  // a soma ao vivo das parcelas em aberto -- antes usava parcela.aggregate
+  // (paga:false), que caía a cada pagamento parcial e fazia o valor-alvo da
+  // meta em % mudar sozinho durante o mês, mesmo sem a carteira ter mudado
+  // (achado real: Leticia Cristina da Silva Sergio, 2026-09-22).
+  const carteiras = await prisma.carteiraParcela.findMany({
     where: {
-      paga: false,
-      equivocada: false,
-      contrato: {
-        inadimplenciaEquivocada: false,
-        carteiras: { some: { consultorId: { in: consultorIds }, competenciaId, ativo: true, ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}) } },
-      },
+      consultorId: { in: consultorIds },
+      competenciaId,
+      ativo: true,
+      contrato: { inadimplenciaEquivocada: false },
+      ...(carteiraTeamOr ? { OR: carteiraTeamOr } : {}),
     },
-    _sum: { valorTotalAberto: true },
+    select: { contrato: { select: { valorTotalAberto: true } } },
   });
+  const totalInadimplencia = carteiras.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
 
-  return NextResponse.json({ totalInadimplencia: Number(agg._sum.valorTotalAberto ?? 0) });
+  return NextResponse.json({ totalInadimplencia });
 }

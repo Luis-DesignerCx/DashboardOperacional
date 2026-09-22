@@ -84,17 +84,7 @@ export async function GET(req: NextRequest) {
     orderBy = [{ contrato: { maiorDiasAtraso: "desc" } }, { id: "asc" }];
   }
 
-  // Filtro de parcelas vivas com o mesmo escopo da carteira (para totalizar corretamente)
-  const whereParcelaTotal: any = {
-    paga: false,
-    equivocada: false,
-    contrato: {
-      inadimplenciaEquivocada: false,
-      carteiras: { some: where },
-    },
-  };
-
-  const [total, contratos, parcelasAgg] = await Promise.all([
+  const [total, contratos, carteiraTotalAgg] = await Promise.all([
     prisma.carteiraParcela.count({ where }),
     prisma.carteiraParcela.findMany({
       where,
@@ -148,10 +138,19 @@ export async function GET(req: NextRequest) {
       },
       orderBy,
     }),
-    prisma.parcela.aggregate({ where: whereParcelaTotal, _sum: { valorTotalAberto: true } }),
+    // Carteira Total: soma o valorTotalAberto do CONTRATO (fixo), não a soma
+    // ao vivo das parcelas em aberto -- mesma correção do dashboard (21/09).
+    // Antes usava prisma.parcela.aggregate(paga:false), que caía a cada
+    // pagamento parcial e fazia o total do topo de "Minha Carteira" divergir
+    // do total do dashboard pro mesmo consultor/competência (achado real:
+    // Leticia Cristina da Silva Sergio, 2026-09-22).
+    prisma.carteiraParcela.findMany({
+      where,
+      select: { contrato: { select: { valorTotalAberto: true } } },
+    }),
   ]);
 
-  const valorTotal = Number(parcelasAgg._sum.valorTotalAberto ?? 0);
+  const valorTotal = carteiraTotalAgg.reduce((s, c) => s + Number(c.contrato.valorTotalAberto ?? 0), 0);
 
   return NextResponse.json({
     contratos,

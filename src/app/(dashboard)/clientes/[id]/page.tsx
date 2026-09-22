@@ -326,7 +326,7 @@ export default function ClienteDetalhe() {
 
   const totalAberto = cliente.contratos.reduce((s, c) => s + Number(c.valorTotalAberto ?? 0), 0);
   const totalRecebido = cliente.contratos.reduce(
-    (s, c) => s + c.recebimentos.reduce((r, rec) => r + Number(rec.valor), 0), 0
+    (s, c) => s + c.recebimentos.reduce((r, rec) => r + Number(rec.valor) + Number(rec.valorAParte ?? 0), 0), 0
   );
   const telefones = cliente.telefones ? cliente.telefones.split(",") : [];
   const emails = cliente.emails ? cliente.emails.split(",") : [];
@@ -814,7 +814,7 @@ export default function ClienteDetalhe() {
                                   : formatarMoeda(Number(r.valor))}
                               </p>
                               {Number(r.valorAParte ?? 0) > 0 && (
-                                <span className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-medium">A Parte</span>
+                                <span className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-1.5 py-0.5 rounded font-medium">Parcela Mês</span>
                               )}
                             </div>
                             <p className="text-slate-500 text-xs">

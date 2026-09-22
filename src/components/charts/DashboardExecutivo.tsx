@@ -127,7 +127,7 @@ export function DashboardExecutivo() {
         </div>
 
         <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5 hover:border-white/[0.09] transition-colors">
-          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Rec. a Parte</p>
+          <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-wide">Parcela Mês</p>
           <p className="text-2xl font-bold text-sky-400 mt-2 tabular-nums leading-none">{formatarMoeda((dados as any).recebimentoAParte ?? 0)}</p>
           <div className="mt-3 pt-3 border-t border-white/[0.05]">
             <span className="text-xs text-slate-600">Registrado pelo consultor</span>
