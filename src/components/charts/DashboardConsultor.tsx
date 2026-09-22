@@ -216,25 +216,25 @@ export function DashboardConsultor() {
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.06]">
-                  <th className="text-left pb-2.5 font-semibold">Empreendimento</th>
-                  <th className="text-right pb-2.5 font-semibold">Recebido Inadimplente</th>
-                  <th className="text-right pb-2.5 font-semibold">Parcela Mês</th>
-                  <th className="text-center pb-2.5 font-semibold">Contr. Recuperados</th>
-                  <th className="text-right pb-2.5 font-semibold">Saldo sob Gestão</th>
-                  <th className="text-center pb-2.5 font-semibold">Contr. sob Gestão</th>
-                  <th className="text-right pb-2.5 font-semibold">% Recuperação</th>
+                  <th className="text-left px-2 pb-2.5 font-semibold whitespace-nowrap">Empreendimento</th>
+                  <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Total Inadimplente</th>
+                  <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Inadimplente</th>
+                  <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Recebido Inadimplente</th>
+                  <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Parcela Mês</th>
+                  <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Recuperados</th>
+                  <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">% Recuperação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.04]">
                 {dados.porEmpresa.map((e) => (
                   <tr key={e.nome} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-2.5 text-left text-slate-200 font-bold">{e.nome}</td>
-                    <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(e.recebidoInadimplente)}</td>
-                    <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.parcelaMes)}</td>
-                    <td className="py-2.5 text-center text-slate-500 tabular-nums">{e.contratosRecuperados}</td>
-                    <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.inadimplencia)}</td>
-                    <td className="py-2.5 text-center text-slate-500 tabular-nums">{e.contratos}</td>
-                    <td className="py-2.5 text-right">
+                    <td className="py-2.5 px-2 text-left text-slate-200 font-bold">{e.nome}</td>
+                    <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(e.inadimplencia)}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{e.contratos}</td>
+                    <td className="py-2.5 px-2 text-right text-slate-200 font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(e.recebidoInadimplente)}</td>
+                    <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(e.parcelaMes)}</td>
+                    <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{e.contratosRecuperados}</td>
+                    <td className="py-2.5 px-2 text-right">
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums ${e.eficiencia >= 10 ? "bg-emerald-500/10 text-emerald-400" : e.eficiencia >= 5 ? "bg-amber-500/10 text-amber-400" : "bg-white/[0.04] text-slate-500"}`}>
                         {e.eficiencia.toFixed(1)}%
                       </span>

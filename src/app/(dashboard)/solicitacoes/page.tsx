@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import { formatarDataHora } from "@/lib/utils";
-import { ClipboardList, CheckCircle, XCircle, Clock, ArrowLeftRight, X, Search, Loader2 } from "lucide-react";
+import { ClipboardList, CheckCircle, XCircle, Clock, ArrowLeftRight, X, Search, Loader2, Download, Check, ArrowRight } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { usePersistedState } from "@/hooks/usePersistedState";
 
@@ -41,46 +42,123 @@ interface Solicitacao {
   destinoConsultorNome?: string | null;
 }
 
+function fluxoOrigemDestino(s: Solicitacao): { origem: string; origemFrente?: string; destino: string; destinoFrente?: string; frenteDiferente: boolean } | null {
+  if (s.tipo !== "TRANSFERENCIA_CONTRATO" || !s.contrato) return null;
+  const donoAtual = s.contrato.carteiras?.[0]?.consultor;
+  // "Enviar": o próprio dono (solicitante) pediu pra mandar pra um colega --
+  // origem é o solicitante, destino é quem foi escolhido.
+  if (s.destinoConsultorNome) {
+    return { origem: s.solicitante.nome, origemFrente: s.solicitante.equipe ? (FRENTE_LABEL[s.solicitante.equipe.tipo] ?? s.solicitante.equipe.nome) : undefined, destino: s.destinoConsultorNome, frenteDiferente: false };
+  }
+  if (!donoAtual) return null;
+  const frenteSolicitante = s.solicitante.equipe?.tipo;
+  const frenteDono = donoAtual.equipe?.tipo;
+  const frenteDiferente = !!(frenteSolicitante && frenteDono && frenteSolicitante !== frenteDono);
+  return {
+    origem: donoAtual.nome,
+    origemFrente: donoAtual.equipe ? (FRENTE_LABEL[donoAtual.equipe.tipo] ?? donoAtual.equipe.nome) : undefined,
+    destino: s.solicitante.nome,
+    destinoFrente: s.solicitante.equipe ? (FRENTE_LABEL[s.solicitante.equipe.tipo] ?? s.solicitante.equipe.nome) : undefined,
+    frenteDiferente,
+  };
+}
+
+function exportarRelatorio(lista: Solicitacao[]) {
+  const linhas = lista.map((s) => {
+    const donoAtual = s.contrato?.carteiras?.[0]?.consultor;
+    return {
+      Status: LABEL_STATUS[s.status]?.label ?? s.status,
+      Tipo: LABEL_TIPO[s.tipo] ?? s.tipo,
+      Cliente: s.contrato?.cliente.nome ?? "",
+      Contrato: s.contrato?.numero ?? "",
+      Empreendimento: s.contrato?.empresa?.nome ?? "",
+      Solicitante: s.solicitante.nome,
+      "Frente Solicitante": s.solicitante.equipe ? (FRENTE_LABEL[s.solicitante.equipe.tipo] ?? s.solicitante.equipe.nome) : "",
+      "Dono Atual": donoAtual?.nome ?? s.destinoConsultorNome ?? "",
+      Motivo: s.motivo,
+      Resposta: s.resposta ?? "",
+      "Data/Hora": formatarDataHora(s.criadoEm),
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(linhas);
+  ws["!cols"] = [{ wch: 12 }, { wch: 26 }, { wch: 30 }, { wch: 16 }, { wch: 22 }, { wch: 26 }, { wch: 16 }, { wch: 26 }, { wch: 40 }, { wch: 40 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Solicitações");
+  XLSX.writeFile(wb, `solicitacoes_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
 export default function SolicitacoesPage() {
   const { data: session } = useSession();
   const isGestorOuAdmin = ["ADMINISTRADOR", "GESTOR"].includes((session?.user as any)?.perfil ?? "");
 
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [filtroStatus, setFiltroStatus] = usePersistedState("filtroStatus", "TODOS");
+  const [filtroTipo, setFiltroTipo] = usePersistedState("filtroTipoSolicitacao", "TODOS");
   const [carregando, setCarregando] = useState(true);
   const [modalTransf, setModalTransf] = useState(false);
+  const [rejeitandoId, setRejeitandoId] = useState<string | null>(null);
+  const [motivoRejeicao, setMotivoRejeicao] = useState("");
+  const [enviandoId, setEnviandoId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/solicitacoes").then((r) => r.json()).then((d) => { setSolicitacoes(d); setCarregando(false); });
   }, []);
 
-  const filtradas = filtroStatus === "TODOS"
-    ? solicitacoes
-    : solicitacoes.filter((s) => s.status === filtroStatus);
+  const porTipo = filtroTipo === "TODOS" ? solicitacoes : solicitacoes.filter((s) => s.tipo === filtroTipo);
+  const filtradas = filtroStatus === "TODOS" ? porTipo : porTipo.filter((s) => s.status === filtroStatus);
 
-  // Acompanha o filtro selecionado -- antes sempre mostrava o total geral de
-  // pendentes, mesmo filtrando por Aprovada/Rejeitada, destoando da lista
-  // abaixo (que já respeitava o filtro).
-  const pendentes = filtradas.filter((s) => s.status === "PENDENTE").length;
+  // Contagem de pendentes acompanha o filtro de Tipo (pra saber "quantas
+  // pendentes existem desse tipo"), mas não o filtro de Status -- é a
+  // contagem que justifica o badge no próprio pill "Pendentes".
+  const totalPendentes = porTipo.filter((s) => s.status === "PENDENTE").length;
+
+  async function decidir(id: string, status: "APROVADA" | "REJEITADA", resposta?: string) {
+    setEnviandoId(id);
+    const res = await fetch(`/api/solicitacoes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status, resposta: resposta || undefined }),
+      headers: { "Content-Type": "application/json" },
+    });
+    setEnviandoId(null);
+    if (res.ok) {
+      setSolicitacoes((prev) => prev.map((x) => x.id === id ? { ...x, status, resposta: resposta || x.resposta } : x));
+      setRejeitandoId(null);
+      setMotivoRejeicao("");
+    } else if (status === "APROVADA") {
+      alert("Erro ao aprovar. Verifique o console.");
+    } else {
+      alert("Erro ao rejeitar. Verifique o console.");
+    }
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Solicitações</h1>
           <p className="text-slate-400 text-sm mt-1">
-            {pendentes > 0 ? <span className="text-amber-400">{pendentes} pendente(s) aguardando aprovação</span> : "Nenhuma pendência"}
+            {totalPendentes > 0 ? <span className="text-amber-400">{totalPendentes} pendente(s) aguardando aprovação</span> : "Nenhuma pendência"}
           </p>
         </div>
-        {isGestorOuAdmin && (
+        <div className="flex items-center gap-2">
           <button
-            onClick={() => setModalTransf(true)}
-            className="flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
+            onClick={() => exportarRelatorio(filtradas)}
+            disabled={filtradas.length === 0}
+            className="flex items-center gap-2 bg-surface-2 hover:bg-white/[0.06] disabled:opacity-40 disabled:cursor-not-allowed border border-white/[0.08] text-slate-300 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
           >
-            <ArrowLeftRight size={15} />
-            Transferência Direta
+            <Download size={15} />
+            Exportar Relatório
           </button>
-        )}
+          {isGestorOuAdmin && (
+            <button
+              onClick={() => setModalTransf(true)}
+              className="flex items-center gap-2 bg-sky-500 hover:bg-sky-400 text-white text-sm font-medium px-4 py-2.5 rounded-xl transition-colors"
+            >
+              <ArrowLeftRight size={15} />
+              Transferência Direta
+            </button>
+          )}
+        </div>
       </div>
 
       {modalTransf && (
@@ -88,20 +166,35 @@ export default function SolicitacoesPage() {
       )}
 
       {/* Filtros */}
-      <div className="flex gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         {["TODOS", "PENDENTE", "APROVADA", "REJEITADA"].map((s) => (
           <button
             key={s}
             onClick={() => setFiltroStatus(s)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
               filtroStatus === s
                 ? "bg-sky-500 text-white"
                 : "bg-white/[0.07] text-slate-400 hover:text-white"
             }`}
           >
             {s === "TODOS" ? "Todos" : LABEL_STATUS[s]?.label}
+            {s === "PENDENTE" && totalPendentes > 0 && (
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filtroStatus === s ? "bg-white/25 text-white" : "bg-amber-500/20 text-amber-400"}`}>
+                {totalPendentes}
+              </span>
+            )}
           </button>
         ))}
+        <select
+          value={filtroTipo}
+          onChange={(e) => setFiltroTipo(e.target.value)}
+          className="bg-white/[0.07] hover:bg-white/[0.09] text-slate-300 text-sm font-medium px-3 py-2 rounded-xl border-none focus:outline-none focus:ring-1 focus:ring-sky-500 transition-colors"
+        >
+          <option value="TODOS">Todos os Tipos</option>
+          {Object.entries(LABEL_TIPO).map(([valor, label]) => (
+            <option key={valor} value={valor}>{label}</option>
+          ))}
+        </select>
       </div>
 
       {carregando ? (
@@ -110,113 +203,134 @@ export default function SolicitacoesPage() {
         </div>
       ) : filtradas.length === 0 ? (
         <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-12 text-center">
-          <ClipboardList size={40} className="mx-auto mb-3 text-slate-400" />
-          <p className="text-slate-400">Nenhuma solicitação encontrada</p>
+          <ClipboardList size={40} className="mx-auto mb-3 text-slate-600" />
+          <p className="text-slate-400">Nenhuma solicitação encontrada para os filtros selecionados</p>
         </div>
       ) : (
         <div className="space-y-3">
           {filtradas.map((s) => {
             const st = LABEL_STATUS[s.status];
             const Icon = st.icon;
+            const fluxo = fluxoOrigemDestino(s);
+            const rejeitando = rejeitandoId === s.id;
             return (
               <div key={s.id} className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex items-center gap-1.5 ${st.cor}`}>
-                        <Icon size={12} /> {st.label}
-                      </span>
-                      <span className="text-xs text-slate-500 bg-surface-1 px-2 py-1 rounded-full">
-                        {LABEL_TIPO[s.tipo]}
-                      </span>
-                    </div>
-                    {/* Cliente / Contrato / Empresa — aparece para todos os tipos */}
+                {/* Cabeçalho do card */}
+                <div className="flex items-center justify-between gap-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2.5 py-1 rounded-full border font-medium flex items-center gap-1.5 ${st.cor}`}>
+                      <Icon size={12} /> {st.label}
+                    </span>
+                    <span className="text-xs text-slate-500 bg-surface-1 px-2 py-1 rounded-full">
+                      {LABEL_TIPO[s.tipo]}
+                    </span>
+                  </div>
+                  <p className="text-slate-500 text-xs flex-shrink-0">{formatarDataHora(s.criadoEm)}</p>
+                </div>
+
+                {/* Corpo: grid de 3 colunas */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* Coluna 1: Cliente */}
+                  <div className="min-w-0">
                     {s.contrato ? (
-                      <div className="mt-1 mb-2">
-                        <p className="text-white font-semibold">{s.contrato.cliente.nome}</p>
-                        <p className="text-slate-400 text-xs mt-0.5">
-                          {s.contrato.numero}
-                          {s.contrato.empresa?.nome && (
-                            <span className="text-slate-500"> · {s.contrato.empresa.nome}</span>
-                          )}
-                        </p>
-                      </div>
+                      <>
+                        <p className="text-white font-bold truncate">{s.contrato.cliente.nome}</p>
+                        <p className="text-slate-400 text-xs mt-0.5">{s.contrato.numero}</p>
+                        {s.contrato.empresa?.nome && (
+                          <p className="text-slate-500 text-xs mt-0.5">{s.contrato.empresa.nome}</p>
+                        )}
+                      </>
                     ) : (
-                      <p className="text-white font-medium mb-1">{s.solicitante.nome}</p>
-                    )}
-
-                    {/* Solicitante / Frente */}
-                    <p className="text-slate-500 text-xs">
-                      Solicitante: <span className="text-slate-400">{s.solicitante.nome}</span>
-                      {s.solicitante.equipe && (
-                        <span className="text-slate-500"> · Frente: <span className="text-slate-400">{FRENTE_LABEL[s.solicitante.equipe.tipo] ?? s.solicitante.equipe.nome}</span></span>
-                      )}
-                    </p>
-
-                    {/* Info extra para transferência */}
-                    {s.tipo === "TRANSFERENCIA_CONTRATO" && s.contrato && (() => {
-                      const donoAtual = s.contrato.carteiras?.[0]?.consultor;
-                      const frenteSolicitante = s.solicitante.equipe?.tipo;
-                      const frenteDono = donoAtual?.equipe?.tipo;
-                      const frenteDiferente = frenteSolicitante && frenteDono && frenteSolicitante !== frenteDono;
-                      // "Enviar": o próprio dono (solicitante) pediu pra mandar
-                      // pra um colega -- mostra o destino escolhido em vez de
-                      // repetir "dono atual = solicitante".
-                      if (s.destinoConsultorNome) {
-                        return (
-                          <div className="mt-1.5 rounded-lg px-3 py-2 border text-xs bg-surface-1 border-white/[0.08]">
-                            <p className="text-slate-400">
-                              Enviar de <span className="text-slate-300">{s.solicitante.nome}</span> para{" "}
-                              <span className="text-slate-300">{s.destinoConsultorNome}</span>
-                            </p>
-                          </div>
-                        );
-                      }
-                      return donoAtual ? (
-                        <div className={`mt-1.5 rounded-lg px-3 py-2 border text-xs ${frenteDiferente ? "bg-amber-500/10 border-amber-500/30" : "bg-surface-1 border-white/[0.08]"}`}>
-                          <p className="text-slate-400">
-                            Dono atual: <span className="text-slate-300">{donoAtual.nome}</span>
-                            {donoAtual.equipe && <span className={`ml-1 ${frenteDiferente ? "text-amber-400 font-medium" : "text-slate-500"}`}>({FRENTE_LABEL[donoAtual.equipe.tipo] ?? donoAtual.equipe.nome})</span>}
-                          </p>
-                          {frenteDiferente && (
-                            <p className="text-[11px] text-amber-400 font-medium mt-1">⚠ Transferência entre frentes diferentes</p>
-                          )}
-                        </div>
-                      ) : null;
-                    })()}
-
-                    <p className="text-slate-400 text-sm mt-1.5">{s.motivo}</p>
-                    {s.resposta && (
-                      <p className="text-slate-500 text-sm mt-1 italic">Resposta: {s.resposta}</p>
+                      <p className="text-white font-bold truncate">{s.solicitante.nome}</p>
                     )}
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-slate-500 text-xs">{formatarDataHora(s.criadoEm)}</p>
-                    {s.status === "PENDENTE" && (
-                      <div className="flex gap-2 mt-3">
+
+                  {/* Coluna 2: Atores / Fluxo */}
+                  <div className="min-w-0">
+                    {fluxo ? (
+                      <div className={`rounded-lg px-3 py-2 border text-xs ${fluxo.frenteDiferente ? "bg-amber-500/10 border-amber-500/30" : "bg-surface-1 border-white/[0.08]"}`}>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-slate-300 font-medium">{fluxo.origem}</span>
+                          {fluxo.origemFrente && <span className="text-slate-500">({fluxo.origemFrente})</span>}
+                          <ArrowRight size={12} className="text-slate-500 flex-shrink-0" />
+                          <span className="text-slate-300 font-medium">{fluxo.destino}</span>
+                          {fluxo.destinoFrente && <span className="text-slate-500">({fluxo.destinoFrente})</span>}
+                        </div>
+                        {fluxo.frenteDiferente && (
+                          <p className="text-[11px] text-amber-400 font-medium mt-1">⚠ Transferência entre frentes diferentes</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-slate-500 text-xs">
+                        Solicitante: <span className="text-slate-400">{s.solicitante.nome}</span>
+                        {s.solicitante.equipe && (
+                          <span className="text-slate-500"> · Frente: <span className="text-slate-400">{FRENTE_LABEL[s.solicitante.equipe.tipo] ?? s.solicitante.equipe.nome}</span></span>
+                        )}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Coluna 3: Motivo */}
+                  <div className="min-w-0">
+                    <div className="bg-surface-1 border border-white/[0.08] rounded-lg px-3 py-2 h-full">
+                      <p className="text-slate-400 text-xs">{s.motivo}</p>
+                      {s.resposta && (
+                        <p className="text-slate-500 text-xs mt-1.5 pt-1.5 border-t border-white/[0.06] italic">Resposta: {s.resposta}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ações para pendentes */}
+                {s.status === "PENDENTE" && (
+                  <div className="mt-4 pt-4 border-t border-white/[0.05]">
+                    {rejeitando ? (
+                      <div className="space-y-2">
+                        <textarea
+                          autoFocus
+                          value={motivoRejeicao}
+                          onChange={(e) => setMotivoRejeicao(e.target.value)}
+                          placeholder="Motivo da recusa (opcional)..."
+                          rows={2}
+                          className="w-full bg-surface-1 border border-white/[0.08] rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:ring-1 focus:ring-rose-500 placeholder:text-slate-500"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => { setRejeitandoId(null); setMotivoRejeicao(""); }}
+                            className="px-3 py-1.5 text-xs rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.04] transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                          <button
+                            onClick={() => decidir(s.id, "REJEITADA", motivoRejeicao)}
+                            disabled={enviandoId === s.id}
+                            className="px-3 py-1.5 text-xs rounded-lg bg-rose-500/15 text-rose-400 border border-rose-500/25 hover:bg-rose-500/25 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                          >
+                            {enviandoId === s.id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
+                            Confirmar rejeição
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex justify-end gap-2">
                         <button
-                          onClick={async () => {
-                            const res = await fetch(`/api/solicitacoes/${s.id}`, { method: "PATCH", body: JSON.stringify({ status: "REJEITADA" }), headers: { "Content-Type": "application/json" } });
-                            if (res.ok) setSolicitacoes((prev) => prev.map((x) => x.id === s.id ? { ...x, status: "REJEITADA" } : x));
-                          }}
-                          className="px-3 py-1.5 text-xs rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+                          onClick={() => setRejeitandoId(s.id)}
+                          className="px-4 py-2 text-xs font-medium rounded-lg text-rose-400 border border-rose-500/25 hover:bg-rose-500/10 transition-colors"
                         >
                           Rejeitar
                         </button>
                         <button
-                          onClick={async () => {
-                            const res = await fetch(`/api/solicitacoes/${s.id}`, { method: "PATCH", body: JSON.stringify({ status: "APROVADA" }), headers: { "Content-Type": "application/json" } });
-                            if (res.ok) setSolicitacoes((prev) => prev.map((x) => x.id === s.id ? { ...x, status: "APROVADA" } : x));
-                            else alert("Erro ao aprovar. Verifique o console.");
-                          }}
-                          className="px-3 py-1.5 text-xs rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                          onClick={() => decidir(s.id, "APROVADA")}
+                          disabled={enviandoId === s.id}
+                          className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-50 text-white transition-colors"
                         >
+                          {enviandoId === s.id ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
                           Aprovar
                         </button>
                       </div>
                     )}
                   </div>
-                </div>
+                )}
               </div>
             );
           })}

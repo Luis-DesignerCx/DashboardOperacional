@@ -81,6 +81,15 @@ function iniciais(nome: string): string {
   return (primeira + ultima).toUpperCase();
 }
 
+// Primeiro + segundo nome -- nome completo não cabe na largura da coluna
+// (achado real: Leticia Cristina da Silva Sergio cortando em "Leticia
+// Cristina da Sil...", 2026-09-22).
+function nomeReduzido(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean);
+  if (partes.length <= 1) return nome;
+  return `${partes[0]} ${partes[1]}`;
+}
+
 const RANK_STYLE = [
   "bg-amber-500/15 text-amber-400",
   "bg-white/[0.08] text-slate-300",
@@ -139,14 +148,15 @@ export function MatrizPerformance({ frentes }: Props) {
         <table className="w-full text-xs">
           <thead>
             <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.05]">
-              <th className="text-center pb-2.5 font-semibold w-8">#</th>
-              <th className="text-left pb-2.5 font-semibold">Consultor</th>
-              <th className="text-right pb-2.5 font-semibold">Recebido Inadimplente</th>
-              <th className="text-right pb-2.5 font-semibold">Parcela Mês</th>
-              <th className="text-right pb-2.5 font-semibold">% da Meta</th>
-              <th className="text-center pb-2.5 font-semibold">Contr. Recebidos</th>
-              <th className="text-right pb-2.5 font-semibold">Saldo sob Gestão</th>
-              <th className="text-right pb-2.5 font-semibold">% Recuperado</th>
+              <th className="text-center px-2 pb-2.5 font-semibold w-8">#</th>
+              <th className="text-left px-2 pb-2.5 font-semibold whitespace-nowrap">Consultor</th>
+              <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Total Inadimplente</th>
+              <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Inadimplente</th>
+              <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Recebido Inadimplente</th>
+              <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Parcela Mês</th>
+              <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Recebidos</th>
+              <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">% Recuperação</th>
+              <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">% da Meta</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/[0.04]">
@@ -155,7 +165,7 @@ export function MatrizPerformance({ frentes }: Props) {
               const pctM = pctMeta(c.metaAlvo, c.recebidoInadimplente, c.parcelaMes);
               return (
                 <tr key={c.consultorId} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="py-2.5 text-center">
+                  <td className="py-2.5 px-2 text-center">
                     <span className={cn(
                       "inline-flex w-5 h-5 rounded-full items-center justify-center text-[10px] font-bold",
                       RANK_STYLE[i] ?? "bg-white/[0.04] text-slate-500"
@@ -163,26 +173,27 @@ export function MatrizPerformance({ frentes }: Props) {
                       {i + 1}
                     </span>
                   </td>
-                  <td className="py-2.5 text-left">
+                  <td className="py-2.5 px-2 text-left">
                     <div className="flex items-center gap-2">
                       <span className="w-6 h-6 rounded-full bg-white/[0.06] text-slate-400 flex items-center justify-center text-[9px] font-semibold flex-shrink-0">
                         {iniciais(c.nome)}
                       </span>
-                      <span className="text-slate-200 font-medium truncate max-w-[140px]">{c.nome}</span>
+                      <span className="text-slate-200 font-medium whitespace-nowrap" title={c.nome}>{nomeReduzido(c.nome)}</span>
                     </div>
                   </td>
-                  <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(c.recebidoInadimplente)}</td>
-                  <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(c.parcelaMes)}</td>
-                  <td className="py-2.5 text-right">
-                    <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums", corBadgeMeta(pctM))}>
-                      {pctM === null ? "—" : `${pctM.toFixed(1)}%`}
-                    </span>
-                  </td>
-                  <td className="py-2.5 text-center text-slate-500 tabular-nums">{c.contratosRecebidos}</td>
-                  <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(c.saldoAberto)}</td>
-                  <td className="py-2.5 text-right">
+                  <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(c.saldoAberto)}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{c.contratos}</td>
+                  <td className="py-2.5 px-2 text-right text-slate-200 font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(c.recebidoInadimplente)}</td>
+                  <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(c.parcelaMes)}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{c.contratosRecebidos}</td>
+                  <td className="py-2.5 px-2 text-right">
                     <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums", corBadgeRecuperado(pctRec))}>
                       {pctRec.toFixed(1)}%
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-2 text-right">
+                    <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums", corBadgeMeta(pctM))}>
+                      {pctM === null ? "—" : `${pctM.toFixed(1)}%`}
                     </span>
                   </td>
                 </tr>
@@ -191,17 +202,18 @@ export function MatrizPerformance({ frentes }: Props) {
           </tbody>
           <tfoot>
             <tr className="border-t border-white/[0.07]">
-              <td className="pt-3 pb-0.5" />
-              <td className="pt-3 pb-0.5 text-white font-semibold">Total</td>
-              <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(aba.total.recebidoInadimplente)}</td>
-              <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(aba.total.parcelaMes)}</td>
-              <td className="pt-3 pb-0.5 text-right text-slate-400 text-[10px] tabular-nums">
-                {pctMetaTotal === null ? "—" : `${pctMetaTotal.toFixed(1)}%`}
-              </td>
-              <td className="pt-3 pb-0.5 text-center text-slate-400 font-semibold tabular-nums">{aba.total.contratosRecebidos}</td>
-              <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(aba.total.saldoAberto)}</td>
-              <td className="pt-3 pb-0.5 text-right text-slate-500 text-[10px] tabular-nums">
+              <td className="pt-3 pb-0.5 px-2" />
+              <td className="pt-3 pb-0.5 px-2 text-white font-semibold">Total</td>
+              <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(aba.total.saldoAberto)}</td>
+              <td className="pt-3 pb-0.5 px-2 text-center text-slate-400 font-semibold tabular-nums">{aba.total.contratos}</td>
+              <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(aba.total.recebidoInadimplente)}</td>
+              <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(aba.total.parcelaMes)}</td>
+              <td className="pt-3 pb-0.5 px-2 text-center text-slate-400 font-semibold tabular-nums">{aba.total.contratosRecebidos}</td>
+              <td className="pt-3 pb-0.5 px-2 text-right text-slate-500 text-[10px] tabular-nums">
                 {pctRecuperado(aba.total.saldoAberto, aba.total.recebidoInadimplente).toFixed(1)}%
+              </td>
+              <td className="pt-3 pb-0.5 px-2 text-right text-slate-400 text-[10px] tabular-nums">
+                {pctMetaTotal === null ? "—" : `${pctMetaTotal.toFixed(1)}%`}
               </td>
             </tr>
           </tfoot>

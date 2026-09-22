@@ -45,25 +45,25 @@ export function SaudeEmpreendimentos({ porEmpresa }: Props) {
           <table className="w-full text-xs">
             <thead>
               <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.05]">
-                <th className="text-left pb-2.5 font-semibold">Empreendimento</th>
-                <th className="text-right pb-2.5 font-semibold">Recebido Inadimplente</th>
-                <th className="text-right pb-2.5 font-semibold">Parcela Mês</th>
-                <th className="text-center pb-2.5 font-semibold">Contr. Recuperados</th>
-                <th className="text-right pb-2.5 font-semibold">Saldo sob Gestão</th>
-                <th className="text-center pb-2.5 font-semibold">Contr. sob Gestão</th>
-                <th className="text-right pb-2.5 font-semibold">% Recuperação</th>
+                <th className="text-left px-2 pb-2.5 font-semibold whitespace-nowrap">Empreendimento</th>
+                <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Total Inadimplente</th>
+                <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Inadimplente</th>
+                <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Recebido Inadimplente</th>
+                <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Parcela Mês</th>
+                <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Recuperados</th>
+                <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">% Recuperação</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {porEmpresa.map((e) => (
                 <tr key={e.empresaId} className="hover:bg-white/[0.02] transition-colors">
-                  <td className="py-2.5 text-left text-slate-200 font-bold">{e.nome}</td>
-                  <td className="py-2.5 text-right text-slate-200 font-semibold tabular-nums">{formatarMoeda(e.recebidoInadimplente)}</td>
-                  <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.parcelaMes)}</td>
-                  <td className="py-2.5 text-center text-slate-500 tabular-nums">{e.contratosRecuperados}</td>
-                  <td className="py-2.5 text-right text-slate-400 tabular-nums">{formatarMoeda(e.saldoAberto)}</td>
-                  <td className="py-2.5 text-center text-slate-500 tabular-nums">{e.contratos}</td>
-                  <td className="py-2.5 text-right">
+                  <td className="py-2.5 px-2 text-left text-slate-200 font-bold">{e.nome}</td>
+                  <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(e.saldoAberto)}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{e.contratos}</td>
+                  <td className="py-2.5 px-2 text-right text-slate-200 font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(e.recebidoInadimplente)}</td>
+                  <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(e.parcelaMes)}</td>
+                  <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{e.contratosRecuperados}</td>
+                  <td className="py-2.5 px-2 text-right">
                     <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums", corBadgeRecuperacao(e.percentual))}>
                       {e.percentual.toFixed(1)}%
                     </span>
@@ -73,13 +73,13 @@ export function SaudeEmpreendimentos({ porEmpresa }: Props) {
             </tbody>
             <tfoot>
               <tr className="border-t border-white/[0.07]">
-                <td className="pt-3 pb-0.5 text-white font-semibold">Total</td>
-                <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(total.recebidoInadimplente)}</td>
-                <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(total.parcelaMes)}</td>
-                <td className="pt-3 pb-0.5 text-center text-white font-semibold tabular-nums">{total.contratosRecuperados}</td>
-                <td className="pt-3 pb-0.5 text-right text-white font-semibold tabular-nums">{formatarMoeda(total.saldoAberto)}</td>
-                <td className="pt-3 pb-0.5 text-center text-white font-semibold tabular-nums">{total.contratos}</td>
-                <td className="pt-3 pb-0.5 text-right text-slate-500 text-[10px] tabular-nums">
+                <td className="pt-3 pb-0.5 px-2 text-white font-semibold">Total</td>
+                <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(total.saldoAberto)}</td>
+                <td className="pt-3 pb-0.5 px-2 text-center text-white font-semibold tabular-nums">{total.contratos}</td>
+                <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(total.recebidoInadimplente)}</td>
+                <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(total.parcelaMes)}</td>
+                <td className="pt-3 pb-0.5 px-2 text-center text-white font-semibold tabular-nums">{total.contratosRecuperados}</td>
+                <td className="pt-3 pb-0.5 px-2 text-right text-slate-500 text-[10px] tabular-nums">
                   {total.saldoAberto > 0 ? `${percentualTotal.toFixed(1)}%` : "—"}
                 </td>
               </tr>

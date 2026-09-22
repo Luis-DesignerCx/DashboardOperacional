@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, Gauge, Info } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 import { useFrente } from "@/contexts/FrenteContext";
 import { MatrizPerformance } from "@/components/charts/MatrizPerformance";
 import { SaudeEmpreendimentos } from "@/components/charts/SaudeEmpreendimentos";
@@ -98,21 +98,7 @@ export function DashboardGestor() {
               <CheckCircle2 size={12} className="text-emerald-500" />
               <span className="text-slate-300 font-medium tabular-nums">{dados.clientesRegularizados}</span> regularizados
             </span>
-            <span className="w-1 h-1 rounded-full bg-white/[0.15]" />
-            <span className="flex items-center gap-1.5">
-              <Gauge size={12} className={dados.eficienciaHoje >= 80 ? "text-emerald-500" : dados.eficienciaHoje >= 50 ? "text-amber-500" : "text-slate-500"} />
-              <span className="text-slate-300 font-medium tabular-nums">{dados.eficienciaHoje.toFixed(0)}%</span> eficiência hoje
-            </span>
           </div>
-          {dados.aprovacoesPendentes > 0 && (
-            <a
-              href="/solicitacoes"
-              className="flex items-center gap-1.5 bg-amber-500/[0.08] border border-amber-500/25 text-amber-400 text-xs font-medium px-3 py-2 rounded-xl hover:bg-amber-500/[0.13] transition-all"
-            >
-              <AlertTriangle size={12} />
-              {dados.aprovacoesPendentes} pendente{dados.aprovacoesPendentes !== 1 ? "s" : ""}
-            </a>
-          )}
           <Select
             value={competenciaId}
             onValueChange={(v) => { setCompetenciaId(v); carregarDashboard(v, equipeIds); }}
