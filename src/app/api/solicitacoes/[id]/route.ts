@@ -46,20 +46,45 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     solicitacaoAtual.tipo === "INADIMPLENCIA_EQUIVOCADA" &&
     solicitacaoAtual.contratoId
   ) {
-    const dados = solicitacaoAtual.dados as { parcelasIds?: string[]; todasParcelas?: boolean } | null;
+    const dados = solicitacaoAtual.dados as { parcelasIds?: string[]; todasParcelas?: boolean; competenciaId?: string | null } | null;
     const parcialIds = dados?.parcelasIds;
     const isTodas = !dados || dados.todasParcelas || !parcialIds?.length;
 
     if (isTodas) {
-      // Remoção total: sai da carteira e da inadimplência geral
-      await prisma.contrato.update({
-        where: { id: solicitacaoAtual.contratoId },
-        data: { inadimplenciaEquivocada: true, situacao: "INADIMPLENTE" },
-      });
-      await prisma.carteiraParcela.updateMany({
-        where: { contratoId: solicitacaoAtual.contratoId, ativo: true },
-        data: { ativo: false },
-      });
+      const competenciaAlvo = dados?.competenciaId;
+      if (competenciaAlvo) {
+        // Remoção escopada só na competência em que foi contestada --
+        // nunca mexe em competência já FECHADA onde o mesmo contrato também
+        // tem carteira (ex.: dívida paga no mês anterior, mas só baixada
+        // oficialmente depois que o mês seguinte já tinha sido importado,
+        // então a dívida "voltou" pra carteira nova sem nunca ter deixado
+        // de ser real no mês antigo). Sem esse escopo, a inadimplência
+        // geral de um mês já fechado encolhia retroativamente junto
+        // (achado real: Bruno de Jesus Siqueira Campos, 2026-09-22). Não
+        // marca inadimplenciaEquivocada no contrato -- esse campo é global
+        // (sem competência) e é checado em toda consulta de carteira;
+        // marcá-lo aqui excluiria o contrato também do mês fechado.
+        await prisma.carteiraParcela.updateMany({
+          where: { contratoId: solicitacaoAtual.contratoId, competenciaId: competenciaAlvo, ativo: true },
+          data: { ativo: false },
+        });
+        await prisma.contrato.update({
+          where: { id: solicitacaoAtual.contratoId },
+          data: { situacao: "INADIMPLENTE" },
+        });
+      } else {
+        // Fallback -- solicitações antigas, criadas antes de guardarmos a
+        // competência: mantém o comportamento de sempre (remoção total, em
+        // qualquer competência).
+        await prisma.contrato.update({
+          where: { id: solicitacaoAtual.contratoId },
+          data: { inadimplenciaEquivocada: true, situacao: "INADIMPLENTE" },
+        });
+        await prisma.carteiraParcela.updateMany({
+          where: { contratoId: solicitacaoAtual.contratoId, ativo: true },
+          data: { ativo: false },
+        });
+      }
     } else {
       // Remoção parcial: apenas as parcelas selecionadas saem da inadimplência
       const parcelasEquiv = await prisma.parcela.findMany({

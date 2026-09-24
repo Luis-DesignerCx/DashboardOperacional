@@ -82,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
           empresa: true,
           parcelas: { orderBy: { dataVencimento: "asc" } },
           recebimentos: { where: recebimentosWhere, orderBy: { dataRecebimento: "desc" } },
-          contatos: { orderBy: { criadoEm: "desc" }, take: 5 },
+          contatos: { orderBy: { criadoEm: "desc" }, take: 5, include: { consultor: { select: { nome: true } } } },
           promessas: { where: { status: "ABERTA" }, orderBy: { dataPrometida: "asc" } },
           carteiras: {
             select: { tipoEquipe: true, consultor: { select: { nome: true } }, competencia: true },

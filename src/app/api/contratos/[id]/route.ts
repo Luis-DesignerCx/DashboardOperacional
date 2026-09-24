@@ -40,7 +40,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   // Bloqueia mudança de situação para contratos já recuperados integralmente
-  if (situacao) {
+  // -- exceto GESTOR/ADMIN contestando Inadimplência Equivocada: contrato
+  // pago numa competência mas ainda não baixado oficialmente quando a
+  // próxima competência foi importada volta pra carteira "quitado" (acha
+  // real: Bruno de Jesus Siqueira Campos, 2026-09-22) -- só o gestor pode
+  // destravar esse caso específico, consultor continua bloqueado.
+  const podeContestarRecuperado = isGestorAdmin && situacao === "INADIMPLENCIA_EQUIVOCADA";
+  if (situacao && !podeContestarRecuperado) {
     const atual = await prisma.contrato.findUnique({
       where: { id: params.id },
       select: { statusRecuperacao: true },
@@ -115,15 +121,30 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { contratoId: params.id, tipo: "INADIMPLENCIA_EQUIVOCADA", status: "PENDENTE" },
     });
     if (!jaExiste) {
+      // Guarda a competência ABERTA no momento da contestação -- na
+      // aprovação, a remoção da carteira fica restrita a essa competência
+      // (nunca desativa carteira de mês já fechado). Sem isso, um contrato
+      // com carteira em mais de uma competência (dívida paga numa
+      // competência mas ainda não baixada oficialmente quando a próxima já
+      // foi importada) tinha a competência FECHADA anterior apagada
+      // retroativamente junto -- achado real: Bruno de Jesus Siqueira
+      // Campos, pago em 31/08 mas com carteira ativa em Agosto E Setembro,
+      // 2026-09-22.
+      const competenciaAberta = await prisma.competencia.findFirst({
+        where: { fechada: false },
+        orderBy: [{ ano: "desc" }, { mes: "desc" }],
+        select: { id: true },
+      });
       await prisma.solicitacao.create({
         data: {
           tipo: "INADIMPLENCIA_EQUIVOCADA",
           contratoId: params.id,
           solicitanteId: session.user.id,
           motivo: justificativa || "Consultor contestou a inadimplência via carteira",
-          dados: Array.isArray(parcelasIds) && parcelasIds.length > 0
-            ? { parcelasIds, todasParcelas: !!todasParcelas }
-            : undefined,
+          dados: {
+            ...(Array.isArray(parcelasIds) && parcelasIds.length > 0 ? { parcelasIds, todasParcelas: !!todasParcelas } : { todasParcelas: true }),
+            competenciaId: competenciaAberta?.id ?? null,
+          },
         },
       });
     }

@@ -31,6 +31,7 @@ interface Contrato {
     meioPagamento: string | null;
     paga: boolean;
     equivocada: boolean;
+    cadastradaManualmente: boolean;
   }[];
   recebimentos: {
     id: string;
@@ -41,7 +42,7 @@ interface Contrato {
     consultorId: string;
     parcelasIds: string[];
   }[];
-  contatos: { id: string; tipo: string; status: string; observacao: string | null; criadoEm: string }[];
+  contatos: { id: string; tipo: string; status: string; observacao: string | null; criadoEm: string; consultor: { nome: string } }[];
   promessas: { id: string; valorPrometido: number; dataPrometida: string; formaPagamento: string }[];
   carteiras: { tipoEquipe: string | null; consultor: { nome: string }; competencia: { descricao: string } }[];
 }
@@ -133,9 +134,13 @@ export default function ClienteDetalhe() {
   async function submeterInadEquivocada() {
     if (!inadEquivContratoId) return;
     if (!inadEquivJustificativa.trim()) { setErroInadEquiv("Informe o motivo da contestação"); return; }
-    if (!inadEquivParcelasIds.length) { setErroInadEquiv("Selecione ao menos uma parcela equivocada"); return; }
     const contratoDaSelecao = cliente?.contratos.find(c => c.id === inadEquivContratoId);
     const totalNaoPagas = contratoDaSelecao?.parcelas.filter(p => !p.paga).length ?? 0;
+    // Contrato com todas as parcelas já pagas (ex: pago no mês anterior,
+    // carregado pra carteira nova antes da baixa oficial) não tem parcela
+    // nenhuma pra selecionar -- nesse caso a contestação vale pro contrato
+    // inteiro, sem exigir seleção.
+    if (totalNaoPagas > 0 && !inadEquivParcelasIds.length) { setErroInadEquiv("Selecione ao menos uma parcela equivocada"); return; }
     const todasParcelas = inadEquivParcelasIds.length === totalNaoPagas;
     setSalvandoInadEquiv(true);
     setErroInadEquiv("");
@@ -546,9 +551,12 @@ export default function ClienteDetalhe() {
                 <Calendar size={15} className="text-gr-400" />
                 Parcelas ({contrato.parcelas.length})
               </h2>
-              {/* Botão Inad. equivocada — só para CONSULTOR, contrato não adimplente e ainda não equivocado */}
-              {perfil === "CONSULTOR"
-                && contrato.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE"
+              {/* Botão Inad. equivocada — consultor não pode contestar contrato já
+                  recuperado integralmente (paga a dívida, acabou); gestor/admin
+                  pode sempre, pra destravar o caso de dívida paga numa competência
+                  mas carregada pra próxima antes da baixa oficial (achado real:
+                  Bruno de Jesus Siqueira Campos, 2026-09-22). */}
+              {(perfil === "CONSULTOR" ? contrato.statusRecuperacao !== "RECUPERADO_INTEGRALMENTE" : isGestorOuAdmin)
                 && contrato.situacao !== "INADIMPLENCIA_EQUIVOCADA" && (
                 <button
                   onClick={() => {
@@ -585,6 +593,13 @@ export default function ClienteDetalhe() {
                 {(() => {
                   const naoPageas = contrato.parcelas.filter(p => !p.paga && !p.equivocada);
                   const todasSelecionadas = inadEquivParcelasIds.length === naoPageas.length && naoPageas.length > 0;
+                  if (naoPageas.length === 0) {
+                    return (
+                      <p className="text-xs text-slate-400 bg-surface-1 border border-white/[0.08] rounded-lg px-3 py-2">
+                        Todas as parcelas já estão pagas — a contestação vai marcar o contrato inteiro como equivocado.
+                      </p>
+                    );
+                  }
                   return (
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
@@ -726,6 +741,11 @@ export default function ClienteDetalhe() {
                         <span className="text-slate-400 text-xs">
                           {new Date(p.dataVencimento).toLocaleDateString("pt-BR", { timeZone: "UTC" })}
                         </span>
+                        {p.cadastradaManualmente && (
+                          <span title="Cadastrada manualmente" className="text-slate-600 text-[10px] cursor-help select-none">
+                            ●
+                          </span>
+                        )}
                         {p.equivocada && (
                           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-orange-500/15 text-orange-400 border border-orange-500/20 font-medium">
                             Inad. Equivocada
@@ -875,10 +895,12 @@ export default function ClienteDetalhe() {
               <div className="space-y-2">
                 {contrato.contatos.map((c) => (
                   <div key={c.id} className="py-1.5 border-b border-white/[0.06]/50 last:border-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs text-slate-400">{c.tipo}</span>
                       <span className="text-xs text-slate-400">·</span>
                       <span className="text-xs text-slate-300">{c.status.replace(/_/g, " ")}</span>
+                      <span className="text-xs text-slate-400">·</span>
+                      <span className="text-xs font-medium text-gr-400">{c.consultor.nome}</span>
                     </div>
                     {c.observacao && <p className="text-slate-500 text-xs mt-0.5">{c.observacao}</p>}
                     <p className="text-slate-700 text-xs mt-0.5">{new Date(c.criadoEm).toLocaleDateString("pt-BR", { timeZone: "UTC" })}</p>

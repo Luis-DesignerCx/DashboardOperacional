@@ -36,7 +36,66 @@ export async function GET(req: NextRequest) {
     orderBy: { criadoEm: "desc" },
   });
 
-  return NextResponse.json(metas);
+  // Alvo em R$ das metas FINANCEIRA por percentual passa a ser calculado em
+  // tempo real (soma o valorTotalAberto do CONTRATO, ativo:true,
+  // inadimplenciaEquivocada:false -- mesma base do dashboard), em vez do
+  // valor congelado no momento em que a meta foi criada. A meta da EQUIPE
+  // TODA (consultorId null) exclui consultores que têm meta INDIVIDUAL
+  // cadastrada na mesma frente/competência -- a carteira deles já está
+  // coberta pela própria meta, não deve contar duas vezes na da equipe
+  // (decisão de negócio, 2026-09-22).
+  const chavesEquipeCompetencia = [...new Set(
+    metas.filter((m) => m.tipo === "FINANCEIRA" && m.percentualAlvo != null)
+      .map((m) => `${m.equipeId}::${m.competenciaId}`)
+  )];
+
+  const valorAlvoAtualPorMeta = new Map<string, number>();
+
+  for (const chave of chavesEquipeCompetencia) {
+    const [eqId, compId] = chave.split("::");
+
+    const consultoresDaFrente = await prisma.usuario.findMany({
+      where: { equipeId: eqId, ativo: true, perfil: "CONSULTOR" },
+      select: { id: true },
+    });
+    const consultorIds = consultoresDaFrente.map((c) => c.id);
+
+    const carteiras = await prisma.carteiraParcela.findMany({
+      where: { consultorId: { in: consultorIds }, competenciaId: compId, ativo: true, contrato: { inadimplenciaEquivocada: false } },
+      select: { consultorId: true, contrato: { select: { valorTotalAberto: true } } },
+    });
+    const saldoPorConsultor = new Map<string, number>();
+    for (const c of carteiras) {
+      saldoPorConsultor.set(c.consultorId, (saldoPorConsultor.get(c.consultorId) ?? 0) + Number(c.contrato.valorTotalAberto ?? 0));
+    }
+
+    // Metas individuais já cadastradas nessa frente/competência -- excluídas
+    // da base da meta de equipe toda.
+    const consultoresComMetaIndividual = new Set(
+      metas.filter((m) => m.equipeId === eqId && m.competenciaId === compId && m.tipo === "FINANCEIRA" && m.consultorId).map((m) => m.consultorId as string)
+    );
+
+    for (const meta of metas) {
+      if (meta.equipeId !== eqId || meta.competenciaId !== compId || meta.tipo !== "FINANCEIRA" || meta.percentualAlvo == null) continue;
+      let base = 0;
+      if (meta.consultorId) {
+        base = saldoPorConsultor.get(meta.consultorId) ?? 0;
+      } else {
+        for (const cId of consultorIds) {
+          if (consultoresComMetaIndividual.has(cId)) continue;
+          base += saldoPorConsultor.get(cId) ?? 0;
+        }
+      }
+      valorAlvoAtualPorMeta.set(meta.id, (Number(meta.percentualAlvo) / 100) * base);
+    }
+  }
+
+  const metasComAlvoAtual = metas.map((m) => ({
+    ...m,
+    valorAlvoAtual: valorAlvoAtualPorMeta.has(m.id) ? valorAlvoAtualPorMeta.get(m.id) : null,
+  }));
+
+  return NextResponse.json(metasComAlvoAtual);
 }
 
 export async function POST(req: NextRequest) {

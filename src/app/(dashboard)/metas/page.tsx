@@ -11,6 +11,7 @@ interface Meta {
   percentualAlvo: number | null;
   quantidadeAlvo: number | null;
   valorAlvo: number | null;
+  valorAlvoAtual: number | null;
   peso: number;
   thresholdsMonitoria: Record<string, number> | null;
   equipe: { nome: string; tipo: string };
@@ -222,7 +223,7 @@ export default function MetasPage() {
         return (
           <span className="flex flex-col items-end gap-0.5">
             <span>{Number(m.percentualAlvo).toFixed(1)}% da inadimplência</span>
-            {m.valorAlvo && <span className="text-xs text-slate-400 font-normal">{formatarMoeda(Number(m.valorAlvo))}</span>}
+            {m.valorAlvoAtual != null && <span className="text-xs text-slate-400 font-normal">{formatarMoeda(Number(m.valorAlvoAtual))}</span>}
           </span>
         );
       }
