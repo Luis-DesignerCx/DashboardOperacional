@@ -27,9 +27,15 @@ const FAIXA_COR: Record<string, string> = {
 const TIPO_ORDEM = ["FLASH", "CRA_1_30", "CR_31_90", "CR_PDD_91_180"];
 
 // Sub-faixas por tipo de frente
-const SUB_FAIXAS_MAP: Record<string, Array<{ label: string; diasMin: number; diasMax?: number }>> = {
+const SUB_FAIXAS_MAP: Record<string, Array<{ label: string; diasMin?: number; diasMax?: number }>> = {
   CR_31_90: [
-    { label: "Todos 31-90", diasMin: 31, diasMax: 90 },
+    // "Todos 31-90" == a frente inteira, sem recorte -- não pode reaplicar
+    // maiorDiasAtraso 31-90 aqui: esse campo é AO VIVO e só cresce, então um
+    // contrato distribuído a esta frente (tipoEquipe CONGELADO) que passa dos
+    // 90 dias ainda na mesma competência sumia da tela mesmo continuando
+    // corretamente contado no Dashboard/demais telas (achado real, Jair
+    // Matias, 2026-09-24: 33 contratos / R$ 6.249,18 escondidos).
+    { label: "Todos 31-90" },
     { label: "31–60 dias",  diasMin: 31, diasMax: 60 },
     { label: "61–90 dias",  diasMin: 61, diasMax: 90 },
   ],
@@ -119,7 +125,7 @@ export default function GestaoPage() {
       const subFaixas = SUB_FAIXAS_MAP[equipe.tipo];
       if (subFaixas) {
         const sf = subFaixas[subFaixa] ?? subFaixas[0];
-        url += `&diasMin=${sf.diasMin}`;
+        if (sf.diasMin !== undefined) url += `&diasMin=${sf.diasMin}`;
         if (sf.diasMax !== undefined) url += `&diasMax=${sf.diasMax}`;
       }
       if (equipe.tipo === "FLASH" && baseVencFiltro) {
