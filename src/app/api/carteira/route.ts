@@ -30,13 +30,15 @@ export async function GET(req: NextRequest) {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
   const busca = searchParams.get("busca")?.trim() || "";
   const sort = searchParams.get("sort") ?? "diasAtraso";
-  const statusRecuperacao = searchParams.get("statusRecuperacao") || "";
-  const situacao = searchParams.get("situacao") || "";
-  const baseVencimentoParam = searchParams.get("baseVencimento") || "";
+  // Filtros multi-seleção -- chegam como lista separada por vírgula (ex:
+  // "RECUPERACAO_PARCIAL,INADIMPLENTE"); array vazio = sem filtro (mostra tudo).
+  const statusRecuperacao = (searchParams.get("statusRecuperacao") || "").split(",").filter(Boolean);
+  const situacao = (searchParams.get("situacao") || "").split(",").filter(Boolean);
+  const baseVencimentoParam = (searchParams.get("baseVencimento") || "").split(",").filter(Boolean);
   const skip = (page - 1) * PAGE_SIZE;
 
   // Quando qualquer filtro de status está ativo, retorna tudo sem paginação
-  const temFiltroAtivo = !!(statusRecuperacao || situacao || baseVencimentoParam);
+  const temFiltroAtivo = statusRecuperacao.length > 0 || situacao.length > 0 || baseVencimentoParam.length > 0;
 
   const where: any = { competenciaId, ativo: true };
   if (session.user.perfil === "CONSULTOR") where.consultorId = session.user.id;
@@ -48,7 +50,7 @@ export async function GET(req: NextRequest) {
     const equipesGerenciadas = await getEquipesGerenciadas(session.user.id);
     where.consultor = { equipeId: { in: equipesGerenciadas } };
   }
-  if (baseVencimentoParam) where.baseVencimento = parseInt(baseVencimentoParam);
+  if (baseVencimentoParam.length > 0) where.baseVencimento = { in: baseVencimentoParam.map((v) => parseInt(v)) };
 
   where.contrato = { inadimplenciaEquivocada: false };
   if (busca) {
@@ -57,15 +59,19 @@ export async function GET(req: NextRequest) {
       { numero: { contains: busca, mode: "insensitive" } },
     ];
   }
-  if (statusRecuperacao === "RECUPERADO_INTEGRALMENTE") {
-    where.contrato.statusRecuperacao = "RECUPERADO_INTEGRALMENTE";
-  } else if (statusRecuperacao === "RECUPERACAO_PARCIAL") {
-    where.contrato.statusRecuperacao = "RECUPERACAO_PARCIAL";
-  } else if (statusRecuperacao === "INADIMPLENTE_TODOS") {
-    where.contrato.statusRecuperacao = { not: "RECUPERADO_INTEGRALMENTE" };
+  if (statusRecuperacao.length > 0) {
+    where.contrato.statusRecuperacao = { in: statusRecuperacao };
   }
-  if (situacao) {
-    where.contrato.situacao = situacao;
+  // "Situação" filtra por StatusContato (enum do modelo Contato, via
+  // contratoId) -- NÃO pelo enum SituacaoContrato do próprio Contrato (bug
+  // pré-existente: comparar direto contra where.contrato.situacao usando
+  // valores de StatusContato como "LINK_ENVIADO"/"AGUARDANDO_RETORNO"/
+  // "LIGAR_DEPOIS" fazia o Prisma rejeitar por enum inválido -- só
+  // "PROMESSA_PAGAMENTO" funcionava, por coincidência, por ser válido nos
+  // dois enums). Aqui, contratos com AO MENOS UM contato registrado com
+  // esse status.
+  if (situacao.length > 0) {
+    where.contrato.contatos = { some: { status: { in: situacao } } };
   }
 
   // Ordenação -- sempre com "id" como critério de desempate final. Sem isso,

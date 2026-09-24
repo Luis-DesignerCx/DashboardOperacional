@@ -92,8 +92,8 @@ export default function SolicitacoesPage() {
   const isGestorOuAdmin = ["ADMINISTRADOR", "GESTOR"].includes((session?.user as any)?.perfil ?? "");
 
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
-  const [filtroStatus, setFiltroStatus] = usePersistedState("filtroStatus", "TODOS");
-  const [filtroTipo, setFiltroTipo] = usePersistedState("filtroTipoSolicitacao", "TODOS");
+  const [filtroStatus, setFiltroStatus] = usePersistedState<string[]>("filtroStatus", []);
+  const [filtroTipo, setFiltroTipo] = usePersistedState<string[]>("filtroTipoSolicitacao", []);
   const [carregando, setCarregando] = useState(true);
   const [modalTransf, setModalTransf] = useState(false);
   const [rejeitandoId, setRejeitandoId] = useState<string | null>(null);
@@ -104,8 +104,8 @@ export default function SolicitacoesPage() {
     fetch("/api/solicitacoes").then((r) => r.json()).then((d) => { setSolicitacoes(d); setCarregando(false); });
   }, []);
 
-  const porTipo = filtroTipo === "TODOS" ? solicitacoes : solicitacoes.filter((s) => s.tipo === filtroTipo);
-  const filtradas = filtroStatus === "TODOS" ? porTipo : porTipo.filter((s) => s.status === filtroStatus);
+  const porTipo = filtroTipo.length === 0 ? solicitacoes : solicitacoes.filter((s) => filtroTipo.includes(s.tipo));
+  const filtradas = filtroStatus.length === 0 ? porTipo : porTipo.filter((s) => filtroStatus.includes(s.status));
 
   // Contagem de pendentes acompanha o filtro de Tipo (pra saber "quantas
   // pendentes existem desse tipo"), mas não o filtro de Status -- é a
@@ -167,34 +167,46 @@ export default function SolicitacoesPage() {
 
       {/* Filtros */}
       <div className="flex items-center gap-2 flex-wrap">
-        {["TODOS", "PENDENTE", "APROVADA", "REJEITADA"].map((s) => (
-          <button
-            key={s}
-            onClick={() => setFiltroStatus(s)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              filtroStatus === s
-                ? "bg-sky-500 text-white"
-                : "bg-white/[0.07] text-slate-400 hover:text-white"
-            }`}
-          >
-            {s === "TODOS" ? "Todos" : LABEL_STATUS[s]?.label}
-            {s === "PENDENTE" && totalPendentes > 0 && (
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${filtroStatus === s ? "bg-white/25 text-white" : "bg-amber-500/20 text-amber-400"}`}>
-                {totalPendentes}
-              </span>
-            )}
-          </button>
-        ))}
-        <select
-          value={filtroTipo}
-          onChange={(e) => setFiltroTipo(e.target.value)}
-          className="bg-white/[0.07] hover:bg-white/[0.09] text-slate-300 text-sm font-medium px-3 py-2 rounded-xl border-none focus:outline-none focus:ring-1 focus:ring-sky-500 transition-colors"
-        >
-          <option value="TODOS">Todos os Tipos</option>
-          {Object.entries(LABEL_TIPO).map(([valor, label]) => (
-            <option key={valor} value={valor}>{label}</option>
-          ))}
-        </select>
+        {["TODOS", "PENDENTE", "APROVADA", "REJEITADA"].map((s) => {
+          const ativo = s === "TODOS" ? filtroStatus.length === 0 : filtroStatus.includes(s);
+          return (
+            <button
+              key={s}
+              onClick={() => {
+                if (s === "TODOS") { setFiltroStatus([]); return; }
+                setFiltroStatus((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
+              }}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                ativo ? "bg-sky-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white"
+              }`}
+            >
+              {s === "TODOS" ? "Todos" : LABEL_STATUS[s]?.label}
+              {s === "PENDENTE" && totalPendentes > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${ativo ? "bg-white/25 text-white" : "bg-amber-500/20 text-amber-400"}`}>
+                  {totalPendentes}
+                </span>
+              )}
+            </button>
+          );
+        })}
+        <div className="w-px h-6 bg-white/[0.08] mx-1" />
+        {["TODOS", ...Object.keys(LABEL_TIPO)].map((t) => {
+          const ativo = t === "TODOS" ? filtroTipo.length === 0 : filtroTipo.includes(t);
+          return (
+            <button
+              key={t}
+              onClick={() => {
+                if (t === "TODOS") { setFiltroTipo([]); return; }
+                setFiltroTipo((prev) => prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]);
+              }}
+              className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
+                ativo ? "bg-sky-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white"
+              }`}
+            >
+              {t === "TODOS" ? "Todos os Tipos" : LABEL_TIPO[t]}
+            </button>
+          );
+        })}
       </div>
 
       {carregando ? (

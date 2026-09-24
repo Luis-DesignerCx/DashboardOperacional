@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { formatarMoeda } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { BarChart3 } from "lucide-react";
@@ -98,15 +98,53 @@ const RANK_STYLE = [
 
 export function MatrizPerformance({ frentes }: Props) {
   const frentesComDados = useMemo(() => frentes.filter((f) => f.consultores.length > 0), [frentes]);
-  const abas = useMemo(() => {
-    const geral = mesclarGeral(frentesComDados);
-    return geral.consultores.length > 0 ? [geral, ...frentesComDados] : frentesComDados;
+
+  // Multi-seleção de frentes: guarda os equipeId reais (nunca o "geral" sintético).
+  // Inicializa com todas selecionadas -- equivalente à aba "Geral" de antes.
+  const [frentesSelecionadas, setFrentesSelecionadas] = useState<Set<string>>(
+    () => new Set(frentesComDados.map((f) => f.equipeId))
+  );
+
+  // Se uma frente nova passar a ter dado (ex: troca de competência revela
+  // uma frente antes vazia), ela entra selecionada automaticamente -- sem
+  // isso, "Geral" ficava incompleto silenciosamente após a troca, mostrando
+  // menos frentes do que o rótulo "Geral" promete.
+  const idsConhecidosRef = useRef<Set<string>>(new Set(frentesComDados.map((f) => f.equipeId)));
+  useEffect(() => {
+    const novas = frentesComDados.filter((f) => !idsConhecidosRef.current.has(f.equipeId));
+    idsConhecidosRef.current = new Set(frentesComDados.map((f) => f.equipeId));
+    if (novas.length > 0) {
+      setFrentesSelecionadas((prev) => {
+        const next = new Set(prev);
+        for (const f of novas) next.add(f.equipeId);
+        return next;
+      });
+    }
   }, [frentesComDados]);
 
-  const [abaAtiva, setAbaAtiva] = useState(0);
-  const aba = abas[Math.min(abaAtiva, abas.length - 1)];
+  const isGeralAtivo = frentesSelecionadas.size === frentesComDados.length;
 
-  if (abas.length === 0) {
+  function selecionarGeral() {
+    setFrentesSelecionadas(new Set(frentesComDados.map((f) => f.equipeId)));
+  }
+
+  function toggleFrente(equipeId: string) {
+    setFrentesSelecionadas((prev) => {
+      if (prev.has(equipeId) && prev.size === 1) return prev; // nunca deixa zerar
+      const next = new Set(prev);
+      if (next.has(equipeId)) next.delete(equipeId);
+      else next.add(equipeId);
+      return next;
+    });
+  }
+
+  const frentesSelecionadasArr = useMemo(
+    () => frentesComDados.filter((f) => frentesSelecionadas.has(f.equipeId)),
+    [frentesComDados, frentesSelecionadas]
+  );
+  const aba = useMemo(() => mesclarGeral(frentesSelecionadasArr), [frentesSelecionadasArr]);
+
+  if (frentesComDados.length === 0) {
     return (
       <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
         <div className="flex items-center gap-2 mb-1">
@@ -129,13 +167,22 @@ export function MatrizPerformance({ frentes }: Props) {
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Matriz de Performance da Equipe</h2>
         </div>
         <div className="flex bg-white/[0.04] rounded-xl p-0.5 border border-white/[0.06] overflow-x-auto ml-auto">
-          {abas.map((f, i) => (
+          <button
+            onClick={selecionarGeral}
+            className={cn(
+              "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all",
+              isGeralAtivo ? "bg-gr-500/20 text-gr-300" : "text-slate-500 hover:text-slate-300"
+            )}
+          >
+            Geral
+          </button>
+          {frentesComDados.map((f) => (
             <button
               key={f.equipeId}
-              onClick={() => setAbaAtiva(i)}
+              onClick={() => toggleFrente(f.equipeId)}
               className={cn(
                 "px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all",
-                i === abaAtiva ? "bg-gr-500/20 text-gr-300" : "text-slate-500 hover:text-slate-300"
+                frentesSelecionadas.has(f.equipeId) ? "bg-gr-500/20 text-gr-300" : "text-slate-500 hover:text-slate-300"
               )}
             >
               {f.label}

@@ -646,7 +646,7 @@ const FRENTE_CHIP_STYLE: Record<string, string> = {
 export default function ComissaoPage() {
   const { data: session } = useSession();
   const [frentesGerenciadas, setFrentesGerenciadas] = useState<FrenteOpcao[]>([]);
-  const [frenteSelecionada, setFrenteSelecionada] = useState<string>("");
+  const [frentesSelecionadas, setFrentesSelecionadas] = useState<string[]>([]);
 
   const perfil = (session?.user as any)?.perfil as string | undefined;
   const userId = (session?.user as any)?.id as string | undefined;
@@ -658,7 +658,7 @@ export default function ComissaoPage() {
       .then((data: FrenteOpcao[]) => {
         if (Array.isArray(data) && data.length > 0) {
           setFrentesGerenciadas(data);
-          setFrenteSelecionada(data[0].equipeId);
+          setFrentesSelecionadas([data[0].equipeId]);
         }
       })
       .catch(() => {});
@@ -677,12 +677,20 @@ export default function ComissaoPage() {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs text-slate-500 font-medium mr-1">Frente:</span>
             {frentesGerenciadas.map((f) => {
-              const ativo = frenteSelecionada === f.equipeId;
+              const ativo = frentesSelecionadas.includes(f.equipeId);
               const style = FRENTE_CHIP_STYLE[f.equipeId] ?? "bg-white/[0.07] text-slate-300 border-white/[0.12]";
               return (
                 <button
                   key={f.equipeId}
-                  onClick={() => setFrenteSelecionada(f.equipeId)}
+                  onClick={() =>
+                    setFrentesSelecionadas((prev) => {
+                      if (prev.includes(f.equipeId)) {
+                        if (prev.length === 1) return prev;
+                        return prev.filter((id) => id !== f.equipeId);
+                      }
+                      return [...prev, f.equipeId];
+                    })
+                  }
                   className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
                     ativo ? style : "bg-surface-1/50 text-slate-500 border-white/[0.08] hover:text-slate-300"
                   }`}
@@ -694,8 +702,19 @@ export default function ComissaoPage() {
           </div>
         )}
 
-        {frenteSelecionada ? (
-          <GestorComissao key={frenteSelecionada} equipeId={frenteSelecionada} />
+        {frentesSelecionadas.length > 0 ? (
+          <div className="space-y-6">
+            {frentesSelecionadas.map((id) => (
+              <div key={id}>
+                {frentesSelecionadas.length > 1 && (
+                  <div className="text-xs text-slate-400 font-medium mb-2">
+                    {frentesGerenciadas.find((f) => f.equipeId === id)?.label ?? id}
+                  </div>
+                )}
+                <GestorComissao key={id} equipeId={id} />
+              </div>
+            ))}
+          </div>
         ) : (
           <div className="flex items-center justify-center h-40">
             <div className="w-6 h-6 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />

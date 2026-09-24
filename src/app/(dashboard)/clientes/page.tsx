@@ -106,7 +106,7 @@ export default function ClientesPage() {
   const [pagina, setPagina] = useState(1);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [busca, setBusca] = usePersistedState("busca", "");
-  const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string | null>("empresaFiltro", null);
+  const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string[]>("empresaFiltro", []);
   const [carregando, setCarregando] = useState(true);
   const buscaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Evita corrida entre buscas: se o usuário digitar de novo antes da busca
@@ -247,9 +247,9 @@ export default function ClientesPage() {
     new Set(clientes.flatMap((c) => c.contratos.map((ct) => ct.empresa.nome)))
   ).sort();
 
-  const filtrados = empresaFiltro
-    ? clientes.filter((c) => c.contratos.some((ct) => ct.empresa.nome === empresaFiltro))
-    : clientes;
+  const filtrados = empresaFiltro.length === 0
+    ? clientes
+    : clientes.filter((c) => c.contratos.some((ct) => empresaFiltro.includes(ct.empresa.nome)));
 
   return (
     <div className="space-y-5">
@@ -273,9 +273,9 @@ export default function ClientesPage() {
       {empresas.length > 0 && (
         <div className="flex flex-wrap gap-2">
           <button
-            onClick={() => setEmpresaFiltro(null)}
+            onClick={() => setEmpresaFiltro([])}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-              !empresaFiltro ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
+              empresaFiltro.length === 0 ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
             }`}
           >
             Todas
@@ -283,9 +283,9 @@ export default function ClientesPage() {
           {empresas.map((emp) => (
             <button
               key={emp}
-              onClick={() => setEmpresaFiltro(emp === empresaFiltro ? null : emp)}
+              onClick={() => setEmpresaFiltro(empresaFiltro.includes(emp) ? empresaFiltro.filter((e) => e !== emp) : [...empresaFiltro, emp])}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                empresaFiltro === emp ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                empresaFiltro.includes(emp) ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
               }`}
             >
               {emp}

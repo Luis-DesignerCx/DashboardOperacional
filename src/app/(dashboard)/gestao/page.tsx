@@ -66,8 +66,9 @@ interface Consultor {
   id: string; nome: string; emFerias: boolean;
   totalContratos: number; inadimplencia: number; recebido: number;
   recebidoAParte: number; percentual: number; porEmpresa: PorEmpresa[];
+  frenteId?: string; frenteLabel?: string; // presentes quando 2+ frentes estão selecionadas
 }
-interface ConsultorNoEmpreendimento { id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; }
+interface ConsultorNoEmpreendimento { id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; frenteId?: string; }
 interface Empreendimento {
   id: string; nome: string;
   contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; percentual: number;
@@ -75,9 +76,9 @@ interface Empreendimento {
 }
 
 export default function GestaoPage() {
-  const { equipeId: filtroFrente } = useFrente();
+  const { equipeIds: filtroFrentes } = useFrente();
   const [equipes, setEquipes] = useState<Equipe[]>([]);
-  const [equipeId, setEquipeId] = useState<string>("");
+  const [equipeIds, setEquipeIds] = useState<string[]>([]);
   const [competencias, setCompetencias] = useState<any[]>([]);
   const [competenciaId, setCompetenciaId] = useState("");
   const [consultores, setConsultores] = useState<Consultor[]>([]);
@@ -85,8 +86,37 @@ export default function GestaoPage() {
   const [busca, setBusca] = usePersistedState("busca", "");
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [expandidosEmpreend, setExpandidosEmpreend] = useState<Set<string>>(new Set());
-  const [subFaixa, setSubFaixa] = usePersistedState("subFaixa", 0); // índice em SUB_FAIXAS_MAP[tipo]
-  const [baseVencFiltro, setBaseVencFiltro] = usePersistedState<number | null>("baseVencFiltro", null);
+  // Sub-faixa de dias e base de vencimento Flash agora são POR FRENTE (chave =
+  // equipeId) -- várias frentes podem estar selecionadas ao mesmo tempo, cada
+  // uma com seu próprio recorte independente. Array vazio/ausente = "Todos".
+  const [subFaixasPorFrente, setSubFaixasPorFrente] = usePersistedState<Record<string, number[]>>("subFaixasPorFrente", {});
+  const [baseVencPorFrente, setBaseVencPorFrente] = usePersistedState<Record<string, number[]>>("baseVencPorFrente", {});
+
+  function toggleEquipeId(id: string) {
+    setEquipeIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleSubFaixa(alvoId: string, indice: number) {
+    setSubFaixasPorFrente((prev) => {
+      // índice 0 é sempre "Todos X" (a frente inteira, sem recorte) -- marcá-lo
+      // limpa o array em vez de entrar nele, senão ele se somaria às outras
+      // sub-faixas e duplicaria consultor/contrato (é superconjunto das
+      // demais, não uma faixa independente que possa concatenar com elas).
+      if (indice === 0) return { ...prev, [alvoId]: [] };
+      const atual = prev[alvoId] ?? [];
+      const novo = atual.includes(indice) ? atual.filter((i) => i !== indice) : [...atual, indice];
+      return { ...prev, [alvoId]: novo };
+    });
+  }
+
+  function toggleBaseVenc(alvoId: string, dia: number | null) {
+    setBaseVencPorFrente((prev) => {
+      if (dia === null) return { ...prev, [alvoId]: [] }; // "Todos"
+      const atual = prev[alvoId] ?? [];
+      const novo = atual.includes(dia) ? atual.filter((d) => d !== dia) : [...atual, dia];
+      return { ...prev, [alvoId]: novo };
+    });
+  }
 
   useEffect(() => {
     Promise.all([
@@ -98,10 +128,11 @@ export default function GestaoPage() {
       );
       setEquipes(ordenadas);
       const visiveis = ordenadas.filter((e: Equipe) => FRENTES_VISIVEIS.includes(e.tipo));
-      const inicial = filtroFrente
-        ? (visiveis.find((e: Equipe) => e.id === filtroFrente) ?? visiveis[0])
-        : visiveis[0];
-      if (inicial) setEquipeId(inicial.id);
+      const doFiltroGlobal = visiveis.filter((e: Equipe) => filtroFrentes.includes(e.id));
+      const inicial = doFiltroGlobal.length > 0
+        ? doFiltroGlobal.map((e) => e.id)
+        : (visiveis[0] ? [visiveis[0].id] : []);
+      setEquipeIds(inicial);
       if (Array.isArray(cs) && cs.length > 0) {
         setCompetencias(cs);
         setCompetenciaId(cs[0].id);
@@ -110,33 +141,66 @@ export default function GestaoPage() {
   }, []);
 
   useEffect(() => {
-    if (filtroFrente && equipes.length > 0) setEquipeId(filtroFrente);
-  }, [filtroFrente, equipes.length]);
+    if (filtroFrentes.length > 0 && equipes.length > 0) {
+      const validos = equipes
+        .filter((e) => FRENTES_VISIVEIS.includes(e.tipo) && filtroFrentes.includes(e.id))
+        .map((e) => e.id);
+      if (validos.length > 0) setEquipeIds(validos);
+    }
+  }, [filtroFrentes, equipes.length]);
 
   const carregarConsultores = useCallback(() => {
-    if (!equipeId || !competenciaId) return;
-    const equipe = equipes.find((e) => e.id === equipeId);
+    if (equipeIds.length === 0 || !competenciaId) {
+      setConsultores([]);
+      setCarregando(false);
+      return;
+    }
     setCarregando(true);
     setExpandidos(new Set());
     setExpandidosEmpreend(new Set());
 
-    let url = `/api/gestao/${equipeId}?competenciaId=${competenciaId}`;
-    if (equipe) {
-      const subFaixas = SUB_FAIXAS_MAP[equipe.tipo];
-      if (subFaixas) {
-        const sf = subFaixas[subFaixa] ?? subFaixas[0];
-        if (sf.diasMin !== undefined) url += `&diasMin=${sf.diasMin}`;
-        if (sf.diasMax !== undefined) url += `&diasMax=${sf.diasMax}`;
-      }
-      if (equipe.tipo === "FLASH" && baseVencFiltro) {
-        url += `&baseVencimento=${baseVencFiltro}`;
-      }
-    }
+    // 1 fetch por frente selecionada; dentro de cada frente, 1 fetch POR
+    // sub-faixa/base-de-vencimento marcada (a API só aceita 1 par diasMin/
+    // diasMax ou 1 baseVencimento por chamada) -- concatena os resultados da
+    // mesma frente entre si, depois anexa frenteId/frenteLabel e junta tudo.
+    const porFrente = equipeIds.map((id) => {
+      const equipe = equipes.find((e) => e.id === id);
+      const tipo = equipe?.tipo ?? "";
+      const label = equipe ? (FAIXA_LABEL[tipo] ?? equipe.nome) : id;
 
-    fetch(url)
-      .then((r) => r.json())
-      .then((data) => { setConsultores(Array.isArray(data) ? data : []); setCarregando(false); });
-  }, [equipeId, competenciaId, subFaixa, baseVencFiltro, equipes]);
+      let sufixos: string[] = [""]; // "" = sem filtro extra ("Todos")
+      const subFaixasDoTipo = SUB_FAIXAS_MAP[tipo];
+      if (subFaixasDoTipo) {
+        const indices = subFaixasPorFrente[id] ?? [];
+        if (indices.length > 0) {
+          sufixos = indices.map((i) => {
+            const sf = subFaixasDoTipo[i];
+            let s = "";
+            if (sf?.diasMin !== undefined) s += `&diasMin=${sf.diasMin}`;
+            if (sf?.diasMax !== undefined) s += `&diasMax=${sf.diasMax}`;
+            return s;
+          });
+        }
+      } else if (tipo === "FLASH") {
+        const bases = baseVencPorFrente[id] ?? [];
+        if (bases.length > 0) sufixos = bases.map((dia) => `&baseVencimento=${dia}`);
+      }
+
+      return Promise.all(
+        sufixos.map((sufixo) =>
+          fetch(`/api/gestao/${id}?competenciaId=${competenciaId}${sufixo}`).then((r) => r.json())
+        )
+      ).then((resultados) => {
+        const consolidados: Consultor[] = resultados.flatMap((data) => (Array.isArray(data) ? data : []));
+        return consolidados.map((c) => ({ ...c, frenteId: id, frenteLabel: label }));
+      });
+    });
+
+    Promise.all(porFrente).then((resultadosPorFrente) => {
+      setConsultores(resultadosPorFrente.flat());
+      setCarregando(false);
+    });
+  }, [equipeIds, competenciaId, equipes, subFaixasPorFrente, baseVencPorFrente]);
 
   useEffect(() => { carregarConsultores(); }, [carregarConsultores]);
 
@@ -170,7 +234,7 @@ export default function GestaoPage() {
         reg.inadimplencia += emp.inadimplencia;
         reg.recebido += emp.recebido;
         reg.recebidoAParte += emp.recebidoAParte;
-        reg.consultores.push({ id: c.id, nome: c.nome, contratos: emp.contratos, inadimplencia: emp.inadimplencia, recebido: emp.recebido, recebidoAParte: emp.recebidoAParte });
+        reg.consultores.push({ id: c.id, nome: c.nome, contratos: emp.contratos, inadimplencia: emp.inadimplencia, recebido: emp.recebido, recebidoAParte: emp.recebidoAParte, frenteId: c.frenteId });
       }
     }
     return Array.from(mapa.entries())
@@ -187,16 +251,15 @@ export default function GestaoPage() {
       .sort((a, b) => b.inadimplencia - a.inadimplencia);
   }, [consultores]);
 
-  const equipeSelecionada = equipes.find((e) => e.id === equipeId);
   const visiveis = equipes.filter((e) => FRENTES_VISIVEIS.includes(e.tipo));
+  const equipesSelecionadas = visiveis.filter((e) => equipeIds.includes(e.id));
+  const equipesComSubFaixa = equipesSelecionadas.filter((e) => SUB_FAIXAS_MAP[e.tipo]);
+  const equipesFlash = equipesSelecionadas.filter((e) => e.tipo === "FLASH");
   const filtrados = consultores.filter((c) => c.nome.toLowerCase().includes(busca.toLowerCase()));
 
   const totalInad = filtrados.reduce((s, c) => s + c.inadimplencia, 0);
   const totalRec  = filtrados.reduce((s, c) => s + c.recebido, 0);
   const totalAP   = filtrados.reduce((s, c) => s + c.recebidoAParte, 0);
-
-  const subFaixasAtivas = equipeSelecionada ? (SUB_FAIXAS_MAP[equipeSelecionada.tipo] ?? null) : null;
-  const corSubFaixa = equipeSelecionada ? (SUB_FAIXA_COR[equipeSelecionada.tipo] ?? "bg-gr-500/20 text-gr-300 border border-gr-500/30") : "";
 
   return (
     <div className="flex gap-0 h-[calc(100vh-4rem)] -m-6 overflow-hidden">
@@ -207,13 +270,13 @@ export default function GestaoPage() {
         </div>
         <nav className="flex-1 overflow-y-auto p-2 space-y-0.5">
           {visiveis.map((eq) => {
-            const ativo = eq.id === equipeId;
+            const ativo = equipeIds.includes(eq.id);
             const cor = FAIXA_COR[eq.tipo] ?? "text-slate-400 bg-surface-1 border-white/[0.08]";
             const qtd = eq.usuarios.filter((u) => u.perfil === "CONSULTOR").length;
             return (
               <button
                 key={eq.id}
-                onClick={() => { setEquipeId(eq.id); setSubFaixa(0); }}
+                onClick={() => toggleEquipeId(eq.id)}
                 className={`w-full text-left flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm transition-all ${
                   ativo
                     ? "bg-gr-500/15 text-white border border-gr-500/20 font-medium"
@@ -242,7 +305,11 @@ export default function GestaoPage() {
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06] flex-shrink-0">
           <div>
             <h1 className="text-lg font-bold text-white">
-              {equipeSelecionada ? (FAIXA_LABEL[equipeSelecionada.tipo] ?? equipeSelecionada.nome) : "Gestão de Carteiras"}
+              {equipesSelecionadas.length === 0
+                ? "Gestão de Carteiras"
+                : equipesSelecionadas.length === 1
+                ? (FAIXA_LABEL[equipesSelecionadas[0].tipo] ?? equipesSelecionadas[0].nome)
+                : equipesSelecionadas.map((e) => FAIXA_LABEL[e.tipo] ?? e.nome).join(" · ")}
             </h1>
             {!carregando && (
               <p className="text-slate-500 text-xs mt-0.5">
@@ -259,53 +326,78 @@ export default function GestaoPage() {
           </select>
         </div>
 
-        {/* Sub-faixas (CR 31-90 e PDD 91+) */}
-        {subFaixasAtivas && (
-          <div className="flex gap-1 px-6 pt-3 pb-0 flex-shrink-0">
-            {subFaixasAtivas.map((sf, i) => (
-              <button
-                key={i}
-                onClick={() => setSubFaixa(i)}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                  subFaixa === i
-                    ? corSubFaixa
-                    : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
-                }`}
-              >
-                {sf.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Sub-faixas (CR 31-90 e PDD 91+) -- 1 bloco por frente selecionada
+            desse tipo, cada uma com seu próprio recorte independente. */}
+        {equipesComSubFaixa.map((eq) => {
+          const subFaixas = SUB_FAIXAS_MAP[eq.tipo]!;
+          const selecionados = subFaixasPorFrente[eq.id] ?? [];
+          const cor = SUB_FAIXA_COR[eq.tipo] ?? "bg-gr-500/20 text-gr-300 border border-gr-500/30";
+          return (
+            <div key={eq.id} className="flex items-center gap-2 px-6 pt-3 pb-0 flex-shrink-0 flex-wrap">
+              {equipesComSubFaixa.length > 1 && (
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold flex-shrink-0">
+                  {FAIXA_LABEL[eq.tipo] ?? eq.nome}
+                </span>
+              )}
+              <div className="flex gap-1 flex-wrap">
+                {subFaixas.map((sf, i) => {
+                  const ativo = i === 0 ? selecionados.length === 0 : selecionados.includes(i);
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => toggleSubFaixa(eq.id, i)}
+                      className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                        ativo ? cor : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
+                      }`}
+                    >
+                      {sf.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
 
-        {/* Base de vencimento (Flash) */}
-        {equipeSelecionada?.tipo === "FLASH" && (
-          <div className="flex gap-1 px-6 pt-3 pb-0 flex-shrink-0">
-            <button
-              onClick={() => setBaseVencFiltro(null)}
-              className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                baseVencFiltro === null
-                  ? SUB_FAIXA_COR.FLASH
-                  : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
-              }`}
-            >
-              Todos
-            </button>
-            {BASES_VENCIMENTO_FLASH.map((dia) => (
-              <button
-                key={dia}
-                onClick={() => setBaseVencFiltro(dia)}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                  baseVencFiltro === dia
-                    ? SUB_FAIXA_COR.FLASH
-                    : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
-                }`}
-              >
-                Dia {String(dia).padStart(2, "0")}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Base de vencimento (Flash) -- 1 bloco por frente Flash selecionada
+            (na prática só existe 1 no sistema, mas trata genericamente). */}
+        {equipesFlash.map((eq) => {
+          const selecionados = baseVencPorFrente[eq.id] ?? [];
+          return (
+            <div key={eq.id} className="flex items-center gap-2 px-6 pt-3 pb-0 flex-shrink-0 flex-wrap">
+              {equipesFlash.length > 1 && (
+                <span className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold flex-shrink-0">
+                  {FAIXA_LABEL[eq.tipo] ?? eq.nome}
+                </span>
+              )}
+              <div className="flex gap-1 flex-wrap">
+                <button
+                  onClick={() => toggleBaseVenc(eq.id, null)}
+                  className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                    selecionados.length === 0
+                      ? SUB_FAIXA_COR.FLASH
+                      : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
+                  }`}
+                >
+                  Todos
+                </button>
+                {BASES_VENCIMENTO_FLASH.map((dia) => (
+                  <button
+                    key={dia}
+                    onClick={() => toggleBaseVenc(eq.id, dia)}
+                    className={`text-xs px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                      selecionados.includes(dia)
+                        ? SUB_FAIXA_COR.FLASH
+                        : "text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]"
+                    }`}
+                  >
+                    Dia {String(dia).padStart(2, "0")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
 
         {/* Cards de totais */}
         {!carregando && filtrados.length > 0 && (
@@ -392,7 +484,7 @@ export default function GestaoPage() {
                               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Parcela Mês</span>
                             </div>
                             {emp.consultores.map((cons) => (
-                              <div key={cons.id} className="grid grid-cols-[1fr_100px_160px_160px_160px] gap-2 px-11 py-2 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">
+                              <div key={`${cons.frenteId ?? ""}-${cons.id}`} className="grid grid-cols-[1fr_100px_160px_160px_160px] gap-2 px-11 py-2 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">
                                 <span className="text-slate-300 text-sm truncate">{cons.nome}</span>
                                 <span className="text-slate-400 text-sm tabular-nums text-right">{cons.contratos}</span>
                                 <span className="text-slate-400 text-sm tabular-nums text-right">{formatarMoeda(cons.inadimplencia)}</span>
@@ -438,7 +530,11 @@ export default function GestaoPage() {
           ) : filtrados.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-center">
               <AlertCircle size={28} className="text-slate-400 mb-2" />
-              <p className="text-slate-500 text-sm">Nenhum consultor com carteira nesta frente</p>
+              <p className="text-slate-500 text-sm">
+                {equipeIds.length === 0
+                  ? "Selecione ao menos uma frente"
+                  : "Nenhum consultor com carteira nesta frente"}
+              </p>
             </div>
           ) : (
             <>
@@ -453,11 +549,16 @@ export default function GestaoPage() {
 
               <div className="divide-y divide-white/[0.04]">
                 {filtrados.map((c) => {
-                  const expandido = expandidos.has(c.id);
+                  // Chave composta (frenteId+id) -- o mesmo consultor pode
+                  // aparecer 2x (uma por frente) quando 2+ frentes estão
+                  // selecionadas; usar só c.id colidia a key do React e o
+                  // Set de "expandido" entre as duas linhas da mesma pessoa.
+                  const linhaId = `${c.frenteId ?? ""}-${c.id}`;
+                  const expandido = expandidos.has(linhaId);
                   return (
-                    <div key={c.id}>
+                    <div key={linhaId}>
                       <button
-                        onClick={() => toggleExpandir(c.id)}
+                        onClick={() => toggleExpandir(linhaId)}
                         className="w-full grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-3.5 hover:bg-white/[0.02] transition-colors text-left"
                       >
                         <div className="flex items-center gap-2.5">
@@ -465,6 +566,13 @@ export default function GestaoPage() {
                             ? <ChevronDown size={15} className="text-gr-400 flex-shrink-0" />
                             : <ChevronRight size={15} className="text-slate-400 flex-shrink-0" />}
                           <span className="text-white font-medium text-sm">{c.nome}</span>
+                          {equipesSelecionadas.length > 1 && c.frenteLabel && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold flex-shrink-0 ${
+                              FAIXA_COR[equipes.find((e) => e.id === c.frenteId)?.tipo ?? ""] ?? "text-slate-400 bg-surface-1 border-white/[0.08]"
+                            }`}>
+                              {c.frenteLabel}
+                            </span>
+                          )}
                           {c.emFerias && (
                             <span className="flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
                               <Palmtree size={9} /> Férias

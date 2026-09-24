@@ -116,6 +116,37 @@ const SITUACAO_LABEL_EXTRA: Record<string, string> = {
   INADIMPLENCIA_EQUIVOCADA: "Inad. equivocada",
 };
 
+// Opções das pills multi-seleção dos filtros de "Minha Carteira" -- os 3
+// valores reais do enum StatusRecuperacao (o pseudo-valor antigo
+// "INADIMPLENTE_TODOS" foi descartado: marcar Rec. Parcial + Inadimplente
+// juntos já reproduz o catch-all antigo).
+const STATUS_RECUP_OPCOES = [
+  { valor: "RECUPERADO_INTEGRALMENTE", label: "Recebido" },
+  { valor: "RECUPERACAO_PARCIAL", label: "Rec. Parcial" },
+  { valor: "INADIMPLENTE", label: "Inadimplente" },
+];
+
+// Valores do enum StatusContato (modelo Contato) -- o filtro de "Situação"
+// busca contratos com ao menos um contato registrado com esse status.
+const SITUACAO_CONTATO_OPCOES = [
+  { valor: "PROMESSA_PAGAMENTO", label: "Promessa de pagamento" },
+  { valor: "LINK_ENVIADO", label: "Link enviado" },
+  { valor: "AGUARDANDO_RETORNO", label: "Aguardando retorno" },
+  { valor: "LIGAR_DEPOIS", label: "Ligar depois" },
+];
+
+const BASE_VENCIMENTO_OPCOES = [
+  { valor: "5", label: "Dia 05" },
+  { valor: "10", label: "Dia 10" },
+  { valor: "15", label: "Dia 15" },
+  { valor: "20", label: "Dia 20" },
+  { valor: "25", label: "Dia 25" },
+];
+
+function toggleEmArray(arr: string[], valor: string): string[] {
+  return arr.includes(valor) ? arr.filter((v) => v !== valor) : [...arr, valor];
+}
+
 function getFaixa(dias: number | null): { label: string; cor: string } {
   if (!dias || dias <= 0) return { label: "FLASH", cor: "text-sky-400" };
   if (dias <= 30) return { label: "CRA — 1 a 30 dias", cor: "text-sky-400" };
@@ -222,10 +253,10 @@ export default function CarteiraPage() {
   const [exportando, setExportando] = useState(false);
   const [busca, setBusca] = usePersistedState("busca", "");
   const [sort, setSort] = usePersistedState("sort", "diasAtraso");
-  const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string | null>("empresaFiltro", null);
-  const [statusRecupFiltro, setStatusRecupFiltro] = usePersistedState<string | null>("statusRecupFiltro", null);
-  const [situacaoFiltro, setSituacaoFiltro] = usePersistedState<string | null>("situacaoFiltro", null);
-  const [baseVencimentoFiltro, setBaseVencimentoFiltro] = usePersistedState<string | null>("baseVencimentoFiltro", null);
+  const [empresaFiltro, setEmpresaFiltro] = usePersistedState<string[]>("empresaFiltro", []);
+  const [statusRecupFiltro, setStatusRecupFiltro] = usePersistedState<string[]>("statusRecupFiltro", []);
+  const [situacaoFiltro, setSituacaoFiltro] = usePersistedState<string[]>("situacaoFiltro", []);
+  const [baseVencimentoFiltro, setBaseVencimentoFiltro] = usePersistedState<string[]>("baseVencimentoFiltro", []);
   const [situacaoPopover, setSituacaoPopover] = useState<string | null>(null);
   const [salvandoSituacao, setSalvandoSituacao] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -304,7 +335,7 @@ export default function CarteiraPage() {
   // mais") -- assim a busca e os filtros (o de empresa é client-side, ver
   // `filtrados` abaixo) sempre enxergam a carteira inteira, não só o que já
   // tinha sido carregado até então. Mesmo ajuste já feito em Clientes.
-  async function carregarTodos(cId: string, buscaParam?: string, sortParam?: string, statusRecupParam?: string | null, situacaoParam?: string | null, baseVencimentoParam?: string | null) {
+  async function carregarTodos(cId: string, buscaParam?: string, sortParam?: string, statusRecupParam?: string[], situacaoParam?: string[], baseVencimentoParam?: string[]) {
     const minhaSeq = ++carregarSeqRef.current;
     setCarregando(true);
     const b = buscaParam ?? busca;
@@ -320,9 +351,9 @@ export default function CarteiraPage() {
     while (true) {
       const params = new URLSearchParams({ competenciaId: cId, page: String(pg), sort: s });
       if (b) params.set("busca", b);
-      if (sr) params.set("statusRecuperacao", sr);
-      if (sit) params.set("situacao", sit);
-      if (bv) params.set("baseVencimento", bv);
+      if (sr.length > 0) params.set("statusRecuperacao", sr.join(","));
+      if (sit.length > 0) params.set("situacao", sit.join(","));
+      if (bv.length > 0) params.set("baseVencimento", bv.join(","));
       const data = await fetch(`/api/carteira?${params}`).then((r) => r.json()).catch(() => ({}));
       if (carregarSeqRef.current !== minhaSeq) return; // um carregamento mais novo já assumiu -- descarta este
       const contratos: ItemCarteira[] = Array.isArray(data.contratos) ? data.contratos : [];
@@ -822,7 +853,7 @@ export default function CarteiraPage() {
 
   // Apenas empresa permanece client-side (status/situação são server-side)
   const filtrados = carteira.filter((item) =>
-    !empresaFiltro || item.contrato.empresa.nome === empresaFiltro
+    empresaFiltro.length === 0 || empresaFiltro.includes(item.contrato.empresa.nome)
   );
 
   // Agrupar por faixa de inadimplência
@@ -891,40 +922,55 @@ export default function CarteiraPage() {
             className="w-full bg-surface-2 border border-white/[0.06] rounded-xl pl-10 pr-4 py-2.5 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
           />
         </div>
-        <select
-          value={statusRecupFiltro ?? ""}
-          onChange={(e) => setStatusRecupFiltro(e.target.value || null)}
-          className="bg-surface-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
-        >
-          <option value="">Recuperação — todas</option>
-          <option value="RECUPERADO_INTEGRALMENTE">Recebido</option>
-          <option value="RECUPERACAO_PARCIAL">Rec. Parcial</option>
-          <option value="INADIMPLENTE_TODOS">Inadimplente</option>
-        </select>
-        <select
-          value={situacaoFiltro ?? ""}
-          onChange={(e) => setSituacaoFiltro(e.target.value || null)}
-          className="bg-surface-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
-        >
-          <option value="">Situação — todas</option>
-          <option value="PROMESSA_PAGAMENTO">Promessa de pagamento</option>
-          <option value="LINK_ENVIADO">Link enviado</option>
-          <option value="AGUARDANDO_RETORNO">Aguardando retorno</option>
-          <option value="LIGAR_DEPOIS">Ligar depois</option>
-        </select>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Recuperação</span>
+          <div className="flex flex-wrap gap-1.5">
+            {STATUS_RECUP_OPCOES.map((op) => (
+              <button
+                key={op.valor}
+                onClick={() => setStatusRecupFiltro(toggleEmArray(statusRecupFiltro, op.valor))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  statusRecupFiltro.includes(op.valor) ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                {op.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Situação</span>
+          <div className="flex flex-wrap gap-1.5">
+            {SITUACAO_CONTATO_OPCOES.map((op) => (
+              <button
+                key={op.valor}
+                onClick={() => setSituacaoFiltro(toggleEmArray(situacaoFiltro, op.valor))}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  situacaoFiltro.includes(op.valor) ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                }`}
+              >
+                {op.label}
+              </button>
+            ))}
+          </div>
+        </div>
         {mostrarFiltroBaseVencimento && (
-          <select
-            value={baseVencimentoFiltro ?? ""}
-            onChange={(e) => setBaseVencimentoFiltro(e.target.value || null)}
-            className="bg-surface-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
-          >
-            <option value="">Vencimento Flash — todos</option>
-            <option value="5">Dia 05</option>
-            <option value="10">Dia 10</option>
-            <option value="15">Dia 15</option>
-            <option value="20">Dia 20</option>
-            <option value="25">Dia 25</option>
-          </select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Vencimento Flash</span>
+            <div className="flex flex-wrap gap-1.5">
+              {BASE_VENCIMENTO_OPCOES.map((op) => (
+                <button
+                  key={op.valor}
+                  onClick={() => setBaseVencimentoFiltro(toggleEmArray(baseVencimentoFiltro, op.valor))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    baseVencimentoFiltro.includes(op.valor) ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                  }`}
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
         <div className="flex items-center gap-2">
           <span className="text-xs text-slate-500 flex-shrink-0 whitespace-nowrap">Ordenar por</span>
@@ -938,14 +984,14 @@ export default function CarteiraPage() {
             <option value="parcelasAberto">Valor em aberto</option>
           </select>
         </div>
-        {(busca || statusRecupFiltro || situacaoFiltro || baseVencimentoFiltro || empresaFiltro) && (
+        {(busca || statusRecupFiltro.length > 0 || situacaoFiltro.length > 0 || baseVencimentoFiltro.length > 0 || empresaFiltro.length > 0) && (
           <button
             onClick={() => {
               setBusca("");
-              setStatusRecupFiltro(null);
-              setSituacaoFiltro(null);
-              setBaseVencimentoFiltro(null);
-              setEmpresaFiltro(null);
+              setStatusRecupFiltro([]);
+              setSituacaoFiltro([]);
+              setBaseVencimentoFiltro([]);
+              setEmpresaFiltro([]);
             }}
             className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-white/[0.05] transition-colors"
           >
@@ -959,9 +1005,9 @@ export default function CarteiraPage() {
         {empresas.length > 0 && (
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setEmpresaFiltro(null)}
+              onClick={() => setEmpresaFiltro([])}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                !empresaFiltro ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                empresaFiltro.length === 0 ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
               }`}
             >
               Todas
@@ -969,9 +1015,9 @@ export default function CarteiraPage() {
             {empresas.map((emp) => (
               <button
                 key={emp}
-                onClick={() => setEmpresaFiltro(emp === empresaFiltro ? null : emp)}
+                onClick={() => setEmpresaFiltro(toggleEmArray(empresaFiltro, emp))}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  empresaFiltro === emp ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
+                  empresaFiltro.includes(emp) ? "bg-gr-500 text-white" : "bg-white/[0.07] text-slate-400 hover:text-white hover:bg-white/[0.04]"
                 }`}
               >
                 {emp}
