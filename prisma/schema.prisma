@@ -298,6 +298,7 @@ model Parcela {
   paga             Boolean   @default(false)
   equivocada       Boolean   @default(false)
   remanejada       Boolean   @default(false)
+  cadastradaManualmente Boolean @default(false) // criada via "Cadastrar novo cliente" (fora da base oficial) -- selo discreto na ficha
   criadoEm         DateTime  @default(now())
   atualizadoEm     DateTime  @updatedAt
 

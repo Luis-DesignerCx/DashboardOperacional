@@ -192,6 +192,7 @@ async function processarNovoCliente(req: NextRequest, session: any) {
             diasAtraso: p.diasAtraso,
             valorParcela: new Decimal(p.valor.toFixed(2)),
             valorTotalAberto: new Decimal(p.valor.toFixed(2)),
+            cadastradaManualmente: true,
           },
         })
       ),
@@ -265,6 +266,7 @@ async function processarNovoCliente(req: NextRequest, session: any) {
           diasAtraso: p.diasAtraso,
           valorParcela: new Decimal(p.valor.toFixed(2)),
           valorTotalAberto: new Decimal(p.valor.toFixed(2)),
+          cadastradaManualmente: true,
         },
       })
     ),

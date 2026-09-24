@@ -414,6 +414,46 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ── 3.5 Preserva parcelas com recebimento vinculado ──────────────────────
+    // Um Recebimento aponta pra parcela(s) via "parcelasIds" (array solto, sem
+    // FK/integridade no banco). Se a reimportação apaga essa parcela (passo 7
+    // abaixo), o Recebimento fica órfão -- ela some da ficha do cliente mesmo
+    // já paga (achado real: contratos órfãos recorrentes, inclusive no dia da
+    // correção). Aqui identificamos quais parcelas atuais dos contratos
+    // existentes têm recebimento vinculado, pra excluí-las do deleteMany e não
+    // recriar colidindo o "numero" (@@unique([contratoId, numero])) -- as
+    // parcelas novas desse contrato são renumeradas a partir do maior número
+    // já protegido.
+    const idsExistentesParaProteger = [...existingMap.values()].map((c) => c.id);
+    const protegidosPorContrato = new Map<string, { ids: Set<string>; maxNumero: number }>();
+    if (idsExistentesParaProteger.length > 0) {
+      const [parcelasAtuais, recebimentosVinculados] = await Promise.all([
+        prisma.parcela.findMany({
+          where: { contratoId: { in: idsExistentesParaProteger } },
+          select: { id: true, contratoId: true, numero: true },
+        }),
+        prisma.recebimento.findMany({
+          where: { contratoId: { in: idsExistentesParaProteger } },
+          select: { contratoId: true, parcelasIds: true },
+        }),
+      ]);
+      const vinculadasPorContrato = new Map<string, Set<string>>();
+      for (const r of recebimentosVinculados) {
+        if (r.parcelasIds.length === 0) continue;
+        const set = vinculadasPorContrato.get(r.contratoId) ?? new Set<string>();
+        for (const pid of r.parcelasIds) set.add(pid);
+        vinculadasPorContrato.set(r.contratoId, set);
+      }
+      for (const p of parcelasAtuais) {
+        const vinculadas = vinculadasPorContrato.get(p.contratoId);
+        if (!vinculadas?.has(p.id)) continue;
+        const atual = protegidosPorContrato.get(p.contratoId) ?? { ids: new Set<string>(), maxNumero: 0 };
+        atual.ids.add(p.id);
+        if (p.numero > atual.maxNumero) atual.maxNumero = p.numero;
+        protegidosPorContrato.set(p.contratoId, atual);
+      }
+    }
+
     // ── 4. Prepara dados em memória ──────────────────────────────────────────
     type ClienteRow  = { id: string; nome: string; telefones: string | null; emails: string | null };
     type ContratoRow = {
@@ -476,6 +516,9 @@ export async function POST(req: NextRequest) {
 
         if (rowsFiltradas.length === 0) { filtradosVazios++; continue; }
 
+        const existing = existingMap.get(num);
+        const offsetNumero = existing ? (protegidosPorContrato.get(existing.id)?.maxNumero ?? 0) : 0;
+
         let maiorDiasAtraso  = 0;
         let valorTotalAberto = 0;
         const parcelasTemp: Omit<ParcelaRow, "contratoId">[] = [];
@@ -487,7 +530,7 @@ export async function POST(req: NextRequest) {
           valorTotalAberto += valor;
           parcelasTemp.push({
             id:             randomUUID(),
-            numero:         idx + 1,
+            numero:         idx + 1 + offsetNumero,
             dataVencimento: parseDateExcel(row[colunas.dataVencimento]) ?? new Date(),
             diasAtraso:     dias,
             origem:         String(row[colunas.origem] ?? "").trim() || null,
@@ -496,8 +539,6 @@ export async function POST(req: NextRequest) {
             valorTotalAberto: new Decimal(valor.toFixed(2)),
           });
         });
-
-        const existing = existingMap.get(num);
 
         if (existing) {
           // ── Contrato já existe: atualiza ─────────────────────────────────
@@ -617,7 +658,13 @@ export async function POST(req: NextRequest) {
       ...updateOps.map((op) => op.contratoId),
       ...newContratos.map((c) => c.id),
     ];
-    await prisma.parcela.deleteMany({ where: { contratoId: { in: allContratoIds } } });
+    const idsProtegidos = [...protegidosPorContrato.values()].flatMap((v) => [...v.ids]);
+    await prisma.parcela.deleteMany({
+      where: {
+        contratoId: { in: allContratoIds },
+        ...(idsProtegidos.length > 0 && { id: { notIn: idsProtegidos } }),
+      },
+    });
     for (const ck of chunks(allParcelas, 3000)) {
       await prisma.parcela.createMany({ data: ck });
     }
