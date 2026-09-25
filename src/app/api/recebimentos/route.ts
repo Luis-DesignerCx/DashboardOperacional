@@ -32,12 +32,31 @@ export async function PATCH(req: NextRequest) {
   });
   if (!recAtual) return NextResponse.json({ erro: "Recebimento não encontrado" }, { status: 404 });
 
+  const isDono = recAtual.consultorId === session.user.id;
   if (!isGestorAdmin) {
-    if (recAtual.consultorId !== session.user.id) {
+    if (!isDono) {
       return NextResponse.json({ erro: "Sem permissão para editar este recebimento" }, { status: 403 });
     }
-    if (valor === undefined) {
-      return NextResponse.json({ erro: "Informe o valor a corrigir" }, { status: 400 });
+    if (valor === undefined && formaPagamento === undefined && dataRecebimento === undefined) {
+      return NextResponse.json({ erro: "Informe ao menos um campo para corrigir" }, { status: 400 });
+    }
+
+    // Consultor não edita recebimento de competência já fechada -- o ciclo
+    // fechado pelo gestor é pra travar lançamento/edição, mas essa tela
+    // nunca tinha essa checagem (achado real, 2026-09-25: Luis confirmou que
+    // a intenção sempre existiu, só nunca foi implementada aqui).
+    const competenciaDoRecebimento = await prisma.competencia.findFirst({
+      where: {
+        mes: recAtual.dataRecebimento.getUTCMonth() + 1,
+        ano: recAtual.dataRecebimento.getUTCFullYear(),
+      },
+      select: { fechada: true },
+    });
+    if (competenciaDoRecebimento?.fechada) {
+      return NextResponse.json(
+        { erro: "Competência já fechada -- só gestor/admin pode editar este recebimento." },
+        { status: 403 }
+      );
     }
   }
 
@@ -55,29 +74,55 @@ export async function PATCH(req: NextRequest) {
   if (valor !== undefined) {
     data.valor = new Decimal(parsearValorMonetario(valor));
   }
+  // Meio e data de pagamento: dono do recebimento ou gestor/admin editam --
+  // valorAParte (recebimento fora da inadimplência) continua só gestor/admin.
+  if (isGestorAdmin || isDono) {
+    if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
+    if (dataRecebimento) data.dataRecebimento = parseDataLocalBrasil(dataRecebimento);
+  }
   if (isGestorAdmin) {
     if (valorAParte !== undefined) {
       data.valorAParte = valorAParte != null && Number(valorAParte) > 0
         ? new Decimal(parsearValorMonetario(valorAParte))
         : null;
     }
-    if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
-    if (dataRecebimento) data.dataRecebimento = parseDataLocalBrasil(dataRecebimento);
   }
 
   const rec = await prisma.recebimento.update({ where: { id }, data });
 
-  // Auditoria da edição -- antes não ficava nenhum rastro de quem mudou
-  // valor/forma/data de um recebimento já registrado (achado real da
-  // auditoria de segurança, 2026-09-15).
+  // Auditoria da edição -- registra de fato o campo mudado (antes só
+  // gravava valor, mesmo quando quem mudava era forma/data/valorAParte).
+  const camposAuditoria: string[] = [];
+  const antesAuditoria: string[] = [];
+  const depoisAuditoria: string[] = [];
+  if (data.valor !== undefined) {
+    camposAuditoria.push("valor");
+    antesAuditoria.push(String(recAtual.valor ?? ""));
+    depoisAuditoria.push(String(data.valor));
+  }
+  if (data.formaPagamento !== undefined) {
+    camposAuditoria.push("formaPagamento");
+    antesAuditoria.push(String(recAtual.formaPagamento ?? ""));
+    depoisAuditoria.push(String(data.formaPagamento));
+  }
+  if (data.dataRecebimento !== undefined) {
+    camposAuditoria.push("dataRecebimento");
+    antesAuditoria.push(recAtual.dataRecebimento.toISOString());
+    depoisAuditoria.push(data.dataRecebimento.toISOString());
+  }
+  if (data.valorAParte !== undefined) {
+    camposAuditoria.push("valorAParte");
+    antesAuditoria.push(String(recAtual.valorAParte ?? ""));
+    depoisAuditoria.push(String(data.valorAParte ?? ""));
+  }
   prisma.auditoria.create({
     data: {
       usuarioId: session.user.id,
       tabela: "recebimentos",
       registroId: id,
-      campo: Object.keys(data).join(","),
-      valorAnterior: String(recAtual.valor ?? ""),
-      valorNovo: valor !== undefined ? String(data.valor) : "",
+      campo: camposAuditoria.join(","),
+      valorAnterior: antesAuditoria.join(" | "),
+      valorNovo: depoisAuditoria.join(" | "),
       acao: "UPDATE",
     },
   }).catch(() => {});

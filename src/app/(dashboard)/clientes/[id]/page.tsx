@@ -111,6 +111,9 @@ export default function ClienteDetalhe() {
   const [parcelaForm, setParcelaForm] = useState({ valorParcela: "", valorTotalAberto: "", diasAtraso: "", dataVencimento: "", paga: false });
   const [editandoRecebimento, setEditandoRecebimento] = useState<string | null>(null);
   const [recValor, setRecValor] = useState("");
+  const [recFormaPagamento, setRecFormaPagamento] = useState("");
+  const [recDataRecebimento, setRecDataRecebimento] = useState("");
+  const [recEditErro, setRecEditErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
   // Modal Inadimplência equivocada
@@ -273,12 +276,19 @@ export default function ClienteDetalhe() {
 
   async function salvarRecebimento(recId: string) {
     setSalvando(true);
+    setRecEditErro("");
     try {
       const res = await fetch(`/api/recebimentos`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: recId, valor: recValor }),
+        body: JSON.stringify({
+          id: recId,
+          valor: recValor,
+          formaPagamento: recFormaPagamento,
+          dataRecebimento: recDataRecebimento,
+        }),
       });
+      const d = await res.json().catch(() => null);
       if (res.ok) {
         const valorNum = parsearValorMonetario(recValor);
         setCliente(prev => {
@@ -287,12 +297,21 @@ export default function ClienteDetalhe() {
             ...prev,
             contratos: prev.contratos.map(c => ({
               ...c,
-              recebimentos: c.recebimentos.map(r => r.id !== recId ? r : { ...r, valor: valorNum }),
+              recebimentos: c.recebimentos.map(r => r.id !== recId ? r : {
+                ...r,
+                valor: valorNum,
+                formaPagamento: recFormaPagamento,
+                dataRecebimento: recDataRecebimento + "T03:00:00.000Z",
+              }),
             })),
           };
         });
         setEditandoRecebimento(null);
+      } else {
+        setRecEditErro(d?.erro || "Erro ao salvar.");
       }
+    } catch {
+      setRecEditErro("Erro de conexão.");
     } finally {
       setSalvando(false);
     }
@@ -815,11 +834,29 @@ export default function ClienteDetalhe() {
                             value={recValor}
                             onChange={e => setRecValor(e.target.value)}
                           />
+                          <label className="text-slate-500 text-xs block">Meio de pagamento</label>
+                          <select
+                            className={INPUT}
+                            value={recFormaPagamento}
+                            onChange={e => setRecFormaPagamento(e.target.value)}
+                          >
+                            <option value="PIX">PIX</option>
+                            <option value="CARTAO_CREDITO">Cartão de Crédito</option>
+                            <option value="BOLETO">Boleto</option>
+                          </select>
+                          <label className="text-slate-500 text-xs block">Data do pagamento</label>
+                          <input
+                            type="date"
+                            className={INPUT}
+                            value={recDataRecebimento}
+                            onChange={e => setRecDataRecebimento(e.target.value)}
+                          />
+                          {recEditErro && <p className="text-red-400 text-xs">{recEditErro}</p>}
                           <div className="flex gap-2">
                             <button className={BTN_SAVE} onClick={() => salvarRecebimento(r.id)} disabled={salvando}>
                               <Check size={12} /> Salvar
                             </button>
-                            <button className={BTN_CANCEL} onClick={() => setEditandoRecebimento(null)}>
+                            <button className={BTN_CANCEL} onClick={() => { setEditandoRecebimento(null); setRecEditErro(""); }}>
                               <X size={12} /> Cancelar
                             </button>
                           </div>
@@ -860,6 +897,9 @@ export default function ClienteDetalhe() {
                               <button
                                 onClick={() => {
                                   setRecValor(String(Number(r.valor).toFixed(2)).replace(".", ","));
+                                  setRecFormaPagamento(r.formaPagamento);
+                                  setRecDataRecebimento(new Date(r.dataRecebimento).toISOString().slice(0, 10));
+                                  setRecEditErro("");
                                   setEditandoRecebimento(r.id);
                                 }}
                                 className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.03] transition-colors"
