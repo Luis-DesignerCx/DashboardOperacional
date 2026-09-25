@@ -23,6 +23,26 @@ export function parseDataLocalBrasil(data: string): Date {
   return new Date(`${data}T03:00:00.000Z`);
 }
 
+// Meia-noite de hoje no fuso do Brasil, na mesma representação (03:00 UTC)
+// que parseDataLocalBrasil usa -- permite comparar direto sem conversão extra.
+export function hojeBrasil(): Date {
+  const brasil = new Date(Date.now() - 3 * 3600 * 1000);
+  return new Date(Date.UTC(brasil.getUTCFullYear(), brasil.getUTCMonth(), brasil.getUTCDate(), 3, 0, 0, 0));
+}
+
+// Recebimento é pra dinheiro que JÁ entrou -- data futura significa que o
+// consultor está registrando uma expectativa como se fosse confirmado (a
+// parcela já vira "paga" e o contrato pode fechar como recuperado sem o
+// pagamento ter de fato acontecido). Achado real, 2026-09-25: recebimento
+// lançado dias antes da data informada, cliente não paga e o sistema segue
+// mostrando como recebido -- pra isso existe Promessa de Pagamento.
+export function erroSeDataFutura(dataRecebimento: Date): string | null {
+  if (dataRecebimento.getTime() > hojeBrasil().getTime()) {
+    return "Não é possível registrar um Recebimento com data futura -- o pagamento ainda não aconteceu. Use Promessa de Pagamento para agendar a expectativa.";
+  }
+  return null;
+}
+
 // Interpreta valor monetário digitado em qualquer formato comum -- vírgula
 // decimal (1234,56), ponto decimal (1234.56), ou os dois juntos como
 // separador de milhar + decimal (1.234,56). Antes, telas diferentes faziam

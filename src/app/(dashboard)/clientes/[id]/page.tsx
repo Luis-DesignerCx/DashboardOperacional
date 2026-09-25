@@ -113,6 +113,7 @@ export default function ClienteDetalhe() {
   const [recValor, setRecValor] = useState("");
   const [recFormaPagamento, setRecFormaPagamento] = useState("");
   const [recDataRecebimento, setRecDataRecebimento] = useState("");
+  const [recValorAplicavel, setRecValorAplicavel] = useState(true);
   const [recEditErro, setRecEditErro] = useState("");
   const [salvando, setSalvando] = useState(false);
 
@@ -283,14 +284,13 @@ export default function ClienteDetalhe() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: recId,
-          valor: recValor,
+          ...(recValorAplicavel ? { valor: recValor } : {}),
           formaPagamento: recFormaPagamento,
           dataRecebimento: recDataRecebimento,
         }),
       });
       const d = await res.json().catch(() => null);
       if (res.ok) {
-        const valorNum = parsearValorMonetario(recValor);
         setCliente(prev => {
           if (!prev) return null;
           return {
@@ -299,7 +299,7 @@ export default function ClienteDetalhe() {
               ...c,
               recebimentos: c.recebimentos.map(r => r.id !== recId ? r : {
                 ...r,
-                valor: valorNum,
+                ...(recValorAplicavel ? { valor: parsearValorMonetario(recValor) } : {}),
                 formaPagamento: recFormaPagamento,
                 dataRecebimento: recDataRecebimento + "T03:00:00.000Z",
               }),
@@ -827,13 +827,21 @@ export default function ClienteDetalhe() {
                     <div key={r.id}>
                       {editandoRecebimento === r.id ? (
                         <div className="py-2 border-b border-white/[0.06]/50 space-y-2">
-                          <label className="text-slate-500 text-xs block">Valor recebido (R$)</label>
-                          <input
-                            className={INPUT}
-                            placeholder="Ex: 150,00"
-                            value={recValor}
-                            onChange={e => setRecValor(e.target.value)}
-                          />
+                          {recValorAplicavel ? (
+                            <>
+                              <label className="text-slate-500 text-xs block">Valor recebido (R$)</label>
+                              <input
+                                className={INPUT}
+                                placeholder="Ex: 150,00"
+                                value={recValor}
+                                onChange={e => setRecValor(e.target.value)}
+                              />
+                            </>
+                          ) : (
+                            <p className="text-slate-500 text-xs">
+                              Recebimento de Parcela Mês — sem valor de inadimplência recuperado, só meio e data de pagamento são editáveis aqui.
+                            </p>
+                          )}
                           <label className="text-slate-500 text-xs block">Meio de pagamento</label>
                           <select
                             className={INPUT}
@@ -899,6 +907,11 @@ export default function ClienteDetalhe() {
                                   setRecValor(String(Number(r.valor).toFixed(2)).replace(".", ","));
                                   setRecFormaPagamento(r.formaPagamento);
                                   setRecDataRecebimento(new Date(r.dataRecebimento).toISOString().slice(0, 10));
+                                  // Recebimento "Parcela Mês" puro (valor sempre 0 na criação) não
+                                  // deve expor o campo de valor pra edição -- foi exatamente
+                                  // digitar um valor aqui, num campo que devia ficar 0, que gerou
+                                  // recebido em dobro na ficha da Estela Reginato, 25/09/2026.
+                                  setRecValorAplicavel(Number(r.valor) > 0);
                                   setRecEditErro("");
                                   setEditandoRecebimento(r.id);
                                 }}

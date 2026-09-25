@@ -4,7 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { FormaPagamento } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
-import { parsearValorMonetario, parseDataLocalBrasil } from "@/lib/utils";
+import { parsearValorMonetario, parseDataLocalBrasil, erroSeDataFutura } from "@/lib/utils";
 import { getEquipesGerenciadas } from "@/lib/frentes";
 
 export async function PATCH(req: NextRequest) {
@@ -39,6 +39,19 @@ export async function PATCH(req: NextRequest) {
     }
     if (valor === undefined && formaPagamento === undefined && dataRecebimento === undefined) {
       return NextResponse.json({ erro: "Informe ao menos um campo para corrigir" }, { status: 400 });
+    }
+
+    // Recebimento "Parcela Mês" puro (valor sempre 0 na criação, dinheiro
+    // inteiro em valorAParte) não pode ganhar um valor de inadimplência
+    // recuperado por edição do consultor -- foi exatamente isso que dobrou o
+    // Total Recebido da Estela Reginato (contrato T-My Explorer-000064,
+    // 25/09/2026): consultora foi corrigir a data e preencheu também o campo
+    // de valor, que devia ter ficado 0.
+    if (valor !== undefined && Number(recAtual.valor) === 0 && Number(recAtual.valorAParte ?? 0) > 0) {
+      return NextResponse.json(
+        { erro: "Este recebimento é só Parcela Mês -- não é possível adicionar valor de inadimplência recuperado aqui." },
+        { status: 400 }
+      );
     }
 
     // Consultor não edita recebimento de competência já fechada -- o ciclo
@@ -78,7 +91,12 @@ export async function PATCH(req: NextRequest) {
   // valorAParte (recebimento fora da inadimplência) continua só gestor/admin.
   if (isGestorAdmin || isDono) {
     if (formaPagamento) data.formaPagamento = formaPagamento as FormaPagamento;
-    if (dataRecebimento) data.dataRecebimento = parseDataLocalBrasil(dataRecebimento);
+    if (dataRecebimento) {
+      const dataParsed = parseDataLocalBrasil(dataRecebimento);
+      const erroData = erroSeDataFutura(dataParsed);
+      if (erroData) return NextResponse.json({ erro: erroData }, { status: 400 });
+      data.dataRecebimento = dataParsed;
+    }
   }
   if (isGestorAdmin) {
     if (valorAParte !== undefined) {
@@ -254,6 +272,12 @@ async function processarRecebimento(req: NextRequest, session: any) {
     return NextResponse.json({ erro: "Campos obrigatórios: contratoId, valor, data, forma de pagamento" }, { status: 400 });
   }
 
+  const dataRecebimentoParsed = parseDataLocalBrasil(dataRecebimento);
+  const erroDataFutura = erroSeDataFutura(dataRecebimentoParsed);
+  if (erroDataFutura) {
+    return NextResponse.json({ erro: erroDataFutura }, { status: 400 });
+  }
+
   // Pelo menos 1 parcela precisa ser marcada (recebida ou remanejada) --
   // sem isso, o valor entrava como recebido mas nenhuma Parcela virava
   // paga:true, então o contrato ficava preso em "Recuperação Parcial" (ou
@@ -343,7 +367,7 @@ async function processarRecebimento(req: NextRequest, session: any) {
       consultorId: session.user.id,
       valor: valorDecimal,
       valorAParte: valorAParteDecimal,
-      dataRecebimento: parseDataLocalBrasil(dataRecebimento),
+      dataRecebimento: dataRecebimentoParsed,
       formaPagamento: formaPagamento as FormaPagamento,
       justificativa: observacao || "Recebimento registrado pelo consultor",
       parcelasIds: Array.isArray(parcelasIds) ? parcelasIds : [],

@@ -6,7 +6,7 @@ import { randomUUID } from "crypto";
 import { Decimal } from "@prisma/client/runtime/library";
 import { FormaPagamento } from "@prisma/client";
 import { primeiroDiaUtilDoMes } from "@/utils/dias-uteis";
-import { parsearValorMonetario, parseDataLocalBrasil } from "@/lib/utils";
+import { parsearValorMonetario, parseDataLocalBrasil, erroSeDataFutura } from "@/lib/utils";
 
 interface ParcelaInput {
   dataVencimento: string; // YYYY-MM-DD
@@ -54,6 +54,10 @@ async function processarNovoCliente(req: NextRequest, session: any) {
     }
     if (!dataRecebimento) {
       return NextResponse.json({ erro: "Data do recebimento obrigatória" }, { status: 400 });
+    }
+    const erroDataFutura = erroSeDataFutura(parseDataLocalBrasil(dataRecebimento));
+    if (erroDataFutura) {
+      return NextResponse.json({ erro: erroDataFutura }, { status: 400 });
     }
 
     const parcelasAParte: ParcelaInput[] = Array.isArray(parcelas) && parcelas.length > 0 ? parcelas : [];
