@@ -136,6 +136,7 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
           },
           select: {
             consultorId: true,
+            contratoId: true,
             valor: true,
             valorAParte: true,
             contrato: { select: { empresaId: true } },
@@ -143,6 +144,28 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
         })
       : Promise.resolve([]),
   ]);
+
+  // Meta FINANCEIRA da competência -- pra "% da Meta" por consultor, mesma
+  // resolução usada em /api/dashboard/distribuicao (individual > equipe,
+  // percentual sobre a Carteira Total individual ou valor fixo).
+  const metas = consultorIds.length > 0
+    ? await prisma.meta.findMany({
+        where: {
+          competenciaId,
+          tipo: "FINANCEIRA",
+          OR: [{ consultorId: { in: consultorIds } }, { consultorId: null, equipeId }],
+        },
+        select: { consultorId: true, percentualAlvo: true, valorAlvo: true },
+      })
+    : [];
+  const metaIndividualMap = new Map(metas.filter((m) => m.consultorId).map((m) => [m.consultorId as string, m]));
+  const metaEquipe = metas.find((m) => !m.consultorId) ?? null;
+  function calcularMetaAlvo(saldoAberto: number, consultorId: string): number | null {
+    const meta = metaIndividualMap.get(consultorId) ?? metaEquipe;
+    if (!meta) return null;
+    if (meta.percentualAlvo && saldoAberto > 0) return (Number(meta.percentualAlvo) / 100) * saldoAberto;
+    return meta.valorAlvo ? Number(meta.valorAlvo) : null;
+  }
 
   const empresaNames = new Map<string, string>();
 
@@ -157,14 +180,15 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     reg.contratos.add(c.contratoId);
   }
 
-  const recebMap = new Map<string, Map<string, { recebido: number; recebidoAParte: number }>>();
+  const recebMap = new Map<string, Map<string, { recebido: number; recebidoAParte: number; contratosRecebidos: Set<string> }>>();
   for (const r of recebimentos) {
     if (!recebMap.has(r.consultorId)) recebMap.set(r.consultorId, new Map());
     const empMap = recebMap.get(r.consultorId)!;
-    if (!empMap.has(r.contrato.empresaId)) empMap.set(r.contrato.empresaId, { recebido: 0, recebidoAParte: 0 });
+    if (!empMap.has(r.contrato.empresaId)) empMap.set(r.contrato.empresaId, { recebido: 0, recebidoAParte: 0, contratosRecebidos: new Set() });
     const reg = empMap.get(r.contrato.empresaId)!;
     reg.recebido += Number(r.valor);
     reg.recebidoAParte += Number(r.valorAParte ?? 0);
+    reg.contratosRecebidos.add(r.contratoId);
   }
 
   const resultado = consultores.map((c) => {
@@ -175,6 +199,8 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
     const recebido = Array.from(empReceb.values()).reduce((s, e) => s + e.recebido, 0);
     const recebidoAParte = Array.from(empReceb.values()).reduce((s, e) => s + e.recebidoAParte, 0);
     const totalContratos = Array.from(empCarteira.values()).reduce((s, e) => s + e.contratos.size, 0);
+    const contratosRecebidos = new Set(Array.from(empReceb.values()).flatMap((e) => Array.from(e.contratosRecebidos))).size;
+    const metaAlvo = calcularMetaAlvo(inadimplencia, c.id);
 
     const todasEmpresas = new Set([...empCarteira.keys(), ...empReceb.keys()]);
     const porEmpresa = Array.from(todasEmpresas).map((empId) => ({
@@ -184,6 +210,7 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
       inadimplencia: empCarteira.get(empId)?.inadimplencia ?? 0,
       recebido: empReceb.get(empId)?.recebido ?? 0,
       recebidoAParte: empReceb.get(empId)?.recebidoAParte ?? 0,
+      contratosRecebidos: empReceb.get(empId)?.contratosRecebidos.size ?? 0,
     })).sort((a, b) => b.inadimplencia - a.inadimplencia);
 
     return {
@@ -194,6 +221,8 @@ export async function GET(req: NextRequest, { params }: { params: { equipeId: st
       inadimplencia,
       recebido,
       recebidoAParte,
+      contratosRecebidos,
+      metaAlvo,
       percentual: inadimplencia > 0 ? Math.min((recebido / inadimplencia) * 100, 100) : 0,
       porEmpresa,
     };

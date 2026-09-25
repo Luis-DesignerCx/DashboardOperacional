@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { Fragment, useEffect, useState, useCallback, useMemo } from "react";
 import { useFrente } from "@/contexts/FrenteContext";
-import { formatarMoeda } from "@/lib/utils";
-import { ChevronDown, ChevronRight, Search, AlertCircle, TrendingUp, Palmtree } from "lucide-react";
+import { formatarMoeda, cn } from "@/lib/utils";
+import { ChevronDown, ChevronRight, Building2 } from "lucide-react";
 import { usePersistedState } from "@/hooks/usePersistedState";
+import { corBadgeRecuperado, corBadgeMeta, pctRecuperado, pctMeta } from "@/components/charts/MatrizPerformance";
+import { corBadgeRecuperacao } from "@/components/charts/SaudeEmpreendimentos";
 
 // ── Frentes visíveis no sidebar ──────────────────────────────────────────────
 // CR_PDD_181 não aparece como frente separada; é sub-faixa de PDD 91+
@@ -61,17 +63,20 @@ const BASES_VENCIMENTO_FLASH = [5, 10, 15, 20, 25];
 
 interface EquipeUsuario { id: string; perfil: string; }
 interface Equipe { id: string; nome: string; tipo: string; usuarios: EquipeUsuario[]; }
-interface PorEmpresa { id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; }
+interface PorEmpresa { id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; contratosRecebidos: number; }
 interface Consultor {
   id: string; nome: string; emFerias: boolean;
   totalContratos: number; inadimplencia: number; recebido: number;
-  recebidoAParte: number; percentual: number; porEmpresa: PorEmpresa[];
+  recebidoAParte: number; contratosRecebidos: number; metaAlvo: number | null; percentual: number; porEmpresa: PorEmpresa[];
   frenteId?: string; frenteLabel?: string; // presentes quando 2+ frentes estão selecionadas
 }
-interface ConsultorNoEmpreendimento { id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; frenteId?: string; }
+interface ConsultorNoEmpreendimento {
+  id: string; nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number;
+  contratosRecebidos: number; metaAlvo: number | null; frenteId?: string;
+}
 interface Empreendimento {
   id: string; nome: string;
-  contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; percentual: number;
+  contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; contratosRecebidos: number; percentual: number;
   consultores: ConsultorNoEmpreendimento[];
 }
 
@@ -83,8 +88,6 @@ export default function GestaoPage() {
   const [competenciaId, setCompetenciaId] = useState("");
   const [consultores, setConsultores] = useState<Consultor[]>([]);
   const [carregando, setCarregando] = useState(false);
-  const [busca, setBusca] = usePersistedState("busca", "");
-  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   const [expandidosEmpreend, setExpandidosEmpreend] = useState<Set<string>>(new Set());
   // Sub-faixa de dias e base de vencimento Flash agora são POR FRENTE (chave =
   // equipeId) -- várias frentes podem estar selecionadas ao mesmo tempo, cada
@@ -156,7 +159,6 @@ export default function GestaoPage() {
       return;
     }
     setCarregando(true);
-    setExpandidos(new Set());
     setExpandidosEmpreend(new Set());
 
     // 1 fetch por frente selecionada; dentro de cada frente, 1 fetch POR
@@ -204,14 +206,6 @@ export default function GestaoPage() {
 
   useEffect(() => { carregarConsultores(); }, [carregarConsultores]);
 
-  function toggleExpandir(id: string) {
-    setExpandidos((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }
-
   function toggleExpandirEmpreend(id: string) {
     setExpandidosEmpreend((prev) => {
       const next = new Set(prev);
@@ -223,18 +217,23 @@ export default function GestaoPage() {
   // Agregado por empreendimento -- sempre da frente inteira (não some com a
   // busca de consultor, que serve só pra tabela de baixo).
   const porEmpreendimento: Empreendimento[] = useMemo(() => {
-    const mapa = new Map<string, { nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; consultores: ConsultorNoEmpreendimento[] }>();
+    const mapa = new Map<string, { nome: string; contratos: number; inadimplencia: number; recebido: number; recebidoAParte: number; contratosRecebidos: number; consultores: ConsultorNoEmpreendimento[] }>();
     for (const c of consultores) {
       for (const emp of c.porEmpresa) {
         if (!mapa.has(emp.id)) {
-          mapa.set(emp.id, { nome: emp.nome, contratos: 0, inadimplencia: 0, recebido: 0, recebidoAParte: 0, consultores: [] });
+          mapa.set(emp.id, { nome: emp.nome, contratos: 0, inadimplencia: 0, recebido: 0, recebidoAParte: 0, contratosRecebidos: 0, consultores: [] });
         }
         const reg = mapa.get(emp.id)!;
         reg.contratos += emp.contratos;
         reg.inadimplencia += emp.inadimplencia;
         reg.recebido += emp.recebido;
         reg.recebidoAParte += emp.recebidoAParte;
-        reg.consultores.push({ id: c.id, nome: c.nome, contratos: emp.contratos, inadimplencia: emp.inadimplencia, recebido: emp.recebido, recebidoAParte: emp.recebidoAParte, frenteId: c.frenteId });
+        reg.contratosRecebidos += emp.contratosRecebidos;
+        reg.consultores.push({
+          id: c.id, nome: c.nome, contratos: emp.contratos, inadimplencia: emp.inadimplencia,
+          recebido: emp.recebido, recebidoAParte: emp.recebidoAParte, contratosRecebidos: emp.contratosRecebidos,
+          metaAlvo: c.metaAlvo, frenteId: c.frenteId,
+        });
       }
     }
     return Array.from(mapa.entries())
@@ -245,21 +244,32 @@ export default function GestaoPage() {
         inadimplencia: v.inadimplencia,
         recebido: v.recebido,
         recebidoAParte: v.recebidoAParte,
+        contratosRecebidos: v.contratosRecebidos,
         percentual: v.inadimplencia > 0 ? Math.min((v.recebido / v.inadimplencia) * 100, 100) : 0,
         consultores: v.consultores.sort((a, b) => b.recebido - a.recebido),
       }))
       .sort((a, b) => b.inadimplencia - a.inadimplencia);
   }, [consultores]);
 
+  const totalPorEmpreendimento = useMemo(() => porEmpreendimento.reduce(
+    (acc, e) => ({
+      contratos: acc.contratos + e.contratos,
+      inadimplencia: acc.inadimplencia + e.inadimplencia,
+      recebido: acc.recebido + e.recebido,
+      recebidoAParte: acc.recebidoAParte + e.recebidoAParte,
+      contratosRecebidos: acc.contratosRecebidos + e.contratosRecebidos,
+    }),
+    { contratos: 0, inadimplencia: 0, recebido: 0, recebidoAParte: 0, contratosRecebidos: 0 }
+  ), [porEmpreendimento]);
+
   const visiveis = equipes.filter((e) => FRENTES_VISIVEIS.includes(e.tipo));
   const equipesSelecionadas = visiveis.filter((e) => equipeIds.includes(e.id));
   const equipesComSubFaixa = equipesSelecionadas.filter((e) => SUB_FAIXAS_MAP[e.tipo]);
   const equipesFlash = equipesSelecionadas.filter((e) => e.tipo === "FLASH");
-  const filtrados = consultores.filter((c) => c.nome.toLowerCase().includes(busca.toLowerCase()));
 
-  const totalInad = filtrados.reduce((s, c) => s + c.inadimplencia, 0);
-  const totalRec  = filtrados.reduce((s, c) => s + c.recebido, 0);
-  const totalAP   = filtrados.reduce((s, c) => s + c.recebidoAParte, 0);
+  const totalInad = consultores.reduce((s, c) => s + c.inadimplencia, 0);
+  const totalRec  = consultores.reduce((s, c) => s + c.recebido, 0);
+  const totalAP   = consultores.reduce((s, c) => s + c.recebidoAParte, 0);
 
   return (
     <div className="flex gap-0 h-[calc(100vh-4rem)] -m-6 overflow-hidden">
@@ -313,7 +323,7 @@ export default function GestaoPage() {
             </h1>
             {!carregando && (
               <p className="text-slate-500 text-xs mt-0.5">
-                {filtrados.length} consultor{filtrados.length !== 1 ? "es" : ""} · {formatarMoeda(totalInad)} em carteira
+                {consultores.length} consultor{consultores.length !== 1 ? "es" : ""} · {formatarMoeda(totalInad)} em carteira
               </p>
             )}
           </div>
@@ -400,7 +410,7 @@ export default function GestaoPage() {
         })}
 
         {/* Cards de totais */}
-        {!carregando && filtrados.length > 0 && (
+        {!carregando && consultores.length > 0 && (
           <div className="grid grid-cols-3 gap-3 px-6 py-3 border-b border-white/[0.06] flex-shrink-0">
             <div className="bg-surface-2 border border-white/[0.06] rounded-xl px-4 py-3">
               <p className="text-xs text-slate-500">Inadimplência total</p>
@@ -424,213 +434,130 @@ export default function GestaoPage() {
             sobra de espaço pro flex-1 da tabela). */}
         <div className="flex-1 overflow-y-auto">
 
-        {/* Por Empreendimento -- mesmos números dos cards acima, agregados por
-            empreendimento em vez de por consultor. Sempre a frente inteira,
-            não some com a busca (que é só pra tabela de consultor abaixo). */}
+        {/* Por Empreendimento -- única visão da tela agora (removida a tabela
+            "Por Consultor" solta que existia abaixo: mesma informação, já
+            repetida aqui dentro de cada empreendimento ao expandir). Mesmo
+            desenho de tabela + linha de Total do dash principal
+            (MatrizPerformance/SaudeEmpreendimentos) -- pedido do Luis,
+            2026-09-25. */}
         {!carregando && porEmpreendimento.length > 0 && (
-          <div className="px-6 pt-3">
-            <div className="bg-surface-2 border border-white/[0.06] rounded-xl overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                  Por Empreendimento
-                </p>
+          <div className="px-6 pt-3 pb-6">
+            <div className="bg-surface-2 border border-white/[0.06] rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Building2 size={14} className="text-slate-500" />
+                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Performance por Empreendimento</h2>
               </div>
-              <div>
-                <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-4 py-2 border-b border-white/[0.06] bg-white/[0.02]">
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Empreendimento</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Inadimplência</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Recebido</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">Parcela Mês</span>
-                  <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider text-right">%</span>
-                </div>
-                <div className="divide-y divide-white/[0.04]">
-                  {porEmpreendimento.map((emp) => {
-                    const aberto = expandidosEmpreend.has(emp.id);
-                    return (
-                      <div key={emp.id}>
-                        <button
-                          onClick={() => toggleExpandirEmpreend(emp.id)}
-                          className="w-full grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-4 py-2.5 hover:bg-white/[0.02] transition-colors text-left"
-                        >
-                          <div className="flex items-center gap-2">
-                            {aberto
-                              ? <ChevronDown size={14} className="text-gr-400 flex-shrink-0" />
-                              : <ChevronRight size={14} className="text-slate-400 flex-shrink-0" />}
-                            <span className="text-white font-medium text-sm truncate">{emp.nome}</span>
-                          </div>
-                          <span className="text-slate-400 text-sm tabular-nums text-right self-center">{emp.contratos}</span>
-                          <span className="text-white text-sm tabular-nums font-medium text-right self-center">{formatarMoeda(emp.inadimplencia)}</span>
-                          <span className="text-emerald-400 text-sm tabular-nums font-semibold text-right self-center">{formatarMoeda(emp.recebido)}</span>
-                          <span className="text-sky-400 text-sm tabular-nums text-right self-center">
-                            {emp.recebidoAParte > 0 ? formatarMoeda(emp.recebidoAParte) : <span className="text-slate-400">—</span>}
-                          </span>
-                          <div className="text-right self-center">
-                            <span className={`text-sm font-bold tabular-nums ${
-                              emp.percentual >= 80 ? "text-emerald-400" : emp.percentual >= 40 ? "text-gr-400" : "text-slate-400"
-                            }`}>
-                              {emp.percentual.toFixed(1)}%
-                            </span>
-                          </div>
-                        </button>
-
-                        {aberto && (
-                          <div className="bg-surface-0/60 border-t border-white/[0.06]/50">
-                            <div className="grid grid-cols-[1fr_100px_160px_160px_160px] gap-2 px-11 py-2 border-b border-white/[0.06]/30">
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Consultor</span>
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Contratos</span>
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Recebido</span>
-                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Parcela Mês</span>
-                            </div>
-                            {emp.consultores.map((cons) => (
-                              <div key={`${cons.frenteId ?? ""}-${cons.id}`} className="grid grid-cols-[1fr_100px_160px_160px_160px] gap-2 px-11 py-2 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">
-                                <span className="text-slate-300 text-sm truncate">{cons.nome}</span>
-                                <span className="text-slate-400 text-sm tabular-nums text-right">{cons.contratos}</span>
-                                <span className="text-slate-400 text-sm tabular-nums text-right">{formatarMoeda(cons.inadimplencia)}</span>
-                                <span className={`text-sm tabular-nums font-medium text-right ${cons.recebido > 0 ? "text-emerald-400" : "text-slate-400"}`}>
-                                  {cons.recebido > 0 ? formatarMoeda(cons.recebido) : "—"}
-                                </span>
-                                <span className={`text-sm tabular-nums text-right ${cons.recebidoAParte > 0 ? "text-sky-400" : "text-slate-400"}`}>
-                                  {cons.recebidoAParte > 0 ? formatarMoeda(cons.recebidoAParte) : "—"}
-                                </span>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.05]">
+                      <th className="text-left px-2 pb-2.5 font-semibold whitespace-nowrap">Empreendimento</th>
+                      <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Total Inadimplente</th>
+                      <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Inadimplente</th>
+                      <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Recebido Inadimplente</th>
+                      <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">Parcela Mês</th>
+                      <th className="text-center px-2 pb-2.5 font-semibold whitespace-nowrap">Contr. Recebidos</th>
+                      <th className="text-right px-2 pb-2.5 font-semibold whitespace-nowrap">% Recuperação</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.04]">
+                    {porEmpreendimento.map((emp) => {
+                      const aberto = expandidosEmpreend.has(emp.id);
+                      return (
+                        <Fragment key={emp.id}>
+                          <tr
+                            className="hover:bg-white/[0.02] transition-colors cursor-pointer"
+                            onClick={() => toggleExpandirEmpreend(emp.id)}
+                          >
+                            <td className="py-2.5 px-2 text-left text-slate-200 font-bold">
+                              <div className="flex items-center gap-2">
+                                {aberto
+                                  ? <ChevronDown size={14} className="text-gr-400 flex-shrink-0" />
+                                  : <ChevronRight size={14} className="text-slate-500 flex-shrink-0" />}
+                                {emp.nome}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                            </td>
+                            <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(emp.inadimplencia)}</td>
+                            <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{emp.contratos}</td>
+                            <td className="py-2.5 px-2 text-right text-slate-200 font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(emp.recebido)}</td>
+                            <td className="py-2.5 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(emp.recebidoAParte)}</td>
+                            <td className="py-2.5 px-2 text-center text-slate-500 tabular-nums">{emp.contratosRecebidos}</td>
+                            <td className="py-2.5 px-2 text-right">
+                              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums", corBadgeRecuperacao(emp.percentual))}>
+                                {emp.percentual.toFixed(1)}%
+                              </span>
+                            </td>
+                          </tr>
+                          {aberto && (
+                            <tr>
+                              <td colSpan={7} className="p-0">
+                                <div className="bg-surface-0/60 px-4 py-3">
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-[10px] text-slate-600 uppercase tracking-wider border-b border-white/[0.05]">
+                                        <th className="text-left px-2 pb-2 font-semibold whitespace-nowrap">Consultor</th>
+                                        <th className="text-right px-2 pb-2 font-semibold whitespace-nowrap">Total Inadimplente</th>
+                                        <th className="text-center px-2 pb-2 font-semibold whitespace-nowrap">Contr. Inadimplente</th>
+                                        <th className="text-right px-2 pb-2 font-semibold whitespace-nowrap">Recebido Inadimplente</th>
+                                        <th className="text-right px-2 pb-2 font-semibold whitespace-nowrap">Parcela Mês</th>
+                                        <th className="text-center px-2 pb-2 font-semibold whitespace-nowrap">Contr. Recebidos</th>
+                                        <th className="text-right px-2 pb-2 font-semibold whitespace-nowrap">% Recuperação</th>
+                                        <th className="text-right px-2 pb-2 font-semibold whitespace-nowrap">% da Meta</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-white/[0.03]">
+                                      {emp.consultores.map((cons) => {
+                                        const pctRec = pctRecuperado(cons.inadimplencia, cons.recebido);
+                                        const pctM = pctMeta(cons.metaAlvo, cons.recebido, cons.recebidoAParte);
+                                        return (
+                                          <tr key={`${cons.frenteId ?? ""}-${cons.id}`} className="hover:bg-white/[0.02]">
+                                            <td className="py-2 px-2 text-left text-slate-300">{cons.nome}</td>
+                                            <td className="py-2 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(cons.inadimplencia)}</td>
+                                            <td className="py-2 px-2 text-center text-slate-500 tabular-nums">{cons.contratos}</td>
+                                            <td className="py-2 px-2 text-right text-slate-200 font-medium tabular-nums whitespace-nowrap">{formatarMoeda(cons.recebido)}</td>
+                                            <td className="py-2 px-2 text-right text-slate-400 tabular-nums whitespace-nowrap">{formatarMoeda(cons.recebidoAParte)}</td>
+                                            <td className="py-2 px-2 text-center text-slate-500 tabular-nums">{cons.contratosRecebidos}</td>
+                                            <td className="py-2 px-2 text-right">
+                                              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums", corBadgeRecuperado(pctRec))}>
+                                                {pctRec.toFixed(1)}%
+                                              </span>
+                                            </td>
+                                            <td className="py-2 px-2 text-right">
+                                              <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold tabular-nums", corBadgeMeta(pctM))}>
+                                                {pctM === null ? "—" : `${pctM.toFixed(1)}%`}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t border-white/[0.07]">
+                      <td className="pt-3 pb-0.5 px-2 text-white font-semibold">Total</td>
+                      <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(totalPorEmpreendimento.inadimplencia)}</td>
+                      <td className="pt-3 pb-0.5 px-2 text-center text-white font-semibold tabular-nums">{totalPorEmpreendimento.contratos}</td>
+                      <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(totalPorEmpreendimento.recebido)}</td>
+                      <td className="pt-3 pb-0.5 px-2 text-right text-white font-semibold tabular-nums whitespace-nowrap">{formatarMoeda(totalPorEmpreendimento.recebidoAParte)}</td>
+                      <td className="pt-3 pb-0.5 px-2 text-center text-white font-semibold tabular-nums">{totalPorEmpreendimento.contratosRecebidos}</td>
+                      <td className="pt-3 pb-0.5 px-2 text-right text-slate-500 text-[10px] tabular-nums">
+                        {totalPorEmpreendimento.inadimplencia > 0 ? `${pctRecuperado(totalPorEmpreendimento.inadimplencia, totalPorEmpreendimento.recebido).toFixed(1)}%` : "—"}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
               </div>
             </div>
           </div>
         )}
-
-        {/* Busca */}
-        <div className="px-6 py-3 border-b border-white/[0.06]">
-          <div className="relative max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Buscar consultor..."
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              className="w-full bg-surface-2 border border-white/[0.06] rounded-lg pl-9 pr-4 py-2 text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-gr-500/50 focus:border-gr-500/40"
-            />
-          </div>
-        </div>
-
-        {/* Tabela */}
-        <div>
-          {carregando ? (
-            <div className="flex justify-center items-center h-48">
-              <div className="w-7 h-7 border-2 border-gr-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : filtrados.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-48 text-center">
-              <AlertCircle size={28} className="text-slate-400 mb-2" />
-              <p className="text-slate-500 text-sm">
-                {equipeIds.length === 0
-                  ? "Selecione ao menos uma frente"
-                  : "Nenhum consultor com carteira nesta frente"}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-2.5 border-b border-white/[0.06] bg-white/[0.02]">
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Consultor</span>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Contratos</span>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Inadimplência</span>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Recebido</span>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">Parcela Mês</span>
-                <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right">%</span>
-              </div>
-
-              <div className="divide-y divide-white/[0.04]">
-                {filtrados.map((c) => {
-                  // Chave composta (frenteId+id) -- o mesmo consultor pode
-                  // aparecer 2x (uma por frente) quando 2+ frentes estão
-                  // selecionadas; usar só c.id colidia a key do React e o
-                  // Set de "expandido" entre as duas linhas da mesma pessoa.
-                  const linhaId = `${c.frenteId ?? ""}-${c.id}`;
-                  const expandido = expandidos.has(linhaId);
-                  return (
-                    <div key={linhaId}>
-                      <button
-                        onClick={() => toggleExpandir(linhaId)}
-                        className="w-full grid grid-cols-[1fr_100px_160px_160px_160px_80px] gap-2 px-6 py-3.5 hover:bg-white/[0.02] transition-colors text-left"
-                      >
-                        <div className="flex items-center gap-2.5">
-                          {expandido
-                            ? <ChevronDown size={15} className="text-gr-400 flex-shrink-0" />
-                            : <ChevronRight size={15} className="text-slate-400 flex-shrink-0" />}
-                          <span className="text-white font-medium text-sm">{c.nome}</span>
-                          {equipesSelecionadas.length > 1 && c.frenteLabel && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold flex-shrink-0 ${
-                              FAIXA_COR[equipes.find((e) => e.id === c.frenteId)?.tipo ?? ""] ?? "text-slate-400 bg-surface-1 border-white/[0.08]"
-                            }`}>
-                              {c.frenteLabel}
-                            </span>
-                          )}
-                          {c.emFerias && (
-                            <span className="flex items-center gap-1 text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded">
-                              <Palmtree size={9} /> Férias
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-slate-400 text-sm tabular-nums text-right self-center">{c.totalContratos}</span>
-                        <span className="text-white text-sm tabular-nums font-medium text-right self-center">{formatarMoeda(c.inadimplencia)}</span>
-                        <span className="text-emerald-400 text-sm tabular-nums font-semibold text-right self-center">{formatarMoeda(c.recebido)}</span>
-                        <span className="text-sky-400 text-sm tabular-nums text-right self-center">
-                          {c.recebidoAParte > 0 ? formatarMoeda(c.recebidoAParte) : <span className="text-slate-400">—</span>}
-                        </span>
-                        <div className="text-right self-center">
-                          <span className={`text-sm font-bold tabular-nums ${
-                            c.percentual >= 80 ? "text-emerald-400" : c.percentual >= 40 ? "text-gr-400" : "text-slate-400"
-                          }`}>
-                            {c.percentual.toFixed(1)}%
-                          </span>
-                        </div>
-                      </button>
-
-                      {expandido && (
-                        <div className="bg-surface-0/60 border-t border-white/[0.06]/50">
-                          <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2 border-b border-white/[0.06]/30">
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Empresa</span>
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Inadimplência</span>
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Recebido</span>
-                            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider text-right">Parcela Mês</span>
-                          </div>
-                          {c.porEmpresa.map((emp) => (
-                            <div key={emp.id} className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-b border-white/[0.06]/20 last:border-0 hover:bg-white/[0.02]">
-                              <span className="text-slate-300 text-sm">{emp.nome}</span>
-                              <span className="text-slate-400 text-sm tabular-nums text-right">{formatarMoeda(emp.inadimplencia)}</span>
-                              <span className={`text-sm tabular-nums font-medium text-right ${emp.recebido > 0 ? "text-emerald-400" : "text-slate-400"}`}>
-                                {emp.recebido > 0 ? formatarMoeda(emp.recebido) : "—"}
-                              </span>
-                              <span className={`text-sm tabular-nums text-right ${emp.recebidoAParte > 0 ? "text-sky-400" : "text-slate-400"}`}>
-                                {emp.recebidoAParte > 0 ? formatarMoeda(emp.recebidoAParte) : "—"}
-                              </span>
-                            </div>
-                          ))}
-                          <div className="grid grid-cols-[1fr_160px_160px_160px] gap-2 px-14 py-2.5 border-t border-white/[0.08]/40 bg-white/[0.02]">
-                            <span className="text-xs text-slate-500 font-semibold">TOTAL</span>
-                            <span className="text-xs text-white tabular-nums font-semibold text-right">{formatarMoeda(c.inadimplencia)}</span>
-                            <span className="text-xs text-emerald-400 tabular-nums font-semibold text-right">{formatarMoeda(c.recebido)}</span>
-                            <span className="text-xs text-sky-400 tabular-nums font-semibold text-right">
-                              {c.recebidoAParte > 0 ? formatarMoeda(c.recebidoAParte) : "—"}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </div>
 
         </div>
       </div>

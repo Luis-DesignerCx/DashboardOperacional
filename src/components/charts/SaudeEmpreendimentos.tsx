@@ -14,7 +14,7 @@ interface Props {
   porEmpresa: EmpresaDist[];
 }
 
-function corBadgeRecuperacao(pct: number): string {
+export function corBadgeRecuperacao(pct: number): string {
   return pct >= 10 ? "bg-emerald-500/10 text-emerald-400" : pct >= 5 ? "bg-amber-500/10 text-amber-400" : "bg-white/[0.04] text-slate-500";
 }
 

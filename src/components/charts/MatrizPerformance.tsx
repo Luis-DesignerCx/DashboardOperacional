@@ -51,17 +51,17 @@ function mesclarGeral(frentes: FrenteDist[]): FrenteDist {
   return { equipeId: "geral", label: "Geral", consultores, total };
 }
 
-function pctRecuperado(saldoAberto: number, recebidoInadimplente: number): number {
+export function pctRecuperado(saldoAberto: number, recebidoInadimplente: number): number {
   if (saldoAberto <= 0) return recebidoInadimplente > 0 ? 100 : 0;
   return Math.min((recebidoInadimplente / saldoAberto) * 100, 100);
 }
 
-function pctMeta(metaAlvo: number | null, recebidoInadimplente: number, parcelaMes: number): number | null {
+export function pctMeta(metaAlvo: number | null, recebidoInadimplente: number, parcelaMes: number): number | null {
   if (!metaAlvo || metaAlvo <= 0) return null;
   return ((recebidoInadimplente + parcelaMes) / metaAlvo) * 100;
 }
 
-function corBadgeMeta(pct: number | null): string {
+export function corBadgeMeta(pct: number | null): string {
   if (pct === null) return "bg-white/[0.04] text-slate-500";
   if (pct >= 100) return "bg-emerald-500/10 text-emerald-400";
   if (pct >= 80) return "bg-sky-500/10 text-sky-400";
@@ -69,7 +69,7 @@ function corBadgeMeta(pct: number | null): string {
   return "bg-rose-500/10 text-rose-400";
 }
 
-function corBadgeRecuperado(pct: number): string {
+export function corBadgeRecuperado(pct: number): string {
   return pct >= 20 ? "bg-emerald-500/10 text-emerald-400" : pct >= 8 ? "bg-amber-500/10 text-amber-400" : "bg-white/[0.04] text-slate-500";
 }
 
